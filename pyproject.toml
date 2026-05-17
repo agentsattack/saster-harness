@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "saster-harness"
+version = "0.1.0"
+description = "Wire-level Agentic Detection and Response (ADR) harness for the SASTER taxonomy"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Larry Suto", email = "larry@stratdatsec.com" },
+]
+keywords = [
+    "security",
+    "ai-agents",
+    "monitoring",
+    "saster",
+    "detection",
+    "adr",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    "mitmproxy>=10.0",
+    "sentence-transformers>=2.5",
+    "numpy>=1.24",
+    "pydantic>=2.0",
+    "httpx>=0.25",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+    "mypy>=1.7",
+    "ruff>=0.4",
+    "types-requests",
+]
+
+[project.urls]
+Homepage = "https://github.com/lsuto/saster-harness"
+Documentation = "https://github.com/lsuto/saster-harness/tree/main/docs"
+Repository = "https://github.com/lsuto/saster-harness"
+Issues = "https://github.com/lsuto/saster-harness/issues"
+"SASTER Taxonomy" = "https://github.com/lsuto/saster"
+
+[project.scripts]
+saster-harness = "saster_harness.__main__:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["saster_harness"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+exclude = ["tests/"]
+
+# mitmproxy ships PEP 695 syntax in its internals (requires py3.12 to parse)
+# and lacks distributed type stubs; skip following its imports so mypy stays
+# happy across our 3.10+ target without lying about mitmproxy's typing.
+[[tool.mypy.overrides]]
+module = ["mitmproxy.*", "sentence_transformers.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
