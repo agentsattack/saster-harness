@@ -65,11 +65,17 @@ _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
     "SASTER-31": ("saster_harness.detectors.saster_31",),
     "SASTER-33": ("saster_harness.detectors.saster_33",),
     # Induced
+    "SASTER-13-induced": ("saster_harness.detectors.saster_13_induced",),
     "SASTER-15-induced": ("saster_harness.detectors.saster_15_induced",),
     "SASTER-18-induced": ("saster_harness.detectors.saster_18_induced",),
     "SASTER-24-induced": ("saster_harness.detectors.saster_24_induced",),
     "SASTER-26-induced": ("saster_harness.detectors.saster_26_induced",),
     # Both
+    "SASTER-13-both": (
+        # No passive SASTER-13 ships in v0.2; -both shortcut is
+        # forward-compatible.
+        "saster_harness.detectors.saster_13_induced",
+    ),
     "SASTER-15-both": (
         # No passive SASTER-15 ships in v0.2; -both shortcut is
         # forward-compatible — when the passive detector ships in a
@@ -94,6 +100,7 @@ _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
 # SASTER-24 use the ``-both`` shortcut so both flavours load; the
 # five other passive patterns load directly.
 _DEFAULT_ENABLED_DETECTORS: tuple[str, ...] = (
+    "SASTER-13-induced",
     "SASTER-15-induced",
     "SASTER-18-both",
     "SASTER-24-both",
