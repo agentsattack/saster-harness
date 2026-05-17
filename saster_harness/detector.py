@@ -58,9 +58,12 @@ class SasterDetector(ABC):
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        # Skip the check for intermediate base classes that subclasses
-        # share (none today, but defensive against future refactors).
-        if getattr(cls, "_is_intermediate", False):
+        # Skip the check for intermediate base classes that declare
+        # themselves abstract via _is_intermediate = True. Use __dict__
+        # rather than getattr so the attribute does NOT propagate down
+        # the MRO — concrete subclasses of an intermediate base still
+        # need to declare their own saster_id / pattern_name / tier.
+        if cls.__dict__.get("_is_intermediate", False):
             return
         for required in ("saster_id", "pattern_name", "tier"):
             if not hasattr(cls, required) or getattr(cls, required) in (None, ""):
