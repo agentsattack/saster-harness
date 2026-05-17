@@ -68,6 +68,7 @@ _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
     "SASTER-15-induced": ("saster_harness.detectors.saster_15_induced",),
     "SASTER-18-induced": ("saster_harness.detectors.saster_18_induced",),
     "SASTER-24-induced": ("saster_harness.detectors.saster_24_induced",),
+    "SASTER-26-induced": ("saster_harness.detectors.saster_26_induced",),
     # Both
     "SASTER-15-both": (
         # No passive SASTER-15 ships in v0.2; -both shortcut is
@@ -83,6 +84,10 @@ _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
         "saster_harness.detectors.saster_24",
         "saster_harness.detectors.saster_24_induced",
     ),
+    "SASTER-26-both": (
+        "saster_harness.detectors.saster_26",
+        "saster_harness.detectors.saster_26_induced",
+    ),
 }
 
 # Default-when-not-specified: all 9 implementations. SASTER-18 and
@@ -92,7 +97,7 @@ _DEFAULT_ENABLED_DETECTORS: tuple[str, ...] = (
     "SASTER-15-induced",
     "SASTER-18-both",
     "SASTER-24-both",
-    "SASTER-26",
+    "SASTER-26-both",
     "SASTER-27",
     "SASTER-28",
     "SASTER-31",

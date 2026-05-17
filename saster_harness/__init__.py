@@ -34,6 +34,7 @@ from .detectors.base_induction import InductionDetector
 from .detectors.saster_15_induced import Saster15InducedDetector
 from .detectors.saster_18_induced import Saster18InducedDetector
 from .detectors.saster_24_induced import Saster24InducedDetector
+from .detectors.saster_26_induced import Saster26InducedDetector
 from .event import DetectionEvent, TurnData
 from .harness import MonitoringHarness
 from .prober import HttpInjector, InjectorBackend, InProcessInjector, Prober, ProbeRecord
@@ -53,6 +54,7 @@ __all__ = [
     "Saster15InducedDetector",
     "Saster18InducedDetector",
     "Saster24InducedDetector",
+    "Saster26InducedDetector",
     "SasterDetector",
     "TurnData",
     "__version__",
