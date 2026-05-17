@@ -6,6 +6,20 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Planned for v0.2
+
+- **Split `InductionDetector` into `SingleTurnInductionDetector` and
+  `ScenarioInductionDetector`** with distinct contracts. v0.1's
+  `InductionDetector` was designed around SASTER-18-induced's
+  single-turn baseline + reframings shape; SASTER-24-induced needed
+  multi-turn scenarios (baseline + redefinition + follow-up) and
+  ships in v0.1 with compat-shim placeholders for the abstract
+  methods (`baseline_prompt` / `induction_strategy` /
+  `divergence_score`) it doesn't really use. The type signature is
+  currently lying about the contract — future contributors extending
+  `InductionDetector` for a new pattern will hit a footgun. The v0.2
+  split makes the two shapes first-class and the signatures honest.
+
 ## [0.1.0] — 2026-05-23
 
 Initial public release accompanying the LayerOne 2026 talk on Agentic
