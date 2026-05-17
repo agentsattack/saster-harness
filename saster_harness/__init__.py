@@ -31,6 +31,7 @@ from .adapters import HARAdapter
 from .config import HarnessMode, MonitoringConfig
 from .detector import SasterDetector
 from .detectors.base_induction import InductionDetector
+from .detectors.saster_15_induced import Saster15InducedDetector
 from .detectors.saster_18_induced import Saster18InducedDetector
 from .detectors.saster_24_induced import Saster24InducedDetector
 from .event import DetectionEvent, TurnData
@@ -49,6 +50,7 @@ __all__ = [
     "MonitoringHarness",
     "ProbeRecord",
     "Prober",
+    "Saster15InducedDetector",
     "Saster18InducedDetector",
     "Saster24InducedDetector",
     "SasterDetector",
