@@ -118,10 +118,26 @@ class MonitoringConfig:
     baseline_turns: int = 10
     embedding_model: str = "all-MiniLM-L6-v2"
     mode: HarnessMode = HarnessMode.OBSERVE
-    detectors: list[str] | None = field(default=None, repr=False)
-    """Detector module names to load. ``None`` loads the full v0.1 set
-    (SASTER-18, -24, -26, -27, -28, -31, -33). Override only to restrict
-    the set — additions go through the pattern authoring workflow."""
+    enabled_detectors: list[str] | None = field(default=None, repr=False)
+    """SASTER detector identifiers to load. ``None`` loads the full v0.1
+    set (9 implementations covering 7 SASTER patterns — five passive
+    detectors plus the two patterns that ship in both passive and
+    induced flavours).
+
+    Accepted identifiers:
+
+    - Plain ids (``"SASTER-18"``, ``"SASTER-26"``, …) — passive
+      detectors.
+    - ``"-induced"`` suffix (``"SASTER-18-induced"``,
+      ``"SASTER-24-induced"``) — induction-mode detectors that
+      actively probe agent sessions.
+    - ``"-both"`` suffix (``"SASTER-18-both"``,
+      ``"SASTER-24-both"``) — convenience shortcut for both the
+      passive and induced flavour of the same SASTER pattern.
+
+    Default-when-omitted loads all nine implementations. Restricting
+    the set is the recommended path for initial deployments;
+    additions go through the pattern-authoring workflow."""
 
     def __post_init__(self) -> None:
         if not self.agent_name or not self.agent_name.strip():

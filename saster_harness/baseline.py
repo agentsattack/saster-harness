@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -59,9 +60,30 @@ class SessionBaseline:
         self,
         model_name: str = "all-MiniLM-L6-v2",
         baseline_turns: int = 10,
+        embedder: Callable[[str], np.ndarray] | None = None,
     ) -> None:
+        """Construct a SessionBaseline.
+
+        Parameters
+        ----------
+        model_name
+            sentence-transformer model identifier used when the
+            baseline lazy-loads its own embedder. Ignored when
+            ``embedder`` is supplied.
+        baseline_turns
+            Number of in-band turns required before the baseline
+            locks in.
+        embedder
+            Optional shared embedder callable ``str -> np.ndarray``.
+            When supplied, the baseline routes all embeddings
+            through it — typically a callable produced by
+            :func:`saster_harness.embedding.build_shared_embedder`
+            and shared across the harness so the model only loads
+            once per process.
+        """
         self._model_name = model_name
         self._baseline_turns = baseline_turns
+        self._embedder = embedder
         self._model: object | None = None
         self._model_lock = threading.Lock()
         self._sessions: dict[str, _SessionState] = {}
@@ -72,7 +94,17 @@ class SessionBaseline:
     # ----------------------------------------------------------------
 
     def warm(self) -> None:
-        """Force-load the embedding model. Safe to call multiple times."""
+        """Force-load the embedding model. Safe to call multiple times.
+        No-op when a shared embedder was supplied — the shared embedder
+        handles its own lazy-load."""
+        if self._embedder is not None:
+            # Trigger the shared embedder's lazy-load by embedding a
+            # cheap warmup string.
+            try:
+                self._embedder("warmup")
+            except Exception:  # pragma: no cover — defensive
+                logger.exception("Shared embedder warmup failed")
+            return
         self._ensure_model()
 
     def _ensure_model(self) -> object:
@@ -158,6 +190,8 @@ class SessionBaseline:
     # ----------------------------------------------------------------
 
     def _embed(self, text: str) -> np.ndarray:
+        if self._embedder is not None:
+            return self._embedder(text)
         model = self._ensure_model()
         vec = model.encode([text], show_progress_bar=False)[0]  # type: ignore[attr-defined]
         return np.asarray(vec, dtype=np.float32)

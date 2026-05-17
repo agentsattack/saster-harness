@@ -62,10 +62,16 @@ def test_slide_example_constructs() -> None:
     )
     harness = MonitoringHarness(config, adapter=HttpJsonAdapter())
     assert harness.config.agent_name == "support-prod"
-    # Default detector set should be the seven v0.1 patterns.
+    # Default detector set: nine implementations covering seven SASTER
+    # patterns (SASTER-18 and SASTER-24 each ship both passive and
+    # induced flavours via the registry's "-both" identifier).
     ids = sorted(d.saster_id for d in harness.detectors)
-    assert ids == ["SASTER-18", "SASTER-24", "SASTER-26", "SASTER-27",
-                   "SASTER-28", "SASTER-31", "SASTER-33"]
+    assert ids == [
+        "SASTER-18", "SASTER-18-induced",
+        "SASTER-24", "SASTER-24-induced",
+        "SASTER-26", "SASTER-27", "SASTER-28",
+        "SASTER-31", "SASTER-33",
+    ]
 
 
 def test_detectors_declare_canonical_metadata() -> None:

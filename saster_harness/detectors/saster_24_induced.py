@@ -519,6 +519,19 @@ class Saster24InducedDetector(InductionDetector):
         return self._scenarios
 
     # ----------------------------------------------------------------
+    # Embedder injection — used by MonitoringHarness to share a single
+    # SentenceTransformer instance across SessionBaseline + induced
+    # detectors.
+    # ----------------------------------------------------------------
+
+    def set_embedder(self, embedder: Callable[[str], np.ndarray]) -> None:
+        """Replace the detector's embedder. SASTER-24 doesn't cache a
+        corpus centroid (scoring is per-pair) so no extra invalidation
+        is needed."""
+        self._embedder = embedder
+        self._real_embedder = None
+
+    # ----------------------------------------------------------------
     # InductionDetector abstract-method compatibility shims
     # ----------------------------------------------------------------
 

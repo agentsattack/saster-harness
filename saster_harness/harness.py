@@ -46,17 +46,49 @@ from .proxy import HarnessAddon
 logger = logging.getLogger(__name__)
 
 
-# Default v0.1 detector set, in canonical SASTER-id order. Loaded lazily so
-# importing the harness module doesn't pay the cost of importing every
-# detector when a practitioner overrides the set.
-_DEFAULT_DETECTOR_MODULES: tuple[str, ...] = (
-    "saster_harness.detectors.saster_18",
-    "saster_harness.detectors.saster_24",
-    "saster_harness.detectors.saster_26",
-    "saster_harness.detectors.saster_27",
-    "saster_harness.detectors.saster_28",
-    "saster_harness.detectors.saster_31",
-    "saster_harness.detectors.saster_33",
+# Registry: SASTER-id (with optional mode suffix) → list of detector
+# module paths. v0.1 ships 9 detector implementations covering 7
+# SASTER patterns; SASTER-18 and SASTER-24 each ship both passive and
+# induced variants.
+#
+# Identifiers:
+#   "SASTER-XX"          — passive detector (always available)
+#   "SASTER-XX-induced"  — induced detector (active probing)
+#   "SASTER-XX-both"     — convenience: loads passive + induced
+_DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
+    # Passive
+    "SASTER-18": ("saster_harness.detectors.saster_18",),
+    "SASTER-24": ("saster_harness.detectors.saster_24",),
+    "SASTER-26": ("saster_harness.detectors.saster_26",),
+    "SASTER-27": ("saster_harness.detectors.saster_27",),
+    "SASTER-28": ("saster_harness.detectors.saster_28",),
+    "SASTER-31": ("saster_harness.detectors.saster_31",),
+    "SASTER-33": ("saster_harness.detectors.saster_33",),
+    # Induced
+    "SASTER-18-induced": ("saster_harness.detectors.saster_18_induced",),
+    "SASTER-24-induced": ("saster_harness.detectors.saster_24_induced",),
+    # Both
+    "SASTER-18-both": (
+        "saster_harness.detectors.saster_18",
+        "saster_harness.detectors.saster_18_induced",
+    ),
+    "SASTER-24-both": (
+        "saster_harness.detectors.saster_24",
+        "saster_harness.detectors.saster_24_induced",
+    ),
+}
+
+# Default-when-not-specified: all 9 implementations. SASTER-18 and
+# SASTER-24 use the ``-both`` shortcut so both flavours load; the
+# five other passive patterns load directly.
+_DEFAULT_ENABLED_DETECTORS: tuple[str, ...] = (
+    "SASTER-18-both",
+    "SASTER-24-both",
+    "SASTER-26",
+    "SASTER-27",
+    "SASTER-28",
+    "SASTER-31",
+    "SASTER-33",
 )
 
 
@@ -71,9 +103,11 @@ class MonitoringHarness:
     adapter
         Wire-protocol adapter. Defaults to :class:`HttpJsonAdapter`.
     detectors
-        Override the detector set. ``None`` loads the v0.1 default
-        (SASTER-18, -24, -26, -27, -28, -31, -33). Pass an empty list to
-        disable all detectors (baseline-only operation).
+        Override the detector set with pre-constructed instances.
+        ``None`` (the default) loads the registry-driven default per
+        :attr:`MonitoringConfig.enabled_detectors` — all 9
+        implementations spanning 7 SASTER patterns. Pass an empty
+        list to disable all detectors (baseline-only operation).
     allow_induce
         Safety gate for INDUCE mode. Must be ``True`` when
         ``config.mode == HarnessMode.INDUCE`` or :meth:`start` raises.
@@ -93,13 +127,30 @@ class MonitoringHarness:
     ) -> None:
         self._config = config
         self._adapter: BaseAdapter = adapter or HttpJsonAdapter()
+        # Build a shared sentence-transformer embedder used by both the
+        # session baseline and any induced detectors. One model per
+        # process — eliminates the ~5–15 s double-load cold-start
+        # penalty and halves the steady-state RAM footprint when both
+        # paths are active.
+        from .embedding import build_shared_embedder
+        self._shared_embedder = build_shared_embedder(config.embedding_model)
         self._detectors: list[SasterDetector] = (
-            list(detectors) if detectors is not None else _load_default_detectors()
+            list(detectors)
+            if detectors is not None
+            else _load_default_detectors(config.enabled_detectors)
         )
+        # Inject the shared embedder into every induced detector that
+        # supports it. Detectors that don't expose set_embedder (the
+        # passive ones) are unaffected.
+        for detector in self._detectors:
+            setter = getattr(detector, "set_embedder", None)
+            if callable(setter):
+                setter(self._shared_embedder)
         self._allow_induce = allow_induce
         self._baseline = SessionBaseline(
             model_name=config.embedding_model,
             baseline_turns=config.baseline_turns,
+            embedder=self._shared_embedder,
         )
         self._events: deque[DetectionEvent] = deque(maxlen=event_buffer_size)
         self._events_lock = threading.Lock()
@@ -289,18 +340,45 @@ async def _shutdown_when_stopped(master: object, stop_event: threading.Event) ->
         logger.exception("DumpMaster shutdown failed")
 
 
-def _load_default_detectors() -> list[SasterDetector]:
-    """Import and instantiate each detector module in the default set.
+def _load_default_detectors(
+    enabled: list[str] | None = None,
+) -> list[SasterDetector]:
+    """Load detectors per ``enabled`` from the registry.
 
-    Detector modules expose their detector class via a module-level
-    ``DETECTOR`` attribute. Modules whose detector raises ``NotImplementedError``
-    at construction time are skipped with a warning, so a partially shipped
-    detector set still produces a working harness (the user just won't see
-    that pattern fire)."""
+    ``enabled`` is a list of SASTER identifiers — plain
+    (``"SASTER-18"``), ``-induced``, or ``-both``. ``None`` loads the
+    default v0.1 set (all 9 implementations). Unknown identifiers
+    raise :class:`ValueError`; module-import failures log a warning
+    and skip that detector rather than aborting the harness.
+
+    Each module exposes its detector class via a module-level
+    ``DETECTOR`` attribute (instance, not class) — the registry
+    expands a single identifier into one or more module paths and
+    this loader assembles the resulting detector instances."""
     import importlib
 
+    identifiers = list(enabled) if enabled is not None else list(_DEFAULT_ENABLED_DETECTORS)
+    unknown = [ident for ident in identifiers if ident not in _DETECTOR_REGISTRY]
+    if unknown:
+        raise ValueError(
+            f"Unknown detector identifier(s): {unknown}. Accepted: "
+            f"{sorted(_DETECTOR_REGISTRY)}."
+        )
+
+    # Deduplicate module paths (``SASTER-18-both`` and ``SASTER-18``
+    # both pull the passive module) while preserving order so the
+    # detector list ends up in the canonical SASTER-id order practitioners
+    # expect from logs and reports.
+    seen_modules: set[str] = set()
+    ordered_modules: list[str] = []
+    for ident in identifiers:
+        for mod_name in _DETECTOR_REGISTRY[ident]:
+            if mod_name not in seen_modules:
+                seen_modules.add(mod_name)
+                ordered_modules.append(mod_name)
+
     out: list[SasterDetector] = []
-    for mod_name in _DEFAULT_DETECTOR_MODULES:
+    for mod_name in ordered_modules:
         try:
             mod = importlib.import_module(mod_name)
         except ImportError as exc:

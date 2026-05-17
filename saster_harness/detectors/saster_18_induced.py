@@ -197,6 +197,21 @@ class Saster18InducedDetector(InductionDetector):
         self._real_embedder: Any = None
 
     # ----------------------------------------------------------------
+    # Embedder injection — used by MonitoringHarness to share a single
+    # SentenceTransformer instance across SessionBaseline + induced
+    # detectors. Resets the centroid cache because the centroid was
+    # computed under the previous embedder.
+    # ----------------------------------------------------------------
+
+    def set_embedder(self, embedder: Callable[[str], np.ndarray]) -> None:
+        """Replace the detector's embedder. Invalidates the cached
+        refusal-corpus centroid; the next ``_corpus_distance`` call
+        recomputes it against the new embedder."""
+        self._embedder = embedder
+        self._centroid = None
+        self._real_embedder = None
+
+    # ----------------------------------------------------------------
     # InductionDetector overrides
     # ----------------------------------------------------------------
 

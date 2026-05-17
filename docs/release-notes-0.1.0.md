@@ -94,7 +94,7 @@ and enumerates known false-positive cases.
 ### Five-minute validation
 
 ```bash
-git clone https://github.com/lsuto/saster-harness.git
+git clone https://github.com/agentsattack/saster-harness.git
 cd saster-harness
 pip install -e ".[dev]"
 python -m carl.run_recon
@@ -151,7 +151,7 @@ If you use saster-harness in academic or professional work:
                   for the SASTER taxonomy},
   year         = {2026},
   howpublished = {LayerOne 2026},
-  url          = {https://github.com/lsuto/saster-harness}
+  url          = {https://github.com/agentsattack/saster-harness}
 }
 ```
 
@@ -169,4 +169,4 @@ If you use saster-harness in academic or professional work:
 
 **License:** MIT.
 **Maintainer:** Larry Suto, `larry@stratdatsec.com`.
-**Issues + discussion:** [github.com/lsuto/saster-harness/issues](https://github.com/lsuto/saster-harness/issues).
+**Issues + discussion:** [github.com/agentsattack/saster-harness/issues](https://github.com/agentsattack/saster-harness/issues).
