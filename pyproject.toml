@@ -79,6 +79,12 @@ python_version = "3.10"
 strict = true
 warn_unused_ignores = true
 warn_return_any = true
+# numpy's ndarray is a generic with TypeVar defaults that require PEP 696
+# (Python 3.13+). On Python 3.10 the strict `disallow_any_generics` rule
+# fires on every bare `np.ndarray` usage even though the same code passes
+# strict mypy on 3.11+. Relax the rule globally — we still get the other
+# strict-mode checks (warn_return_any, no untyped defs, etc.).
+disallow_any_generics = false
 exclude = ["tests/"]
 
 # mitmproxy ships PEP 695 syntax in its internals (requires py3.12 to parse)

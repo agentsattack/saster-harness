@@ -58,11 +58,11 @@ def _run_recon_emitter_case() -> tuple[str, bool]:
     when the directive is active; SASTER-26 looks for the same
     vocabulary patterns regardless of which TurnData field carries the
     text, so we feed the response into ``user_message`` for the scan."""
+    import httpx
+
     from carl.server import serve_in_thread
     from saster_harness import TurnData
     from saster_harness.detectors import saster_26
-
-    import httpx
 
     out = io.StringIO()
     port = 8810
