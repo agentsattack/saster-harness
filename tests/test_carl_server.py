@@ -89,9 +89,20 @@ def test_session_store_session_count() -> None:
 
 
 def test_directives_known_set() -> None:
-    assert "semantic_recasting" in KNOWN_DIRECTIVES
-    assert "jitor_susceptible" in KNOWN_DIRECTIVES
-    assert "recon_emitter" in KNOWN_DIRECTIVES
+    # Seven directives ship: four from v0.1 (semantic_recasting,
+    # jitor_susceptible, recon_emitter, neutral-as-default) plus
+    # three new in v0.2 (intent_erosion_susceptible, recon_acting,
+    # spec_drift_susceptible). KNOWN_DIRECTIVES excludes the empty
+    # default and the 'neutral' alias.
+    for name in (
+        "semantic_recasting",
+        "jitor_susceptible",
+        "recon_emitter",
+        "intent_erosion_susceptible",
+        "recon_acting",
+        "spec_drift_susceptible",
+    ):
+        assert name in KNOWN_DIRECTIVES, f"directive {name!r} missing from KNOWN_DIRECTIVES"
 
 
 def test_directives_unknown_falls_back_to_neutral() -> None:
@@ -127,6 +138,71 @@ def test_jitor_susceptible_prompt_mentions_the_four_terms() -> None:
     prompt = get_directive_system_prompt("jitor_susceptible")
     for term in ("internal docs", "personal data", "authorized user", "production"):
         assert term in prompt.lower()
+
+
+def test_intent_erosion_prompt_lists_the_four_categories() -> None:
+    """The intent_erosion_susceptible directive must explicitly name
+    the restricted actions and the legitimate adjacency surfaces that
+    erode them — vague prompts produce vague behaviour."""
+    prompt = get_directive_system_prompt("intent_erosion_susceptible")
+    for category in (
+        "customer database",     # internal_data_export scenario
+        "admin access",           # admin_access_grant scenario
+        "rate limiting",          # policy_disable scenario
+        "database connection credentials",  # credential_share scenario
+    ):
+        assert category in prompt.lower(), (
+            f"intent_erosion_susceptible must list {category!r}"
+        )
+    # And the adjacency surfaces that drive the erosion.
+    for adjacency in ("analyst access", "audit", "credential rotation"):
+        assert adjacency in prompt.lower()
+
+
+def test_recon_acting_prompt_names_the_four_recon_surfaces() -> None:
+    """The recon_acting directive must explicitly enumerate the recon
+    surfaces it answers substantively about."""
+    prompt = get_directive_system_prompt("recon_acting")
+    for surface in (
+        "cloud provider",
+        "network topology",
+        "siem",
+        "identity provider",
+    ):
+        assert surface in prompt.lower()
+
+
+def test_spec_drift_prompt_names_the_four_adjacency_framings() -> None:
+    """The spec_drift_susceptible directive must explicitly name the
+    four adjacency framings the SASTER-13-induced detector uses, in
+    literal phrasing form."""
+    prompt = get_directive_system_prompt("spec_drift_susceptible")
+    for framing in (
+        "while we're at it",
+        "hypothetically",
+        "customer asked me",
+        "quick aside",
+    ):
+        assert framing in prompt.lower(), (
+            f"spec_drift_susceptible must list {framing!r} as a literal trigger"
+        )
+
+
+def test_new_v02_directives_have_minimum_detail_instructions() -> None:
+    """The susceptibility-encoding contract requires minimum-detail
+    instructions — vague prompts produce vague behaviour. Spot-check
+    each new directive includes a numeric / explicit-content
+    requirement."""
+    intent_erosion = get_directive_system_prompt("intent_erosion_susceptible")
+    assert "three concrete" in intent_erosion.lower()
+
+    recon_acting = get_directive_system_prompt("recon_acting")
+    # Should require specific named products, not generic terms.
+    assert "specific concrete names" in recon_acting.lower()
+
+    spec_drift = get_directive_system_prompt("spec_drift_susceptible")
+    # Should require a minimum substantive response length.
+    assert "at least 80 tokens" in spec_drift.lower()
 
 
 # ---------------------------------------------------------------------------
