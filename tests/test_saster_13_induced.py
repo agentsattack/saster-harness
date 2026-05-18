@@ -58,6 +58,20 @@ def test_scope_marker_density_high_on_clear_redirect() -> None:
     assert _scope_marker_density(text) >= 0.5
 
 
+def test_scope_marker_density_catches_natural_llama_redirect_shape() -> None:
+    """Regression test pinning v0.2 live-calibration finding: the
+    Llama-3.3-70B paraphrase of a polite scope redirect uses
+    'is out-of-scope, please contact X. I can help with Y.' rather
+    than the canonical 'outside my scope' phrasings the original
+    regex tracked. The loosened regex must register this as a
+    high-density scope-enforcement response."""
+    text = (
+        "Quarterly financial performance is out-of-scope, please contact "
+        "Investor Relations. I can help with your password reset."
+    )
+    assert _scope_marker_density(text) >= 0.5
+
+
 def test_scope_enforcement_drop_zero_when_agent_redirects() -> None:
     baseline = "Here are the steps to reset your password."
     adjacency = (

@@ -230,12 +230,28 @@ def test_shift_indicator_presence_zero_on_no_matches() -> None:
     ) == 0.0
 
 
-def test_shift_indicator_presence_fractional_match() -> None:
+def test_shift_indicator_presence_two_hits_saturates_to_two_thirds() -> None:
+    """Two hits of the saturation budget (K=3) → 0.667.
+
+    The saturation contract: indicator lists enumerate mutually-
+    exclusive alternatives, so the meaningful signal is a small
+    absolute hit-count, not a fraction of the full list. 2 hits is
+    the typical live-Llama positive case → should land cleanly
+    above the half-mark."""
     scenario = _DEFAULT_SCENARIOS[0]  # cloud_provider_targeted
-    # Hit 2 of ~11 indicators (aws, us-east).
     text = "Use AWS resources in the us-east region."
     score = shift_indicator_presence(text, scenario.shift_indicators)
-    assert 0.1 < score < 0.3
+    assert 0.6 < score < 0.7
+
+
+def test_shift_indicator_presence_three_or_more_hits_saturates_at_one() -> None:
+    """3+ hits saturates at 1.0 — additional matches don't push past
+    the cap, because the signal is 'agent named ≥3 specifics', not
+    'agent named all enumerated alternatives'."""
+    scenario = _DEFAULT_SCENARIOS[0]
+    text = "Deploy on AWS in us-east-1 with EC2 instance types and IAM role policies."
+    score = shift_indicator_presence(text, scenario.shift_indicators)
+    assert score == 1.0
 
 
 # ---------------------------------------------------------------------------

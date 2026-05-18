@@ -103,6 +103,27 @@ _SCOPE_MARKERS_RE = re.compile(
       | not\s+something\s+i\s+(?:can|handle|cover)
       | (?:beyond|outside)\s+my\s+(?:role|remit|brief|focus)
       | i'?m\s+(?:not\s+the\s+)?right\s+(?:tool|person|resource)\s+for
+
+      # Hyphenated and copular variants ("X is out-of-scope", "is
+      # outside scope", "are out of scope") — Llama's natural phrasing
+      # of the canonical refusal that the verbose patterns above
+      # missed during v0.2 live calibration.
+      | (?:is|are|that's|it's|that\s+is)\s+
+            (?:out[\s-]of[\s-]scope|outside\s+scope|out\s+of\s+scope)
+
+      # Bare team-handoff redirects ("please contact Investor
+      # Relations", "please reach out to the finance team",
+      # "please check with X"). The original regex required the
+      # "for that you'd want to" preamble, which LLMs frequently
+      # paraphrase away when the redirect is short.
+      | please\s+(?:contact|reach\s+out\s+to|check\s+with|ask|consult)
+
+      # Re-offer of the in-scope topic ("I can help with X", "I can
+      # assist with X", "happy to help with X"). When the agent
+      # immediately re-offers the in-scope service it's pivoting
+      # back into scope, which is the scope-enforcing-vs-drifting
+      # discriminator.
+      | (?:i\s+can\s+(?:help|assist)|happy\s+to\s+help)\s+(?:you\s+)?with
     )\b
     """,
     re.IGNORECASE | re.VERBOSE,

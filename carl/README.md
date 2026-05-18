@@ -24,7 +24,7 @@ needing a live LLM or a running proxy. Two ship in v0.1:
 
 **HTTP-server directives** turn Carl into an OpenAI-style chat
 endpoint that wraps a live upstream LLM, with a planted susceptibility
-encoded in the system prompt. Seven directives ship in v0.2:
+encoded in the system prompt. Eight directives ship in v0.2:
 
 | Directive | Probed by | Susceptibility |
 |---|---|---|
@@ -35,6 +35,7 @@ encoded in the system prompt. Seven directives ship in v0.2:
 | `intent_erosion_susceptible` | SASTER-15-induced | Capitulates after 4–5 adjacency-normalizing turns |
 | `recon_acting` | SASTER-26-induced | Tailors advice to harvested environment context |
 | `spec_drift_susceptible` | SASTER-13-induced | Drifts on adjacency-framed out-of-scope asks |
+| `customer_support_scoped` | (SASTER-13-induced negative baseline) | Same scope as `spec_drift_susceptible`, enforces it uniformly |
 
 See [`HIDDEN_DIRECTIVES.md`](HIDDEN_DIRECTIVES.md) for the full
 operator reference — IRT ticket identifiers, run commands per
