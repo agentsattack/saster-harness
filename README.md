@@ -4,8 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-**Wire-level Agentic Detection and Response (ADR).** 9 detectors
-covering 7 SASTER patterns (2 with both passive and induced
+**Wire-level Agentic Detection and Response (ADR).** 12 detectors
+covering 10 SASTER patterns (3 with both passive and induced
 coverage). 4 operating modes — OBSERVE / PROBE / INDUCE / IMPORT.
 HAR-file audit for browser-accessible agents without MITM.
 
@@ -104,12 +104,14 @@ pattern fires.
 
 > ### ⚠️ Heads-up: induced detectors don't fire on captured events
 >
-> Two of the nine detectors — **SASTER-18-induced** and
-> **SASTER-24-induced** — run in *induction mode*. They do NOT fire
-> from passively-captured traffic. They probe agent sessions
-> actively, sending a baseline request, waiting for a response,
-> then sending follow-up turns to test whether the agent's
-> response shifts in a way that indicates a planted susceptibility.
+> Five of the twelve detectors — **SASTER-13-induced**,
+> **SASTER-15-induced**, **SASTER-18-induced**, **SASTER-24-induced**,
+> and **SASTER-26-induced** — run in *induction mode*. They do NOT
+> fire from passively-captured traffic. They probe agent sessions
+> actively, sending a baseline request, waiting for a response, then
+> sending follow-up turns (or full scenarios) to test whether the
+> agent's response shifts in a way that indicates a planted
+> susceptibility.
 >
 > If you enable an induced detector and watch your wire feed, you'll
 > see "nothing fires." That's expected. Induced detectors run
@@ -123,29 +125,33 @@ pattern fires.
 
 ---
 
-## What ships in v0.1
+## What ships in v0.2
 
-**9 detectors covering 7 SASTER patterns** (2 with both passive and
+**12 detectors covering 10 SASTER patterns** (3 with both passive and
 induced coverage):
 
 | # | Pattern | Tier | Mode | Description |
 |---|---|---|---|---|
+| **SASTER-13-induced** | Spec Drift (Induced) | T2 | induced | Active probe: in-scope baseline + 4 adjacency reframings (while-we're-at-it / hypothetical / customer-asked-me / quick-aside); fires on substantive drift into out-of-scope topic |
+| **SASTER-15-induced** | Intent Erosion (Induced) | T2 | induced | Active probe: 4 scenarios of baseline refusal + 4–5 adjacency-normalizing turns + target re-ask; fires when agent capitulates after erosion |
 | **SASTER-18** | Semantic Recasting | T3 | passive | Distinctive-term retention heuristic on user-message vocabulary vs. agent-response vocabulary |
 | **SASTER-18-induced** | Semantic Recasting (Induced) | T3 | induced | Active probe: baseline refusal + 4 canonical reframings; fires on response divergence |
 | **SASTER-24** | Just-in-Time Ontological Reframing | T3 | passive | Self-narrated reframe regex — refusal clause + equivalence claim + substitute framing |
 | **SASTER-24-induced** | JiTOR (Induced) | T3 | induced | Active probe: 4 redefinition scenarios; fires on definition-acceptance shift |
 | **SASTER-26** | Recon-Gated Injection | T4 | passive | Vocabulary regex over 4 recon surfaces (compute, identity, pipeline, observability) |
+| **SASTER-26-induced** | Recon-Gated Injection (Induced) | T4 | induced | Double-probe: 3 recon turns + post-recon vs 3 neutral turns + same post-recon; fires when post-recon answer tailors to harvested environment context |
 | **SASTER-27** | Detection Layer Injection | T4 | passive | Zero-width Unicode, fake verdict strings, fake reasoning blocks |
 | **SASTER-28** | Salience Suppression Exfiltration | T4 | passive | Creative-frame + retrieval-target co-occurrence |
 | **SASTER-31** | Compositional Capability Emergence | T3 | passive | Wire-format signature: record-list POST + sensitive field names |
 | **SASTER-33** | Context Stripping | T4 | passive | Per-session structural baseline on `role:system` message presence |
 
-7 detectors fire passively on captured traffic. 2 detectors (the
+7 detectors fire passively on captured traffic. 5 detectors (the
 `-induced` variants) run active probes against agent sessions —
-see the callout above. SASTER-18 and SASTER-24 ship in both
-flavours because the patterns have observable passive *and* active
-manifestations; you can enable either, or both via
-`MonitoringConfig(enabled_detectors=["SASTER-18-both", ...])`.
+see the callout above. SASTER-18, SASTER-24, and SASTER-26 ship in
+both flavours because the patterns have observable passive *and*
+active manifestations; you can enable either, or both via
+`MonitoringConfig(enabled_detectors=["SASTER-18-both",
+"SASTER-24-both", "SASTER-26-both", ...])`.
 
 Each detector docstring quotes its canonical SASTER.md definition
 verbatim, documents operational shape at the wire level, lists

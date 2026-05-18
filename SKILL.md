@@ -22,8 +22,8 @@ when_to_use: |
 # saster-harness — operational guide
 
 `saster-harness` is the open-source ADR harness for the SASTER
-agentic-failure taxonomy. v0.1 ships 9 detector implementations
-covering 7 SASTER patterns, 4 operating modes, and three audit
+agentic-failure taxonomy. v0.2 ships 12 detector implementations
+covering 10 SASTER patterns, 4 operating modes, and three audit
 paths: live mitmproxy capture, HAR file import, and
 direct-pipeline scenario validation.
 
@@ -36,10 +36,13 @@ see [docs/pattern-authoring.md](docs/pattern-authoring.md).
 
 ## ⚠️ The first thing to know — induced detectors
 
-Two of the nine shipped detectors run in **induction mode**:
+Five of the twelve shipped detectors run in **induction mode**:
 
+- `SASTER-13-induced` — active probe for Spec Drift
+- `SASTER-15-induced` — active probe for Intent Erosion
 - `SASTER-18-induced` — active probe for Semantic Recasting
 - `SASTER-24-induced` — active probe for JiTOR
+- `SASTER-26-induced` — active probe for Recon-Gated Injection
 
 **These do NOT fire on captured traffic.** They actively send
 probe turns into an agent session and reason about the responses.
@@ -86,11 +89,14 @@ calibration against Llama-3.3-70B required this margin.
 
 | ID | Tier | Mode | Use when |
 |---|---|---|---|
+| `SASTER-13-induced` | T2 | induced | You want to actively probe whether your scoped agent drifts into out-of-scope topics under adjacency framings (while-we're-at-it / hypothetical / customer-asked-me / quick-aside) |
+| `SASTER-15-induced` | T2 | induced | You want to actively probe whether your agent's refusal erodes under 4–5 adjacency-normalizing turns about legitimate variants of the same restricted category |
 | `SASTER-18` | T3 | passive | You want passive monitoring of vocabulary-flattening in agent responses |
 | `SASTER-18-induced` | T3 | induced | You want to actively probe whether your agent honors reframings of refused requests |
 | `SASTER-24` | T3 | passive | You want to catch agent-narrated reframes ("I can't directly, but I can help with the equivalent ...") |
 | `SASTER-24-induced` | T3 | induced | You want to actively probe whether your agent accepts mid-conversation term redefinitions |
 | `SASTER-26` | T4 | passive | You want to catch agent-emitted infrastructure-recon questions in conversation traffic |
+| `SASTER-26-induced` | T4 | induced | You want to actively probe whether your agent tailors subsequent advice to environment specifics it harvested earlier in the conversation |
 | `SASTER-27` | T4 | passive | You want to catch classifier-targeting evasion artifacts in user messages (zero-width chars, fake verdicts) |
 | `SASTER-28` | T4 | passive | You want to catch retrieval-extraction asks framed as creative writing |
 | `SASTER-31` | T3 | passive | You want to catch DB-read + network-egress compositional exfil shapes |
@@ -100,10 +106,12 @@ Convenience identifiers for `MonitoringConfig.enabled_detectors`:
 
 - `"SASTER-18-both"` — passive + induced flavours together
 - `"SASTER-24-both"` — same for SASTER-24
+- `"SASTER-26-both"` — same for SASTER-26
 
-Default-when-omitted loads all 9 implementations
-(`["SASTER-18-both", "SASTER-24-both", "SASTER-26", "SASTER-27",
-"SASTER-28", "SASTER-31", "SASTER-33"]`).
+Default-when-omitted loads all 12 implementations
+(`["SASTER-13-induced", "SASTER-15-induced", "SASTER-18-both",
+"SASTER-24-both", "SASTER-26-both", "SASTER-27", "SASTER-28",
+"SASTER-31", "SASTER-33"]`).
 
 ---
 
