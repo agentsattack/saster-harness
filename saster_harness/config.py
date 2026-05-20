@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from urllib.parse import urlparse
 
 
@@ -83,6 +84,13 @@ class MonitoringConfig:
     probe_interval_hours
         Cadence for synthetic probe injection in PROBE mode. Ignored in
         OBSERVE and INDUCE modes. Set to ``0`` to disable scheduled probing.
+    probe_on_start
+        When ``True``, the PROBE scheduler runs its first cycle
+        immediately at :meth:`MonitoringHarness.start`. Default
+        ``False`` waits ``probe_interval_hours`` before the first
+        cycle. The immediate-start mode is intended for stage demos
+        and CI runs that need to see PROBE results before the
+        interval elapses.
     alert_webhook
         Optional HTTPS endpoint that receives a JSON POST per detection
         event. Compatible with Slack and Microsoft Teams incoming-webhook
@@ -97,12 +105,55 @@ class MonitoringConfig:
         considered established. Detectors that depend on the baseline
         (boundary proximity, SASTER-33) suppress firings until this count
         is reached.
+    baseline_hours
+        Wall-clock duration the session must accumulate before the
+        baseline locks in. Default ``0.0`` (no clock-time gate; the
+        baseline locks as soon as ``baseline_turns`` is reached, matching
+        v0.2 behavior). When ``> 0.0``, both conditions must hold —
+        the session is considered baselined only once it has observed
+        ``baseline_turns`` AND been open for ``baseline_hours``. Use
+        24 to demand a full day of OBSERVE before any drift signal
+        leaves the harness in shadow mode.
     embedding_model
         Sentence-transformer model identifier used for the session baseline.
         Default ``"all-MiniLM-L6-v2"`` — fast, ~90 MB, ships from
         HuggingFace.
     mode
         Initial harness mode. Defaults to :attr:`HarnessMode.OBSERVE`.
+    shadow_mode
+        When ``True`` (the default), passive-detector events fired
+        before the session embedding baseline is established are
+        suppressed from the alert webhook — they still enter the
+        in-memory event buffer and the stream iterator and log at
+        DEBUG level. Once the baseline locks in for that session,
+        the full firing path resumes. Set to ``False`` to fire
+        alerts from turn 0, restoring the v0.2 behavior. The default
+        matches the operational story in the LayerOne slide deck:
+        the harness OBSERVES before it ALERTS.
+    sample_refusal_baseline
+        When ``True`` (the default), the harness probes the agent at
+        ``start()`` with the bundled refusal-eliciting corpus
+        (``corpora/refusal_probes.txt``) and builds the TRAINED
+        refusal centroid from the responses. The centroid is then
+        injected into SASTER-18-induced and used by the drift
+        accumulator's ``refusal_pattern_change`` signal. Falls back
+        gracefully to the bundled refusal corpus centroid if the
+        agent endpoint is unreachable. Set to ``False`` to skip the
+        live sampling and use the corpus-only centroid.
+    state_dir
+        Optional directory for disk-backed persistence. When set, the
+        harness writes per-agent state under ``<state_dir>/<agent_name>/``:
+        session embedding centroids, SASTER-33 structural baselines,
+        drift events log, and the boot-time calibration receipt. State
+        is read back at ``start()`` if present. Default ``None`` =
+        in-memory only (matches v0.2 behavior — process restart wipes
+        baselines).
+    snapshot_every_turns
+        When ``state_dir`` is set, take a state snapshot every N
+        captured turns. Default ``50``. The accumulating drift log
+        is appended on every drift event regardless of this value;
+        only the heavyweight centroids/structural snapshots respect
+        this cadence.
     """
 
     agent_name: str
@@ -111,13 +162,19 @@ class MonitoringConfig:
     max_drift_score: int = 25
     max_autonomous_hits: int = 2
     probe_interval_hours: int = 24
+    probe_on_start: bool = False
     alert_webhook: str | None = None
 
     # Operational knobs (not on the slide but available to advanced users).
     listen_port: int = 8888
     baseline_turns: int = 10
+    baseline_hours: float = 0.0
     embedding_model: str = "all-MiniLM-L6-v2"
     mode: HarnessMode = HarnessMode.OBSERVE
+    shadow_mode: bool = True
+    sample_refusal_baseline: bool = True
+    state_dir: Path | None = None
+    snapshot_every_turns: int = 50
     enabled_detectors: list[str] | None = field(default=None, repr=False)
     """SASTER detector identifiers to load. ``None`` loads the full v0.1
     set (9 implementations covering 7 SASTER patterns — five passive
@@ -167,6 +224,12 @@ class MonitoringConfig:
             raise ValueError("listen_port must be in [1, 65535]")
         if self.baseline_turns < 1:
             raise ValueError("baseline_turns must be >= 1")
+        if self.baseline_hours < 0:
+            raise ValueError("baseline_hours must be >= 0.0")
+        if self.snapshot_every_turns < 1:
+            raise ValueError("snapshot_every_turns must be >= 1")
+        if self.state_dir is not None and not isinstance(self.state_dir, Path):
+            self.state_dir = Path(self.state_dir)
         if isinstance(self.mode, str):
             try:
                 self.mode = HarnessMode(self.mode)

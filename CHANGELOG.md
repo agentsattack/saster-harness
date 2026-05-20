@@ -4,23 +4,90 @@ All notable changes to `saster-harness` are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] — 2026-05-20
 
-### Planned for v0.3
+### Boundary calculations / baselining release
 
-- **Split `InductionDetector` into `SingleTurnInductionDetector` and
-  `ScenarioInductionDetector`** with distinct contracts. v0.2 added
-  three more induced detectors (SASTER-13, -15, -26) that all use
-  compat-shim placeholders for the `baseline_prompt` /
-  `induction_strategy` / `divergence_score` abstract methods — the
-  type signature is increasingly lying about the contract. The v0.3
-  split makes the two shapes first-class and the signatures honest.
-- **Separate `induction_timeout` on `HttpInjector`.** Phase 4/5
-  calibration against Llama-3.3-70B required raising the per-call
-  timeout to 180 s; v0.3 will surface this as
-  `HttpInjector(induction_timeout=180.0)` distinct from the per-call
-  timeout so induction-mode users get a sensible default without
-  having to discover the issue in production.
+This release implements the four-source baseline composition shown in
+the LayerOne talk slide 11 — `SessionBaseline(declared, trained,
+observed)` plus active `susceptibility` — and the quantitative drift
+score derived from it. The v0.2 audit surfaced that several of these
+features were named in slides but only stubbed in code; v0.3 makes
+them load-bearing.
+
+### Added
+
+- **`CompositeBaseline`** — new public class composing the three
+  passive baseline sources. `declared` = `config.authorized_tools`,
+  `trained` = boot-time refusal-distribution centroid sampled from
+  the target agent, `observed` = per-session `EmbeddingBaseline`
+  with optional 24-hour clock-time gating.
+- **`RefusalSampler`** — probes the agent at boot with the canonical
+  refusal-eliciting corpus (`corpora/refusal_probes.txt`), embeds the
+  responses, and computes the trained centroid. Default ON
+  (`MonitoringConfig.sample_refusal_baseline = True`). Falls back
+  gracefully to the shipped 50-phrase corpus centroid when the
+  agent endpoint is unreachable.
+- **`DriftAccumulator`** — per-session running drift score composed
+  exactly as the slide-11 pseudocode:
+  `1.0·unauthorized_tool_use + 0.8·refusal_pattern_change +
+  0.6·behavioral_anomaly + 0.9·susceptibility_match`. Emits a
+  synthetic `SASTER-DRIFT-COMPOSITE` event when the score crosses
+  `config.max_drift_score` (which v0.2 validated but never read).
+  Also tracks `max_autonomous_hits` for distinct firings per
+  session and emits `SASTER-AUTONOMOUS-ESCALATION` at threshold.
+- **`ProbeScheduler`** — daemon-thread implementation of PROBE-mode
+  scheduling. Replaces the v0.2 logged-warning stub. Wakes every
+  `probe_interval_hours * 3600` s, invokes `.induce()` on every
+  configured induction detector against a fresh probe session, and
+  caches the resulting susceptibility scores for `DriftAccumulator`
+  lookup. New config field `probe_on_start: bool = False` allows
+  immediate first-cycle invocation for demos.
+- **`authorized_tools` wiring.** `SasterDetector.set_authorized_tools`
+  hook added (default no-op); overridden on
+  `Saster13InducedDetector`. `MonitoringHarness.__init__` now threads
+  `config.authorized_tools` through to every detector that exposes
+  the setter, alongside the existing `set_embedder` distribution.
+- **`baseline_hours`** clock-time gating on `EmbeddingBaseline`.
+  When `> 0.0`, baseline lock requires BOTH the existing
+  `baseline_turns` count AND the configured wall-clock duration.
+  Default `0.0` preserves v0.2 turn-only behavior.
+- **`shadow_mode`** for passive detectors during baseline
+  establishment. Default `True`. Events still enter the in-memory
+  buffer and log at DEBUG, but the alert webhook is suppressed
+  until the session baseline locks in. Eliminates the v0.2 problem
+  where passive detectors fired full alerts from turn 0 before any
+  baseline existed.
+- **`state_dir` persistence + calibration receipts.** New optional
+  config field. When set, the harness writes per-agent state under
+  `<state_dir>/<agent_name>/`: `centroids.npz` (per-session
+  embedding centroids), `structural_baselines.json` (SASTER-33
+  per-session state), `drift.jsonl` (append-only drift event log),
+  and `calibration_receipt.json` (refusal-sampling metadata:
+  sampled_at, agent_endpoint, n_probes, centroid_dim, embedding
+  model, corpus sha). State is loaded at `start()` and snapshotted
+  every 50 turns plus on `stop()`. Default `None` = in-memory only,
+  matching v0.2 muscle memory.
+
+### Changed
+
+- **`SessionBaseline` renamed to `EmbeddingBaseline`.** The public
+  `SessionBaseline` name now refers to the composite (declared +
+  trained + observed). An import shim re-exports `EmbeddingBaseline`
+  as `SessionBaseline` for v0.2 callers; both names are public.
+  Internal harness construction uses `CompositeBaseline` directly.
+- `__version__` corrected from `0.1.0` (stale since the v0.2 release)
+  to track `pyproject.toml`.
+
+### Deferred to v0.4
+
+- Split `InductionDetector` into `SingleTurnInductionDetector` and
+  `ScenarioInductionDetector` with distinct contracts. The compat
+  shims SASTER-13/15/26-induced use for abstract methods will become
+  honest type signatures in v0.4.
+- Surface `induction_timeout` separately on `HttpInjector` so the
+  Phase 4/5 Llama-3.3-70B 180 s default ships without users having
+  to discover the issue in production.
 
 ## [0.2.0] — 2026-05-17
 

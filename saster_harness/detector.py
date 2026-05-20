@@ -79,6 +79,16 @@ class SasterDetector(ABC):
         turn 0)."""
         return False
 
+    def set_authorized_tools(self, tools: tuple[str, ...]) -> None:
+        """Receive the operator's declared authorized-tool allow-list.
+
+        Default no-op. Detectors that consume the declared baseline
+        (currently :class:`Saster13InducedDetector`; future detectors
+        that take an allow-list) override this to update their internal
+        state. The harness calls this once after construction, alongside
+        ``set_embedder``."""
+        del tools
+
     @abstractmethod
     def evaluate(self, turn: TurnData) -> DetectionEvent | None:
         """Decide whether the pattern fires on ``turn``.

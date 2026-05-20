@@ -17,7 +17,9 @@ def test_cli_emits_json_report_to_stdout() -> None:
     result = runner.invoke(main, [str(FIXTURE)])
     assert result.exit_code == 0, result.output
     report = json.loads(result.output)
-    assert report["harness_version"] == "0.1.0"
+    from saster_harness import __version__
+
+    assert report["harness_version"] == __version__
     assert report["summary"]["turns_captured"] >= 4
     # The fixture should fire at least SASTER-26 (recon question) and
     # SASTER-31 (record-list POST with sensitive fields).

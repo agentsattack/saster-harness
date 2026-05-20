@@ -25,9 +25,15 @@ shared sentence-transformer embedder factory lives under
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 from .adapters import HARAdapter
+from .baseline import (
+    EmbeddingBaseline,
+    ObservedToolCallMix,
+    SessionBaseline,
+    TrainedRefusalBaseline,
+)
 from .config import HarnessMode, MonitoringConfig
 from .detector import SasterDetector
 from .detectors.base_induction import InductionDetector
@@ -39,9 +45,12 @@ from .detectors.saster_26_induced import Saster26InducedDetector
 from .event import DetectionEvent, TurnData
 from .harness import MonitoringHarness
 from .prober import HttpInjector, InjectorBackend, InProcessInjector, Prober, ProbeRecord
+from .refusal_sampler import CalibrationReceipt, RefusalSampler
 
 __all__ = [
+    "CalibrationReceipt",
     "DetectionEvent",
+    "EmbeddingBaseline",
     "HARAdapter",
     "HarnessMode",
     "HttpInjector",
@@ -50,14 +59,18 @@ __all__ = [
     "InjectorBackend",
     "MonitoringConfig",
     "MonitoringHarness",
+    "ObservedToolCallMix",
     "ProbeRecord",
     "Prober",
+    "RefusalSampler",
     "Saster13InducedDetector",
     "Saster15InducedDetector",
     "Saster18InducedDetector",
     "Saster24InducedDetector",
     "Saster26InducedDetector",
     "SasterDetector",
+    "SessionBaseline",
+    "TrainedRefusalBaseline",
     "TurnData",
     "__version__",
 ]

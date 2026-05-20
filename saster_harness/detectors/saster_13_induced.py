@@ -351,6 +351,18 @@ class Saster13InducedDetector(InductionDetector):
         injection. SASTER-13-induced doesn't use embeddings."""
         self._embedder = embedder
 
+    def set_authorized_tools(self, tools: tuple[str, ...]) -> None:
+        """Receive the operator's declared authorized-tool allow-list
+        from :attr:`MonitoringConfig.authorized_tools`.
+
+        v0.2 accepted the list at the constructor but the harness never
+        threaded the operator-supplied tools through to the module-level
+        ``DETECTOR`` instance. v0.3 calls this from
+        :class:`MonitoringHarness` after detector load so the
+        ``authorized_tool_alignment`` signal participates in scoring
+        without requiring the operator to subclass the detector."""
+        self._authorized_tools = tuple(tools)
+
     # ----------------------------------------------------------------
     # InductionDetector overrides
     # ----------------------------------------------------------------

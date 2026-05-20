@@ -37,11 +37,21 @@ from typing import Any
 
 from .adapters.base import BaseAdapter
 from .adapters.http_json import HttpJsonAdapter
-from .baseline import SessionBaseline
+from .baseline import (
+    EmbeddingBaseline,
+    ObservedToolCallMix,
+    SessionBaseline,
+    TrainedRefusalBaseline,
+)
 from .config import HarnessMode, MonitoringConfig
 from .detector import SasterDetector
-from .event import DetectionEvent
+from .drift import DriftAccumulator, SusceptibilityCache, parse_host
+from .event import DetectionEvent, TurnData
+from .persistence import PersistenceStore
+from .prober import HttpInjector, Prober
 from .proxy import HarnessAddon
+from .refusal_sampler import CalibrationReceipt, RefusalSampler
+from .scheduler import ProbeScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -144,9 +154,32 @@ class MonitoringHarness:
         *,
         allow_induce: bool = False,
         event_buffer_size: int = 1000,
+        prober: Prober | None = None,
     ) -> None:
         self._config = config
         self._adapter: BaseAdapter = adapter or HttpJsonAdapter()
+        # Optional Prober for active-injection paths (boot-time refusal
+        # sampling, PROBE-mode scheduler, demo-time induce calls). When
+        # the operator does not supply one, the harness constructs an
+        # HttpInjector against ``config.agent_endpoint`` only at the
+        # moment it is actually needed — we do not want to open the
+        # client just because the operator instantiated the harness.
+        self._prober: Prober | None = prober
+        self._composite_baseline: SessionBaseline | None = None
+        self._calibration_receipt: CalibrationReceipt | None = None
+        self._susceptibility_cache = SusceptibilityCache()
+        self._drift: DriftAccumulator | None = None
+        self._probe_scheduler: ProbeScheduler | None = None
+        self._probe_thread: threading.Thread | None = None
+        self._store: PersistenceStore | None = (
+            PersistenceStore(
+                state_dir=self._config.state_dir,
+                agent_name=self._config.agent_name,
+            )
+            if self._config.state_dir is not None
+            else None
+        )
+        self._turns_since_snapshot = 0
         # Build a shared sentence-transformer embedder used by both the
         # session baseline and any induced detectors. One model per
         # process — eliminates the ~5–15 s double-load cold-start
@@ -166,10 +199,20 @@ class MonitoringHarness:
             setter = getattr(detector, "set_embedder", None)
             if callable(setter):
                 setter(self._shared_embedder)
+
+        # Distribute the operator's declared authorized-tool allow-list
+        # (Source 1: DECLARED) to every detector that consumes it.
+        # SasterDetector.set_authorized_tools is a no-op on the base
+        # class; Saster13InducedDetector and future allow-list-aware
+        # detectors override.
+        authorized = tuple(self._config.authorized_tools)
+        for detector in self._detectors:
+            detector.set_authorized_tools(authorized)
         self._allow_induce = allow_induce
-        self._baseline = SessionBaseline(
+        self._baseline = EmbeddingBaseline(
             model_name=config.embedding_model,
             baseline_turns=config.baseline_turns,
+            baseline_hours=config.baseline_hours,
             embedder=self._shared_embedder,
         )
         self._events: deque[DetectionEvent] = deque(maxlen=event_buffer_size)
@@ -218,12 +261,56 @@ class MonitoringHarness:
             self._config.listen_port,
         )
 
+        # Restore persisted state before any boot-time work runs so
+        # the refusal sampler etc. see prior state when present.
+        if self._store is not None:
+            self._store.load_centroids(self._baseline)
+            self._store.load_structural(self._detectors)
+
+        # Boot-time refusal sampling (Source 2: TRAINED). Builds the
+        # trained refusal centroid before the proxy starts so the first
+        # captured flow can score against it. Failures degrade
+        # gracefully to corpus-only behavior.
+        trained = self._build_trained_baseline()
+        if self._store is not None and self._calibration_receipt is not None:
+            self._store.write_calibration_receipt(self._calibration_receipt)
+        self._composite_baseline = SessionBaseline(
+            declared=tuple(self._config.authorized_tools),
+            trained=trained,
+            observed=self._baseline,
+            tool_call_mix=ObservedToolCallMix(window_hours=24.0),
+        )
+        # Push the trained centroid into SASTER-18-induced so its
+        # corpus-distance signal uses the agent-sampled centroid
+        # instead of lazy-computing from the bundled corpus on first
+        # scoring call.
+        if trained.is_available():
+            for detector in self._detectors:
+                setter = getattr(detector, "set_refusal_centroid", None)
+                if callable(setter):
+                    setter(trained.centroid)
+
+        # DriftAccumulator — computes the four-signal composite per turn
+        # and emits SASTER-DRIFT-COMPOSITE / SASTER-AUTONOMOUS-ESCALATION
+        # synthetic events through the same sink the proxy uses.
+        self._drift = DriftAccumulator(
+            baseline=self._composite_baseline,
+            max_drift_score=self._config.max_drift_score,
+            max_autonomous_hits=self._config.max_autonomous_hits,
+            embedder=self._shared_embedder,
+            susceptibility_cache=self._susceptibility_cache,
+            agent_endpoint_host=parse_host(self._config.agent_endpoint),
+            sink=self._handle_event,
+            agent_name=self._config.agent_name,
+        )
+
         addon = HarnessAddon(
             adapter=self._adapter,
             detectors=self._detectors,
             baseline=self._baseline,
             sink=self._handle_event,
             agent_name=self._config.agent_name,
+            turn_sink=self._handle_turn,
         )
 
         self._proxy_thread = threading.Thread(
@@ -250,6 +337,12 @@ class MonitoringHarness:
         if self._stop_event.is_set():
             return
         self._stop_event.set()
+        # Final snapshot before exit so the next start() restores fully.
+        if self._store is not None:
+            try:
+                self._store.snapshot(self._baseline, self._detectors)
+            except Exception:  # pragma: no cover — defensive
+                logger.exception("Final snapshot failed")
         logger.info("Harness stop signal sent.")
         # mitmproxy DumpMaster shutdown is initiated from within
         # _run_proxy via the stop event; the thread cleans up itself.
@@ -307,6 +400,32 @@ class MonitoringHarness:
     def _handle_event(self, event: DetectionEvent) -> None:
         with self._events_lock:
             self._events.append(event)
+
+        # Feed distinct-firings tracking to the drift accumulator.
+        # The accumulator filters out its own synthetic events.
+        if self._drift is not None:
+            self._drift.observe_event(event)
+
+        # Append drift / escalation events to the on-disk audit log.
+        if self._store is not None:
+            self._store.append_drift_event(event)
+
+        in_shadow = self._is_in_shadow(event)
+        if in_shadow:
+            # Shadow mode: record + DEBUG-log only; do NOT page out via
+            # the alert webhook. The event is still available on the
+            # in-memory buffer and the stream iterator for tests and
+            # analyst tooling.
+            logger.debug(
+                "SHADOW %s · %s · T%d · session=%s turn=%d (baseline not yet established)",
+                event.saster_id,
+                event.pattern_name,
+                event.tier,
+                event.session_id[:12],
+                event.turn_idx,
+            )
+            return
+
         logger.info(
             "DETECTION %s · %s · T%d · session=%s turn=%d",
             event.saster_id,
@@ -317,6 +436,45 @@ class MonitoringHarness:
         )
         if self._config.alert_webhook:
             self._dispatch_webhook(event)
+
+    def _handle_turn(self, turn: TurnData) -> None:
+        """Per-turn callback wired into the proxy's ``turn_sink``.
+
+        Routes the turn to the drift accumulator (if constructed) and
+        to the observed-tool-call mix counter on the composite
+        baseline. Synthetic-event emission is the accumulator's
+        responsibility — this method does not directly fire anything."""
+        if self._drift is not None:
+            self._drift.observe_turn(turn)
+        if self._composite_baseline is not None:
+            host = (turn.target_host or "").lower().strip()
+            if host:
+                self._composite_baseline.tool_call_mix.observe(
+                    host, timestamp=turn.timestamp,
+                )
+        if self._store is not None:
+            self._turns_since_snapshot += 1
+            if self._turns_since_snapshot >= self._config.snapshot_every_turns:
+                self._turns_since_snapshot = 0
+                self._store.snapshot(self._baseline, self._detectors)
+
+    def _is_in_shadow(self, event: DetectionEvent) -> bool:
+        """Return True when ``event`` should be suppressed from the
+        alert webhook because the session baseline has not locked in
+        and shadow mode is enabled."""
+        if not self._config.shadow_mode:
+            return False
+        # Synthetic events emitted by the drift / probe / sampler
+        # subsystems are not tied to a live session baseline — they
+        # always fire through the full alert path.
+        synthetic_prefixes = (
+            "SASTER-DRIFT", "SASTER-AUTONOMOUS", "SASTER-PROBE",
+        )
+        if any(event.saster_id.startswith(p) for p in synthetic_prefixes):
+            return False
+        if not event.session_id:
+            return False
+        return not self._baseline.is_established(event.session_id)
 
     def _dispatch_webhook(self, event: DetectionEvent) -> None:
         """Fire-and-forget POST. Failures are logged but do not raise — a
@@ -337,13 +495,106 @@ class MonitoringHarness:
             logger.exception("Alert webhook POST failed")
 
     def _start_probe_scheduler(self) -> None:
-        """v0.2 work — schedules probes derived from SASTER pattern
-        definitions every ``probe_interval_hours``. For v0.1 this is
-        a logged no-op so PROBE mode behaves identically to OBSERVE
-        rather than silently failing."""
-        logger.warning(
-            "PROBE mode scheduler is a v0.2 feature; running as OBSERVE in v0.1."
+        """Construct and start the PROBE-mode side-loop.
+
+        Replaces the v0.1/v0.2 logged-warning stub. The scheduler runs
+        as a daemon thread, wakes every ``probe_interval_hours``, and
+        invokes every :class:`InductionDetector` against the configured
+        :class:`Prober`. Divergence scores feed the
+        :class:`DriftAccumulator`'s susceptibility lookup."""
+        prober = self._ensure_prober()
+        if prober is None:
+            logger.warning(
+                "PROBE mode requested but no prober is available "
+                "(operator did not pass one and HttpInjector could not "
+                "be constructed against %s). Scheduler will idle.",
+                self._config.agent_endpoint,
+            )
+        interval_seconds = float(self._config.probe_interval_hours) * 3600.0
+        self._probe_scheduler = ProbeScheduler(
+            detectors=self._detectors,
+            prober=prober,
+            sink=self._handle_event,
+            susceptibility_cache=self._susceptibility_cache,
+            interval_seconds=interval_seconds,
+            probe_on_start=self._config.probe_on_start,
         )
+        self._probe_thread = self._probe_scheduler.start_thread(self._stop_event)
+
+    # ----------------------------------------------------------------
+    # v0.3 baseline construction
+    # ----------------------------------------------------------------
+
+    def _ensure_prober(self) -> Prober | None:
+        """Return the operator-supplied Prober, or construct a default
+        HTTP one against ``config.agent_endpoint`` on first call.
+
+        Returns ``None`` if construction fails (e.g., httpx not
+        installed). The caller is responsible for graceful degradation.
+        """
+        if self._prober is not None:
+            return self._prober
+        try:
+            injector = HttpInjector(
+                endpoint=self._config.agent_endpoint,
+            )
+            self._prober = Prober(backend=injector)
+        except Exception:  # pragma: no cover — defensive
+            logger.exception(
+                "Could not construct default HttpInjector for prober.",
+            )
+            return None
+        return self._prober
+
+    def _build_trained_baseline(self) -> TrainedRefusalBaseline:
+        """Sample the agent's refusal distribution (Source 2: TRAINED)
+        and return a populated baseline. Falls back to corpus-only
+        centroid when sampling is disabled or the endpoint is
+        unreachable."""
+        if not self._config.sample_refusal_baseline:
+            # Sampling explicitly off: ship a corpus-only centroid so
+            # the trained signal still contributes to drift composition.
+            sampler = RefusalSampler(
+                embedder=self._shared_embedder,
+                embedding_model_name=self._config.embedding_model,
+            )
+            baseline, receipt = sampler.sample(
+                prober=None,
+                agent_endpoint=self._config.agent_endpoint,
+            )
+            self._calibration_receipt = receipt
+            return baseline
+
+        prober = self._ensure_prober()
+        sampler = RefusalSampler(
+            embedder=self._shared_embedder,
+            embedding_model_name=self._config.embedding_model,
+        )
+        baseline, receipt = sampler.sample(
+            prober=prober,
+            agent_endpoint=self._config.agent_endpoint,
+        )
+        self._calibration_receipt = receipt
+        return baseline
+
+    @property
+    def probe_scheduler(self) -> ProbeScheduler | None:
+        """The PROBE-mode scheduler, when ``start()`` was called with
+        ``HarnessMode.PROBE`` and a non-zero ``probe_interval_hours``.
+        Otherwise ``None``."""
+        return self._probe_scheduler
+
+    @property
+    def composite_baseline(self) -> SessionBaseline | None:
+        """The composite SessionBaseline assembled at ``start()``.
+        ``None`` until ``start()`` has been called."""
+        return self._composite_baseline
+
+    @property
+    def calibration_receipt(self) -> CalibrationReceipt | None:
+        """The receipt produced by the boot-time refusal sampler.
+        ``None`` until ``start()`` has been called."""
+        return self._calibration_receipt
 
 
 async def _shutdown_when_stopped(master: object, stop_event: threading.Event) -> None:

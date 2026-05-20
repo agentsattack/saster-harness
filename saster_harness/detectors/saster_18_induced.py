@@ -211,6 +211,19 @@ class Saster18InducedDetector(InductionDetector):
         self._centroid = None
         self._real_embedder = None
 
+    def set_refusal_centroid(self, centroid: np.ndarray | None) -> None:
+        """Replace the refusal-corpus centroid with one supplied by the
+        harness — typically the trained centroid sampled from the live
+        agent by :class:`~saster_harness.refusal_sampler.RefusalSampler`
+        at boot.
+
+        Passing ``None`` reverts the detector to lazy-compute-from-corpus
+        on the next scoring call."""
+        if centroid is None:
+            self._centroid = None
+            return
+        self._centroid = _normalize(np.asarray(centroid, dtype=np.float32))
+
     # ----------------------------------------------------------------
     # InductionDetector overrides
     # ----------------------------------------------------------------

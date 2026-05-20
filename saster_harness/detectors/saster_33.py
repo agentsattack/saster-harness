@@ -114,6 +114,37 @@ class ContextStrippingDetector(SasterDetector):
         with self._lock:
             self._baselines.pop(session_id, None)
 
+    def export_state(self) -> dict[str, dict[str, object]]:
+        """Return a JSON-serialisable snapshot of per-session
+        structural baselines. Used by the v0.3 persistence layer to
+        save SASTER-33 state across harness restarts."""
+        out: dict[str, dict[str, object]] = {}
+        with self._lock:
+            for session_id, state in self._baselines.items():
+                out[session_id] = {
+                    "turns_seen": state.turns_seen,
+                    "with_system": state.with_system,
+                    "without_system": state.without_system,
+                    "expects_system": state.expects_system,
+                }
+        return out
+
+    def import_state(self, snapshot: dict[str, dict[str, object]]) -> None:
+        """Restore per-session structural baselines from a previous
+        :meth:`export_state` snapshot."""
+        with self._lock:
+            for session_id, payload in snapshot.items():
+                expects = payload.get("expects_system")
+                state = _StructuralBaseline(
+                    turns_seen=int(payload.get("turns_seen", 0)),  # type: ignore[arg-type]
+                    with_system=int(payload.get("with_system", 0)),  # type: ignore[arg-type]
+                    without_system=int(payload.get("without_system", 0)),  # type: ignore[arg-type]
+                    expects_system=(
+                        bool(expects) if isinstance(expects, bool) else None
+                    ),
+                )
+                self._baselines[session_id] = state
+
     def evaluate(self, turn: TurnData) -> DetectionEvent | None:
         # ``None`` means the adapter could not determine system-message
         # presence — skip rather than guess.

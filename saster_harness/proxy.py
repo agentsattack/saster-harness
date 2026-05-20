@@ -28,7 +28,7 @@ from collections.abc import Callable, Iterable
 from typing import Any
 
 from .adapters.base import BaseAdapter
-from .baseline import SessionBaseline
+from .baseline import EmbeddingBaseline
 from .detector import SasterDetector
 from .event import DetectionEvent, TurnData
 
@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 EventSink = Callable[[DetectionEvent], None]
+TurnSink = Callable[[TurnData], None]
 
 
 class HarnessAddon:
@@ -51,15 +52,17 @@ class HarnessAddon:
         *,
         adapter: BaseAdapter,
         detectors: Iterable[SasterDetector],
-        baseline: SessionBaseline,
+        baseline: EmbeddingBaseline,
         sink: EventSink,
         agent_name: str,
+        turn_sink: TurnSink | None = None,
     ) -> None:
         self._adapter = adapter
         self._detectors = list(detectors)
         self._baseline = baseline
         self._sink = sink
         self._agent_name = agent_name
+        self._turn_sink = turn_sink
         self._turn_counters: dict[str, int] = {}
 
     # ----------------------------------------------------------------
@@ -115,6 +118,18 @@ class HarnessAddon:
         )
 
         self._run_detectors(turn)
+
+        # Notify the harness-level drift accumulator (or any other
+        # per-turn observer). Runs AFTER detectors so any same-turn
+        # firings have already populated their state.
+        if self._turn_sink is not None:
+            try:
+                self._turn_sink(turn)
+            except Exception:  # pragma: no cover — defensive
+                logger.exception(
+                    "turn_sink raised on session=%s turn=%d",
+                    turn.session_id, turn.turn_idx,
+                )
 
     def _run_detectors(self, turn: TurnData) -> None:
         for detector in self._detectors:
