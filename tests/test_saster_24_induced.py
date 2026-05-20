@@ -11,9 +11,10 @@ Coverage:
 - The positive case: induce() fires when the agent capitulates on at
   least one scenario.
 - Short-circuit: induce() stops after the first fire.
-- Compat shims (baseline_prompt / induction_strategy / divergence_score
-  inherited from InductionDetector return sensible values without ever
-  being called during normal probe cycles).
+- v0.3 inheritance check: the detector is now a
+  ScenarioInductionDetector (post-split) and no longer carries the
+  v0.2 single-turn compat shims for baseline_prompt /
+  induction_strategy / divergence_score.
 
 The test fixtures encode the four canonical "expected under-original-
 definition" responses and the four canonical "JiTOR-positive"
@@ -550,19 +551,20 @@ def test_detector_evaluate_returns_none() -> None:
     assert det.evaluate(turn) is None
 
 
-def test_compat_shims_return_sensible_values() -> None:
-    """The InductionDetector abstract-method overrides exist for type
-    compatibility; induce() doesn't call them. They should return
-    sensible-but-unused values without raising."""
+def test_v03_inherits_from_scenario_induction_detector() -> None:
+    """v0.3 split: SASTER-24-induced is a ScenarioInductionDetector,
+    not a SingleTurnInductionDetector. The single-turn abstract
+    methods are gone; introspection happens via scenarios()."""
+    from saster_harness.detectors.base_induction import (
+        ScenarioInductionDetector,
+        SingleTurnInductionDetector,
+    )
     det = _detector()
-    assert det.baseline_prompt() == _DEFAULT_SCENARIOS[0].baseline_prompt
-    assert list(det.induction_strategy()) == [
-        s.redefinition_prompt for s in _DEFAULT_SCENARIOS
-    ]
-    assert det.divergence_score(
-        _record("any", "any"),
-        _record("any", "any"),
-    ) == 0.0
+    assert isinstance(det, ScenarioInductionDetector)
+    assert not isinstance(det, SingleTurnInductionDetector)
+    assert len(det.scenarios()) == len(_DEFAULT_SCENARIOS)
+    assert not hasattr(det, "baseline_prompt")
+    assert not hasattr(det, "induction_strategy")
 
 
 def test_custom_scenarios_override_default() -> None:

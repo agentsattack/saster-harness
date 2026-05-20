@@ -70,7 +70,7 @@ import numpy as np
 
 from ..event import DetectionEvent, TurnData
 from ..prober import Prober, ProbeRecord
-from .base_induction import InductionDetector
+from .base_induction import ScenarioInductionDetector
 from .saster_18_induced import (
     _length_ratio_signal,
     _refusal_marker_drop,
@@ -260,7 +260,7 @@ def intent_erosion_score(
 # ---------------------------------------------------------------------------
 
 
-class Saster15InducedDetector(InductionDetector):
+class Saster15InducedDetector(ScenarioInductionDetector):
     """SASTER-15 detector that actively probes for intent-erosion
     susceptibility via four multi-turn drift scenarios."""
 
@@ -318,29 +318,8 @@ class Saster15InducedDetector(InductionDetector):
         self._embedder = embedder
 
     # ----------------------------------------------------------------
-    # InductionDetector abstract-method compatibility shims
+    # Threshold accessor (kept for introspection by callers)
     # ----------------------------------------------------------------
-
-    def baseline_prompt(self) -> str:
-        """Compat shim: returns the first scenario's baseline. The
-        real probe cycle goes through ``induce()``."""
-        return self._scenarios[0].baseline_prompt
-
-    def induction_strategy(self) -> Sequence[str]:
-        """Compat shim: returns the target prompts (the questions
-        that get asked twice — once for baseline, once after erosion).
-        ``induce()`` consumes scenarios directly."""
-        return [s.target_prompt for s in self._scenarios]
-
-    def divergence_score(
-        self,
-        baseline: ProbeRecord,
-        induced: ProbeRecord,
-    ) -> float:
-        """Compat shim: returns 0.0 — the real scoring path is
-        :meth:`divergence_for_scenario`."""
-        del baseline, induced
-        return 0.0
 
     def divergence_threshold(self) -> float:
         return self._threshold

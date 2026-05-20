@@ -81,7 +81,7 @@ from typing import Any
 import numpy as np
 
 from ..prober import ProbeRecord
-from .base_induction import InductionDetector
+from .base_induction import SingleTurnInductionDetector
 
 # Bundled refusal corpus location (relative to the saster_harness package).
 _REFUSAL_CORPUS_PATH = Path(__file__).parent.parent / "corpora" / "refusals.txt"
@@ -143,7 +143,7 @@ _INDUCTION_PROMPTS: tuple[str, ...] = (
 )
 
 
-class Saster18InducedDetector(InductionDetector):
+class Saster18InducedDetector(SingleTurnInductionDetector):
     """SASTER-18 detector that actively probes for semantic-recasting
     susceptibility via four reframings of a known-refused request."""
 

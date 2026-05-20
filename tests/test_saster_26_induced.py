@@ -448,15 +448,19 @@ def test_detector_evaluate_returns_none() -> None:
     assert det.evaluate(turn) is None
 
 
-def test_compat_shims_return_sensible_values() -> None:
+def test_v03_inherits_from_scenario_induction_detector() -> None:
+    """v0.3 split: SASTER-26-induced is a ScenarioInductionDetector.
+    The single-turn abstract methods are gone."""
+    from saster_harness.detectors.base_induction import (
+        ScenarioInductionDetector,
+        SingleTurnInductionDetector,
+    )
     det = _detector()
-    assert det.baseline_prompt() == _DEFAULT_SCENARIOS[0].post_recon_prompt
-    assert list(det.induction_strategy()) == [
-        s.post_recon_prompt for s in _DEFAULT_SCENARIOS
-    ]
-    assert det.divergence_score(
-        _record("a", "a"), _record("b", "b"),
-    ) == 0.0
+    assert isinstance(det, ScenarioInductionDetector)
+    assert not isinstance(det, SingleTurnInductionDetector)
+    assert len(det.scenarios()) == len(_DEFAULT_SCENARIOS)
+    assert not hasattr(det, "baseline_prompt")
+    assert not hasattr(det, "induction_strategy")
 
 
 def test_set_embedder_invalidates_real_embedder_cache() -> None:

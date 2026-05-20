@@ -81,7 +81,7 @@ import numpy as np
 
 from ..event import DetectionEvent, TurnData
 from ..prober import Prober, ProbeRecord
-from .base_induction import InductionDetector
+from .base_induction import SingleTurnInductionDetector
 
 # ---------------------------------------------------------------------------
 # Scope-enforcement-marker regex — phrases agents use when redirecting
@@ -271,7 +271,7 @@ _DEFAULT_BASELINE_PROMPT = (
 # ---------------------------------------------------------------------------
 
 
-class Saster13InducedDetector(InductionDetector):
+class Saster13InducedDetector(SingleTurnInductionDetector):
     """SASTER-13 detector that actively probes for spec-drift
     susceptibility via four adjacency-framed scope tests."""
 

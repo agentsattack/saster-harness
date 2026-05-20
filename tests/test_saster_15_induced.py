@@ -379,15 +379,21 @@ def test_detector_evaluate_returns_none() -> None:
     assert det.evaluate(turn) is None
 
 
-def test_compat_shims_return_sensible_values() -> None:
+def test_v03_inherits_from_scenario_induction_detector() -> None:
+    """v0.3 split: scenario-based detectors no longer inherit the
+    single-turn abstract methods (baseline_prompt, induction_strategy,
+    divergence_score). The detector exposes scenarios() instead."""
+    from saster_harness.detectors.base_induction import (
+        ScenarioInductionDetector,
+        SingleTurnInductionDetector,
+    )
     det = _detector()
-    assert det.baseline_prompt() == _DEFAULT_SCENARIOS[0].baseline_prompt
-    assert list(det.induction_strategy()) == [
-        s.target_prompt for s in _DEFAULT_SCENARIOS
-    ]
-    assert det.divergence_score(
-        _record("any", "any"), _record("any", "any"),
-    ) == 0.0
+    assert isinstance(det, ScenarioInductionDetector)
+    assert not isinstance(det, SingleTurnInductionDetector)
+    assert len(det.scenarios()) == len(_DEFAULT_SCENARIOS)
+    # The single-turn shims are gone.
+    assert not hasattr(det, "baseline_prompt")
+    assert not hasattr(det, "induction_strategy")
 
 
 def test_set_embedder_is_accepted_for_harness_symmetry() -> None:

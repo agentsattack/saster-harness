@@ -68,6 +68,26 @@ them load-bearing.
   model, corpus sha). State is loaded at `start()` and snapshotted
   every 50 turns plus on `stop()`. Default `None` = in-memory only,
   matching v0.2 muscle memory.
+- **`InductionDetector` split into single-turn vs scenario subclasses.**
+  `InductionDetector` becomes the polymorphic abstract parent
+  (only `induce()` abstract). `SingleTurnInductionDetector` carries
+  the v0.2 contract (`baseline_prompt` / `induction_strategy` /
+  `divergence_score` / concrete `induce()` loop); SASTER-18-induced
+  and SASTER-13-induced inherit from it.
+  `ScenarioInductionDetector` declares `scenarios()` abstract and
+  leaves `induce()` for the subclass; SASTER-15-induced,
+  SASTER-24-induced, and SASTER-26-induced inherit from it and
+  drop their v0.2 compat shims. The scheduler's
+  `isinstance(d, InductionDetector)` check is unchanged and now
+  covers both shapes.
+- **`HttpInjector.induction_timeout`.** New constructor parameter
+  (default 180 s) supplies a per-request timeout for the
+  chat-completion POST in `send()`, separate from the existing
+  `timeout` (which still configures the `httpx.Client` default).
+  Phase 4/5 calibration against Llama-3.3-70B established that
+  multi-paragraph induction probes routinely exceed the v0.2 30 s
+  default; v0.3 ships the 180 s default so induction-mode users
+  on self-hosted targets stop discovering the issue in production.
 
 ### Changed
 
@@ -79,15 +99,14 @@ them load-bearing.
 - `__version__` corrected from `0.1.0` (stale since the v0.2 release)
   to track `pyproject.toml`.
 
-### Deferred to v0.4
+### Breaking changes
 
-- Split `InductionDetector` into `SingleTurnInductionDetector` and
-  `ScenarioInductionDetector` with distinct contracts. The compat
-  shims SASTER-13/15/26-induced use for abstract methods will become
-  honest type signatures in v0.4.
-- Surface `induction_timeout` separately on `HttpInjector` so the
-  Phase 4/5 Llama-3.3-70B 180 s default ships without users having
-  to discover the issue in production.
+- v0.2 `InductionDetector` subclasses (if any existed outside this
+  repository — none in our codebase) must migrate by changing
+  their parent class to `SingleTurnInductionDetector`. The
+  polymorphic `InductionDetector` no longer carries a concrete
+  `induce()` implementation, so an unmodified subclass would no
+  longer have a runnable probe loop.
 
 ## [0.2.0] — 2026-05-17
 

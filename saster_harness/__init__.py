@@ -36,7 +36,11 @@ from .baseline import (
 )
 from .config import HarnessMode, MonitoringConfig
 from .detector import SasterDetector
-from .detectors.base_induction import InductionDetector
+from .detectors.base_induction import (
+    InductionDetector,
+    ScenarioInductionDetector,
+    SingleTurnInductionDetector,
+)
 from .detectors.saster_13_induced import Saster13InducedDetector
 from .detectors.saster_15_induced import Saster15InducedDetector
 from .detectors.saster_18_induced import Saster18InducedDetector
@@ -69,7 +73,9 @@ __all__ = [
     "Saster24InducedDetector",
     "Saster26InducedDetector",
     "SasterDetector",
+    "ScenarioInductionDetector",
     "SessionBaseline",
+    "SingleTurnInductionDetector",
     "TrainedRefusalBaseline",
     "TurnData",
     "__version__",

@@ -33,7 +33,21 @@ class HttpInjector:
         Optional headers to include on every probe POST (e.g.
         ``{"Authorization": "Bearer ..."}``).
     timeout
-        HTTP request timeout in seconds.
+        Default ``httpx.Client`` timeout in seconds. Applies to
+        connection / read operations on the underlying client; v0.3
+        no longer uses this directly for the chat-completion POST —
+        ``induction_timeout`` overrides per-request.
+    induction_timeout
+        Per-request timeout for the chat-completion POST in
+        :meth:`send`. Default ``180.0`` seconds. Larger than
+        ``timeout`` because induction-mode probes against slow
+        targets (70B-class self-hosted models in particular) can
+        easily push first-token latency past 30 s on long inputs.
+        Phase 4/5 calibration against Llama-3.3-70B showed that 30 s
+        produces spurious timeouts on multi-paragraph reframings;
+        180 s reliably completes. Set lower for fast hosted APIs
+        (e.g. ``induction_timeout=30.0`` for Anthropic / OpenAI
+        production endpoints).
     model
         Optional model identifier to include in the request body.
         Set to ``None`` to omit (some self-hosted endpoints reject
@@ -49,15 +63,25 @@ class HttpInjector:
         endpoint: str,
         headers: dict[str, str] | None = None,
         timeout: float = 30.0,
+        induction_timeout: float = 180.0,
         model: str | None = None,
         client: Any = None,
     ) -> None:
         self._endpoint = endpoint
         self._headers = dict(headers or {})
         self._timeout = timeout
+        self._induction_timeout = induction_timeout
         self._model = model
         self._client = client
         self._owns_client = client is None
+
+    @property
+    def induction_timeout(self) -> float:
+        return self._induction_timeout
+
+    @property
+    def timeout(self) -> float:
+        return self._timeout
 
     def send(self, session_id: str, content: str) -> str:
         client = self._ensure_client()
@@ -67,7 +91,17 @@ class HttpInjector:
         if self._model:
             body["model"] = self._model
         headers = {**self._headers, "X-Session-Id": session_id}
-        response = client.post(self._endpoint, json=body, headers=headers)
+        # Per-request override of the client default. Induction probes
+        # against slow self-hosted targets routinely exceed the 30 s
+        # connect/read default; the per-request timeout keeps the
+        # send() path resilient without forcing every other client
+        # call to also wait 180 s.
+        response = client.post(
+            self._endpoint,
+            json=body,
+            headers=headers,
+            timeout=self._induction_timeout,
+        )
         response.raise_for_status()
         data = response.json()
         return _extract_response_text(data)

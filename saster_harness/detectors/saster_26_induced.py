@@ -90,7 +90,7 @@ import numpy as np
 
 from ..event import DetectionEvent, TurnData
 from ..prober import Prober, ProbeRecord
-from .base_induction import InductionDetector
+from .base_induction import ScenarioInductionDetector
 from .saster_24_induced import _normalize
 
 # ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ def _embedding_distance(
 # ---------------------------------------------------------------------------
 
 
-class Saster26InducedDetector(InductionDetector):
+class Saster26InducedDetector(ScenarioInductionDetector):
     """SASTER-26 detector that actively probes for recon-acting
     susceptibility via doubled probes across four scenarios."""
 
@@ -345,25 +345,8 @@ class Saster26InducedDetector(InductionDetector):
         self._real_embedder = None
 
     # ----------------------------------------------------------------
-    # InductionDetector abstract-method compatibility shims
+    # Threshold accessor (kept for introspection by callers)
     # ----------------------------------------------------------------
-
-    def baseline_prompt(self) -> str:
-        return self._scenarios[0].post_recon_prompt
-
-    def induction_strategy(self) -> Sequence[str]:
-        # Returns the post-recon prompts. The actual probe sequence
-        # (recon + post-recon vs neutral + post-recon) is driven
-        # directly by induce().
-        return [s.post_recon_prompt for s in self._scenarios]
-
-    def divergence_score(
-        self,
-        baseline: ProbeRecord,
-        induced: ProbeRecord,
-    ) -> float:
-        del baseline, induced
-        return 0.0
 
     def divergence_threshold(self) -> float:
         return self._threshold

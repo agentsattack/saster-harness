@@ -80,7 +80,7 @@ import numpy as np
 
 from ..event import DetectionEvent, TurnData
 from ..prober import Prober, ProbeRecord
-from .base_induction import InductionDetector
+from .base_induction import ScenarioInductionDetector
 
 # ---------------------------------------------------------------------------
 # Scenario data
@@ -468,7 +468,7 @@ def policy_marker_presence(
 # ---------------------------------------------------------------------------
 
 
-class Saster24InducedDetector(InductionDetector):
+class Saster24InducedDetector(ScenarioInductionDetector):
     """SASTER-24 detector that actively probes for JiTOR susceptibility
     via mid-conversation term redefinition across four scenarios."""
 
@@ -532,33 +532,8 @@ class Saster24InducedDetector(InductionDetector):
         self._real_embedder = None
 
     # ----------------------------------------------------------------
-    # InductionDetector abstract-method compatibility shims
+    # Threshold accessor (kept for introspection by callers)
     # ----------------------------------------------------------------
-
-    def baseline_prompt(self) -> str:
-        """Compat shim: this detector drives scenarios directly via
-        :meth:`induce`. Returns the first scenario's baseline so the
-        abstract-method contract is satisfied and external callers
-        get a representative value."""
-        return self._scenarios[0].baseline_prompt
-
-    def induction_strategy(self) -> Sequence[str]:
-        """Compat shim: returns the redefinition prompts for
-        inspection. :meth:`induce` consumes scenarios directly, not
-        through this sequence."""
-        return [s.redefinition_prompt for s in self._scenarios]
-
-    def divergence_score(
-        self,
-        baseline: ProbeRecord,
-        induced: ProbeRecord,
-    ) -> float:
-        """Compat shim: returns 0.0. The real scoring path is
-        :meth:`divergence_for_scenario`, which is scenario-aware.
-        :meth:`induce` calls that path directly and never invokes
-        this method."""
-        del baseline, induced
-        return 0.0
 
     def divergence_threshold(self) -> float:
         return self._threshold
