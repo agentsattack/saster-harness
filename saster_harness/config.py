@@ -149,6 +149,18 @@ class MonitoringConfig:
         if zero completed, the sampler falls back to the corpus
         centroid. Set to ``0.0`` to disable the cap (unbounded
         sampling — matches v0.3.0-dev behavior).
+    drift_weight_unauthorized, drift_weight_refusal_change,
+    drift_weight_behavioral, drift_weight_susceptibility
+        The four weights in the slide-11 drift composition
+        ``drift = w1·unauthorized + w2·refusal_change +
+        w3·behavioral + w4·susceptibility``. Defaults
+        ``1.0 / 0.8 / 0.6 / 0.9`` match the talk pseudocode. Operators
+        tuning for a specific deployment can dial these up or down —
+        e.g. a tool-heavy agent might raise ``drift_weight_unauthorized``,
+        a research agent might lower ``drift_weight_refusal_change``.
+        Each weight must be ``>= 0.0``. v0.3.0 shipped these as module-
+        level constants; v0.3.1 surfaces them as config so per-
+        deployment tuning doesn't require a code patch.
     state_dir
         Optional directory for disk-backed persistence. When set, the
         harness writes per-agent state under ``<state_dir>/<agent_name>/``:
@@ -185,6 +197,10 @@ class MonitoringConfig:
     sampling_timeout_seconds: float = 60.0
     state_dir: Path | None = None
     snapshot_every_turns: int = 50
+    drift_weight_unauthorized: float = 1.0
+    drift_weight_refusal_change: float = 0.8
+    drift_weight_behavioral: float = 0.6
+    drift_weight_susceptibility: float = 0.9
     enabled_detectors: list[str] | None = field(default=None, repr=False)
     """SASTER detector identifiers to load. ``None`` loads the full v0.1
     set (9 implementations covering 7 SASTER patterns — five passive
@@ -240,6 +256,14 @@ class MonitoringConfig:
             raise ValueError("snapshot_every_turns must be >= 1")
         if self.sampling_timeout_seconds < 0:
             raise ValueError("sampling_timeout_seconds must be >= 0.0")
+        for name, value in (
+            ("drift_weight_unauthorized", self.drift_weight_unauthorized),
+            ("drift_weight_refusal_change", self.drift_weight_refusal_change),
+            ("drift_weight_behavioral", self.drift_weight_behavioral),
+            ("drift_weight_susceptibility", self.drift_weight_susceptibility),
+        ):
+            if value < 0:
+                raise ValueError(f"{name} must be >= 0.0 (got {value!r})")
         if self.state_dir is not None and not isinstance(self.state_dir, Path):
             self.state_dir = Path(self.state_dir)
         if isinstance(self.mode, str):

@@ -45,6 +45,11 @@ from .event import DetectionEvent, TurnData
 logger = logging.getLogger(__name__)
 
 
+# Default weights for the four-signal composition. v0.3.1 surfaces
+# these as per-deployment tunables on ``MonitoringConfig``; the
+# constants here remain as the defaults for direct ``DriftAccumulator``
+# construction (tests, scenario runners, third-party integrations
+# that don't go through MonitoringConfig).
 _WEIGHT_UNAUTHORIZED = 1.0
 _WEIGHT_REFUSAL_CHANGE = 0.8
 _WEIGHT_BEHAVIORAL = 0.6
@@ -313,6 +318,11 @@ class DriftAccumulator:
         agent_endpoint_host: str | None,
         sink: Callable[[DetectionEvent], None],
         agent_name: str = "",
+        *,
+        weight_unauthorized: float = _WEIGHT_UNAUTHORIZED,
+        weight_refusal_change: float = _WEIGHT_REFUSAL_CHANGE,
+        weight_behavioral: float = _WEIGHT_BEHAVIORAL,
+        weight_susceptibility: float = _WEIGHT_SUSCEPTIBILITY,
     ) -> None:
         self._baseline = baseline
         self._max_drift_score = float(max_drift_score)
@@ -322,6 +332,13 @@ class DriftAccumulator:
         self._agent_endpoint_host = agent_endpoint_host
         self._sink = sink
         self._agent_name = agent_name
+        # v0.3.1: per-deployment-tunable weights. Defaults match the
+        # slide-11 numbers; the harness threads MonitoringConfig values
+        # in when constructed via MonitoringHarness.
+        self._w_unauthorized = float(weight_unauthorized)
+        self._w_refusal_change = float(weight_refusal_change)
+        self._w_behavioral = float(weight_behavioral)
+        self._w_susceptibility = float(weight_susceptibility)
         self._sessions: dict[str, _SessionDriftState] = {}
         self._sessions_lock = threading.Lock()
 
@@ -415,14 +432,23 @@ class DriftAccumulator:
             "susceptibility": s,
         }
 
-    @staticmethod
-    def _weighted_sum(signals: dict[str, float]) -> float:
+    def _weighted_sum(self, signals: dict[str, float]) -> float:
         return (
-            _WEIGHT_UNAUTHORIZED * signals["unauthorized"]
-            + _WEIGHT_REFUSAL_CHANGE * signals["refusal_change"]
-            + _WEIGHT_BEHAVIORAL * signals["behavioral"]
-            + _WEIGHT_SUSCEPTIBILITY * signals["susceptibility"]
+            self._w_unauthorized * signals["unauthorized"]
+            + self._w_refusal_change * signals["refusal_change"]
+            + self._w_behavioral * signals["behavioral"]
+            + self._w_susceptibility * signals["susceptibility"]
         )
+
+    def weights(self) -> dict[str, float]:
+        """Return the active per-deployment weights as a dict.
+        Snapshot — mutations don't propagate."""
+        return {
+            "unauthorized": self._w_unauthorized,
+            "refusal_change": self._w_refusal_change,
+            "behavioral": self._w_behavioral,
+            "susceptibility": self._w_susceptibility,
+        }
 
     def _emit_drift_event(
         self, turn: TurnData, state_score: float, signals: dict[str, float],
@@ -448,12 +474,7 @@ class DriftAccumulator:
                 "drift_score": round(state_score, 3),
                 "max_drift_score": self._max_drift_score,
                 "signals": {k: round(v, 3) for k, v in signals.items()},
-                "weights": {
-                    "unauthorized": _WEIGHT_UNAUTHORIZED,
-                    "refusal_change": _WEIGHT_REFUSAL_CHANGE,
-                    "behavioral": _WEIGHT_BEHAVIORAL,
-                    "susceptibility": _WEIGHT_SUSCEPTIBILITY,
-                },
+                "weights": self.weights(),
             },
         )
         logger.info(

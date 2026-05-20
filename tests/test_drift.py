@@ -278,6 +278,96 @@ def test_accumulator_ignores_synthetic_events_for_escalation_counter() -> None:
     assert sink == []
 
 
+def test_accumulator_uses_custom_weights_when_supplied() -> None:
+    """v0.3.1: per-deployment-tunable weights. The accumulator honors
+    weight_* keyword args at construction; the slide-11 defaults are
+    just defaults."""
+    sink: list[DetectionEvent] = []
+    baseline = SessionBaseline(
+        declared=("github.com",),
+        trained=TrainedRefusalBaseline(),
+        observed=None,  # type: ignore[arg-type]
+        tool_call_mix=ObservedToolCallMix(),
+    )
+    # Custom weights: zero out unauthorized, double behavioral.
+    acc = DriftAccumulator(
+        baseline=baseline,
+        max_drift_score=0.5,
+        max_autonomous_hits=2,
+        embedder=_fake_embedder,
+        susceptibility_cache=SusceptibilityCache(),
+        agent_endpoint_host="agent.local",
+        sink=sink.append,
+        agent_name="t",
+        weight_unauthorized=0.0,
+        weight_refusal_change=0.0,
+        weight_behavioral=1.2,
+        weight_susceptibility=0.0,
+    )
+    # weights() snapshot exposes the active values.
+    assert acc.weights() == {
+        "unauthorized": 0.0,
+        "refusal_change": 0.0,
+        "behavioral": 1.2,
+        "susceptibility": 0.0,
+    }
+    # An unauthorized turn would contribute 1.0 under defaults but 0.0
+    # under these weights. behavioral_proximity 0.5 × 1.2 = 0.6 → crosses
+    # the 0.5 threshold.
+    t = _turn(target_host="evil.example.com", boundary_proximity=0.5)
+    acc.observe_turn(t)
+    assert len(sink) == 1
+    fired = sink[0]
+    assert fired.saster_id == SASTER_DRIFT_COMPOSITE
+    # Event evidence carries the active weights, not the defaults.
+    assert fired.evidence["weights"]["unauthorized"] == 0.0
+    assert fired.evidence["weights"]["behavioral"] == 1.2
+
+
+def test_accumulator_defaults_match_slide_11() -> None:
+    """The defaults haven't changed in v0.3.1 — only the ability to
+    override them. Pin the defaults so a future careless edit doesn't
+    silently break the stage narrative."""
+    sink: list[DetectionEvent] = []
+    baseline = SessionBaseline(
+        declared=(),
+        trained=TrainedRefusalBaseline(),
+        observed=None,  # type: ignore[arg-type]
+        tool_call_mix=ObservedToolCallMix(),
+    )
+    acc = DriftAccumulator(
+        baseline=baseline,
+        max_drift_score=10.0,
+        max_autonomous_hits=2,
+        embedder=_fake_embedder,
+        susceptibility_cache=SusceptibilityCache(),
+        agent_endpoint_host=None,
+        sink=sink.append,
+    )
+    assert acc.weights() == {
+        "unauthorized": 1.0,
+        "refusal_change": 0.8,
+        "behavioral": 0.6,
+        "susceptibility": 0.9,
+    }
+
+
+def test_config_validates_drift_weights_nonnegative() -> None:
+    """Negative weights are not meaningful and would invert the drift
+    signal. The config validator catches this."""
+    import pytest
+
+    from saster_harness.config import MonitoringConfig
+
+    with pytest.raises(ValueError, match="drift_weight_behavioral"):
+        MonitoringConfig(
+            agent_name="t",
+            agent_endpoint="http://t/",
+            authorized_tools=[],
+            drift_weight_behavioral=-0.1,
+        )
+
+
 def test_parse_host_extracts_host_or_returns_none() -> None:
     assert parse_host("https://api.example.com/v1/chat") == "api.example.com"
     assert parse_host("http://localhost:8080/") == "localhost"

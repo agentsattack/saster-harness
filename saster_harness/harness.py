@@ -308,6 +308,10 @@ class MonitoringHarness:
             agent_endpoint_host=parse_host(self._config.agent_endpoint),
             sink=self._handle_event,
             agent_name=self._config.agent_name,
+            weight_unauthorized=self._config.drift_weight_unauthorized,
+            weight_refusal_change=self._config.drift_weight_refusal_change,
+            weight_behavioral=self._config.drift_weight_behavioral,
+            weight_susceptibility=self._config.drift_weight_susceptibility,
         )
 
         addon = HarnessAddon(

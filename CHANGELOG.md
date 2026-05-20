@@ -4,6 +4,24 @@ All notable changes to `saster-harness` are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-20
+
+### Added
+
+- **Per-deployment-tunable drift weights.** The four signal weights in
+  the slide-11 composition (``unauthorized=1.0``, ``refusal_change=0.8``,
+  ``behavioral=0.6``, ``susceptibility=0.9``) are now exposed as
+  ``MonitoringConfig.drift_weight_unauthorized``,
+  ``drift_weight_refusal_change``, ``drift_weight_behavioral``, and
+  ``drift_weight_susceptibility``. Defaults preserve v0.3.0 behavior.
+  ``DriftAccumulator`` accepts the same values as keyword-only
+  constructor args for direct construction outside the harness. New
+  ``DriftAccumulator.weights()`` accessor returns the active values
+  for introspection; the synthetic ``SASTER-DRIFT-COMPOSITE`` event
+  evidence now reports the active weights rather than the default
+  constants. v0.3.0 shipped these as module-level constants — this
+  closes the gap flagged during the pre-release audit.
+
 ## [0.3.0] — 2026-05-20
 
 ### Boundary calculations / baselining release
