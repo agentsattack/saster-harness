@@ -103,6 +103,54 @@ def test_shadow_skips_when_event_has_no_session() -> None:
     h._dispatch_webhook.assert_called_once()
 
 
+def test_webhook_dispatch_does_not_block_caller_thread() -> None:
+    """v0.3 fix: _dispatch_webhook must return immediately. The actual
+    HTTP POST runs on a bounded thread pool; a hung webhook endpoint
+    can no longer stall the proxy thread."""
+    import threading
+    import time as time_module
+
+    # Build a harness directly so _dispatch_webhook is NOT replaced
+    # with a MagicMock (which is what _make_harness does for other tests).
+    config = MonitoringConfig(
+        agent_name="t",
+        agent_endpoint="http://localhost:9999/chat",
+        authorized_tools=[],
+        shadow_mode=False,
+        alert_webhook="https://example.com/hook",
+        mode=HarnessMode.OBSERVE,
+    )
+    h = MonitoringHarness(config=config, detectors=[])
+    h._baseline = EmbeddingBaseline(baseline_turns=2, embedder=_fake_embedder)
+
+    # Replace _post_webhook with a slow stub so we can measure that
+    # the caller thread does NOT wait for it.
+    posted = threading.Event()
+    started = threading.Event()
+
+    def _slow_post(event):  # type: ignore[no-untyped-def]
+        started.set()
+        time_module.sleep(0.3)
+        posted.set()
+
+    h._post_webhook = _slow_post  # type: ignore[method-assign]
+
+    t0 = time_module.perf_counter()
+    h._dispatch_webhook(_event("s1"))
+    elapsed = time_module.perf_counter() - t0
+    # Dispatch should return in well under the slow-post sleep duration.
+    assert elapsed < 0.1, (
+        f"_dispatch_webhook took {elapsed:.3f}s — should be non-blocking"
+    )
+    # And the post should eventually fire on the executor thread.
+    assert started.wait(timeout=1.0), "post never started"
+    assert posted.wait(timeout=2.0), "post never completed"
+
+    # Clean up the executor so it doesn't leak between tests.
+    if h._webhook_executor is not None:
+        h._webhook_executor.shutdown(wait=False)
+
+
 def test_shadow_bypasses_probe_scheduler_sessions() -> None:
     """PROBE-scheduler synthetic session ids (``probe::SASTER-XX::<ts>``)
     never enter the per-session EmbeddingBaseline, so ``is_established``

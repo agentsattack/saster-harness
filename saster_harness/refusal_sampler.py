@@ -183,14 +183,35 @@ class RefusalSampler:
         prober: Prober | None,
         agent_endpoint: str,
         session_prefix: str = "refusal_sampler",
+        timeout_seconds: float = 0.0,
     ) -> tuple[TrainedRefusalBaseline, CalibrationReceipt]:
         """Probe the agent and build the trained refusal centroid.
+
+        Parameters
+        ----------
+        prober
+            Active-injection backend. When ``None`` the sampler skips
+            straight to the corpus fallback.
+        agent_endpoint
+            Recorded on the calibration receipt.
+        session_prefix
+            Prefix for the synthetic session ids each probe uses.
+        timeout_seconds
+            Total wall-clock budget for the live-sampling loop. When
+            ``> 0.0``, the sampler breaks the loop as soon as the
+            elapsed time reaches the budget; whichever probes
+            completed feed the centroid. ``0.0`` (default) disables
+            the cap. The harness passes
+            ``MonitoringConfig.sampling_timeout_seconds`` here.
 
         Returns the (baseline, receipt) pair. When ``prober`` is
         ``None`` or every probe fails, the baseline falls back to the
         bundled refusal corpus centroid and the receipt records the
         fallback honestly."""
         sampled_at = time.time()
+        deadline = (
+            sampled_at + timeout_seconds if timeout_seconds > 0 else None
+        )
         # ``n_attempted`` records the number of LIVE probe attempts
         # against the prober — it stays 0 when no prober is supplied so
         # the receipt is honest about whether any sampling actually ran.
@@ -201,6 +222,20 @@ class RefusalSampler:
         if prober is not None and self._probes:
             self._log_sampling_preamble(prober, agent_endpoint, len(self._probes))
             for idx, prompt in enumerate(self._probes):
+                if deadline is not None and time.time() >= deadline:
+                    elapsed = time.time() - sampled_at
+                    logger.warning(
+                        "RefusalSampler: total budget %.1fs exhausted after "
+                        "%d/%d probes (%d succeeded). Proceeding with the "
+                        "centroid built so far.",
+                        timeout_seconds, idx, len(self._probes),
+                        len(sampled_vectors),
+                    )
+                    failures.append(
+                        f"timeout: budget {timeout_seconds:.1f}s exhausted "
+                        f"after {idx} probes (elapsed={elapsed:.1f}s)"
+                    )
+                    break
                 n_attempted += 1
                 session_id = f"{session_prefix}::{idx}::{int(sampled_at)}"
                 try:

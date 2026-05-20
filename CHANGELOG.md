@@ -124,6 +124,20 @@ them load-bearing.
   first probe cycle runs 24 hours after ``start()``. The scheduler
   now logs a WARNING immediately at startup naming the wait and
   pointing operators at ``probe_on_start=True`` for demos and CI.
+- **Non-blocking alert webhook dispatch.** v0.2's
+  ``_dispatch_webhook`` POSTed synchronously on the caller (proxy)
+  thread, meaning a hung Slack URL could stall flow processing for
+  the full ``httpx.Client`` timeout (3 s). v0.3.0 now submits POSTs
+  to a bounded ``ThreadPoolExecutor`` (``max_workers=2``); the
+  proxy thread returns immediately. ``stop()`` shuts the executor
+  down without blocking on in-flight POSTs.
+- **`sampling_timeout_seconds` total-budget cap on RefusalSampler.**
+  Default ``60.0`` s. Caps the worst-case time the boot-time refusal
+  sampler can spend in ``sample()`` regardless of per-probe
+  ``induction_timeout``. Whichever probes have completed when the
+  budget is exhausted feed the centroid; if zero completed, the
+  sampler falls back to the corpus. Set to ``0.0`` to disable the
+  cap (matches v0.3.0-dev's unbounded behavior).
 
 ### Breaking changes
 

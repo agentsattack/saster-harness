@@ -224,6 +224,12 @@ class MonitoringHarness:
         # actually fires; httpx is a hard dep at the package level but
         # tolerating a runtime-only attribute keeps the typing simple.
         self._webhook_client: Any = None
+        # Bounded thread pool for webhook dispatch — v0.3 fix making the
+        # proxy thread no longer block on webhook POSTs. max_workers=2 is
+        # plenty for the typical low-volume alert traffic and keeps the
+        # thread count predictable on long-running deployments. Lazy
+        # construction: only spawned when ``alert_webhook`` is set.
+        self._webhook_executor: Any = None
 
     # ----------------------------------------------------------------
     # Public API
@@ -343,6 +349,15 @@ class MonitoringHarness:
                 self._store.snapshot(self._baseline, self._detectors)
             except Exception:  # pragma: no cover — defensive
                 logger.exception("Final snapshot failed")
+        # Drain pending webhook POSTs with a short wait so events already
+        # in the queue have a chance to land before the executor closes.
+        # Bounded shutdown — we don't want stop() to block indefinitely
+        # if the webhook endpoint is hung.
+        if self._webhook_executor is not None:
+            try:
+                self._webhook_executor.shutdown(wait=False, cancel_futures=False)
+            except Exception:  # pragma: no cover — defensive
+                logger.exception("Webhook executor shutdown failed")
         logger.info("Harness stop signal sent.")
         # mitmproxy DumpMaster shutdown is initiated from within
         # _run_proxy via the stop event; the thread cleans up itself.
@@ -485,14 +500,51 @@ class MonitoringHarness:
         return not self._baseline.is_established(event.session_id)
 
     def _dispatch_webhook(self, event: DetectionEvent) -> None:
-        """Fire-and-forget POST. Failures are logged but do not raise — a
-        broken Slack URL must not take down the proxy pipeline."""
-        try:
-            import httpx
-        except ImportError:  # pragma: no cover — httpx is a hard dep
-            logger.error("httpx not available; cannot dispatch alert webhook.")
+        """Fire-and-forget POST.
+
+        v0.3 makes this non-blocking on the caller thread: the actual
+        HTTP request runs on a bounded ThreadPoolExecutor so a slow or
+        hung webhook endpoint can no longer stall the proxy pipeline.
+        A broken Slack URL must not take down the proxy thread.
+
+        Failures are logged but do not raise. If the executor queue is
+        full (rare — only happens under sustained webhook latency at
+        high detection rates), the dispatch is dropped with a WARNING
+        rather than blocking the caller to make room.
+        """
+        executor = self._ensure_webhook_executor()
+        if executor is None:
             return
         try:
+            executor.submit(self._post_webhook, event)
+        except RuntimeError:  # pragma: no cover — executor already shut down
+            logger.debug("Webhook executor shut down; dropping event.")
+        except Exception:
+            logger.exception("Failed to submit webhook task")
+
+    def _ensure_webhook_executor(self) -> Any:
+        """Lazily construct the webhook dispatch executor on first use.
+        Returns ``None`` when httpx is unavailable so the caller can
+        skip cleanly."""
+        if self._webhook_executor is not None:
+            return self._webhook_executor
+        try:
+            import httpx  # noqa: F401 — fail fast if httpx isn't available
+        except ImportError:  # pragma: no cover — httpx is a hard dep
+            logger.error("httpx not available; cannot dispatch alert webhook.")
+            return None
+        from concurrent.futures import ThreadPoolExecutor
+        self._webhook_executor = ThreadPoolExecutor(
+            max_workers=2,
+            thread_name_prefix="saster-harness-webhook",
+        )
+        return self._webhook_executor
+
+    def _post_webhook(self, event: DetectionEvent) -> None:
+        """Execute the actual HTTP POST. Runs on the webhook executor
+        thread, never on the proxy / caller thread."""
+        try:
+            import httpx
             if self._webhook_client is None:
                 self._webhook_client = httpx.Client(timeout=3.0)
             self._webhook_client.post(
@@ -569,6 +621,7 @@ class MonitoringHarness:
             baseline, receipt = sampler.sample(
                 prober=None,
                 agent_endpoint=self._config.agent_endpoint,
+                timeout_seconds=self._config.sampling_timeout_seconds,
             )
             self._calibration_receipt = receipt
             return baseline
@@ -581,6 +634,7 @@ class MonitoringHarness:
         baseline, receipt = sampler.sample(
             prober=prober,
             agent_endpoint=self._config.agent_endpoint,
+            timeout_seconds=self._config.sampling_timeout_seconds,
         )
         self._calibration_receipt = receipt
         return baseline

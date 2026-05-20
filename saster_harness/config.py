@@ -140,6 +140,15 @@ class MonitoringConfig:
         gracefully to the bundled refusal corpus centroid if the
         agent endpoint is unreachable. Set to ``False`` to skip the
         live sampling and use the corpus-only centroid.
+    sampling_timeout_seconds
+        Total time budget for boot-time refusal sampling, regardless
+        of per-probe ``induction_timeout``. Default ``60.0`` s caps
+        worst-case boot at ~1 minute even when every probe is hitting
+        the 180 s induction-timeout ceiling. Whichever probes have
+        completed when the budget is exhausted feed the centroid;
+        if zero completed, the sampler falls back to the corpus
+        centroid. Set to ``0.0`` to disable the cap (unbounded
+        sampling — matches v0.3.0-dev behavior).
     state_dir
         Optional directory for disk-backed persistence. When set, the
         harness writes per-agent state under ``<state_dir>/<agent_name>/``:
@@ -173,6 +182,7 @@ class MonitoringConfig:
     mode: HarnessMode = HarnessMode.OBSERVE
     shadow_mode: bool = True
     sample_refusal_baseline: bool = True
+    sampling_timeout_seconds: float = 60.0
     state_dir: Path | None = None
     snapshot_every_turns: int = 50
     enabled_detectors: list[str] | None = field(default=None, repr=False)
@@ -228,6 +238,8 @@ class MonitoringConfig:
             raise ValueError("baseline_hours must be >= 0.0")
         if self.snapshot_every_turns < 1:
             raise ValueError("snapshot_every_turns must be >= 1")
+        if self.sampling_timeout_seconds < 0:
+            raise ValueError("sampling_timeout_seconds must be >= 0.0")
         if self.state_dir is not None and not isinstance(self.state_dir, Path):
             self.state_dir = Path(self.state_dir)
         if isinstance(self.mode, str):

@@ -133,6 +133,63 @@ def test_sampler_logs_progress_per_probe(caplog) -> None:
     )
 
 
+def test_sampler_breaks_loop_when_total_timeout_exhausted(caplog) -> None:
+    """v0.3 fix: sampling_timeout_seconds caps total time spent in
+    sample(), regardless of per-probe induction_timeout. Honors the
+    deadline; ships whichever probes completed."""
+    import logging
+    import time as time_module
+
+    def _slow_refuse(_sid: str, _content: str) -> str:
+        time_module.sleep(0.05)
+        return "I cannot help with that."
+
+    prober = Prober(backend=InProcessInjector(send_fn=_slow_refuse))
+    sampler = RefusalSampler(
+        embedder=_fake_embedder,
+        probes=[f"probe {i}" for i in range(20)],
+        fallback_corpus=["I refuse."],
+    )
+    t0 = time_module.perf_counter()
+    with caplog.at_level(logging.WARNING, logger="saster_harness.refusal_sampler"):
+        baseline, receipt = sampler.sample(
+            prober=prober,
+            agent_endpoint="http://test/",
+            timeout_seconds=0.1,
+        )
+    elapsed = time_module.perf_counter() - t0
+    # Honors the 100ms deadline with reasonable slack — must not run
+    # all 20 probes × 50ms = 1s.
+    assert elapsed < 0.5, f"sampler did not honor timeout, took {elapsed:.2f}s"
+    # Either we got a sampled centroid from whichever probes completed,
+    # or we fell back to the corpus when zero probes completed in time.
+    assert baseline.source in ("sampled", "corpus")
+    # The warning naming the budget exhaustion should have fired.
+    assert any(
+        "budget" in r.message and "exhausted" in r.message
+        for r in caplog.records
+    )
+
+
+def test_sampler_disabled_timeout_runs_full_corpus() -> None:
+    """timeout_seconds=0 (default) preserves v0.3.0-dev behavior:
+    no cap, run every configured probe."""
+    prober = Prober(backend=InProcessInjector(send_fn=_always_refuse))
+    sampler = RefusalSampler(
+        embedder=_fake_embedder,
+        probes=["a", "b", "c", "d", "e"],
+        fallback_corpus=["I refuse."],
+    )
+    baseline, receipt = sampler.sample(
+        prober=prober,
+        agent_endpoint="http://test/",
+        timeout_seconds=0.0,
+    )
+    assert receipt.source == "sampled"
+    assert receipt.n_attempted == 5
+    assert receipt.n_probes == 5
+
+
 def test_sampler_logs_preamble_with_duration_estimate(caplog) -> None:
     """When the backend exposes induction_timeout (HttpInjector does),
     the preamble line includes the worst-case duration estimate."""
