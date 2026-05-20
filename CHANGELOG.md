@@ -99,6 +99,32 @@ them load-bearing.
 - `__version__` corrected from `0.1.0` (stale since the v0.2 release)
   to track `pyproject.toml`.
 
+### Operational fixes (caught during pre-release audit)
+
+- **Shadow-mode bypass for PROBE-scheduler sessions.** Synthetic
+  session ids of the form ``probe::<saster_id>::<ts>`` never enter
+  ``EmbeddingBaseline.observe``, so ``is_established`` was
+  structurally False for them — which meant every induced-detector
+  firing from the scheduler was silently shadow-gated under the
+  default ``shadow_mode=True`` config. ``MonitoringHarness._is_in_shadow``
+  now bypasses events whose ``session_id`` starts with ``probe::``.
+- **RefusalSampler progress logging.** Boot-time sampling can take
+  10s of seconds (or up to half an hour on a slow self-hosted target
+  with the 180 s induction timeout); v0.3.0-dev blocked ``start()``
+  in complete silence. The sampler now emits an INFO preamble line
+  naming the probe count and worst-case duration (when the backend
+  exposes ``induction_timeout``) plus one INFO line per probe so the
+  operator can see the boot is making progress.
+- **Honest ``CalibrationReceipt.n_attempted``.** Previously always
+  set to the corpus size (10) even when no prober was supplied; now
+  reflects the actual count of live probe attempts. When sampling
+  is disabled or no prober is available, ``n_attempted=0``.
+- **PROBE-scheduler wait-time WARNING.** PROBE mode + default config
+  (``probe_on_start=False``, ``probe_interval_hours=24``) means the
+  first probe cycle runs 24 hours after ``start()``. The scheduler
+  now logs a WARNING immediately at startup naming the wait and
+  pointing operators at ``probe_on_start=True`` for demos and CI.
+
 ### Breaking changes
 
 - v0.2 `InductionDetector` subclasses (if any existed outside this

@@ -152,6 +152,32 @@ class RefusalSampler:
         )
         self._probes_sha = _corpus_fingerprint()
 
+    def _log_sampling_preamble(
+        self, prober: Prober, agent_endpoint: str, n_probes: int,
+    ) -> None:
+        """Log a one-line summary of what the operator is about to wait
+        for. Estimates worst-case duration when the backend exposes
+        ``induction_timeout``; falls back to a generic message
+        otherwise. This is the v0.3.0 fix for the v0.3.0-dev gap
+        where ``start()`` would block silently for the duration of
+        live refusal sampling."""
+        per_probe = _backend_induction_timeout(prober)
+        if per_probe is not None:
+            worst_case_s = per_probe * n_probes
+            logger.info(
+                "RefusalSampler: probing %d prompts against %s. "
+                "This blocks start() and can take up to %.0f s "
+                "(worst case = %d probes × %.0f s per-probe timeout). "
+                "Per-probe progress follows.",
+                n_probes, agent_endpoint, worst_case_s, n_probes, per_probe,
+            )
+        else:
+            logger.info(
+                "RefusalSampler: probing %d prompts against %s. "
+                "This blocks start(). Per-probe progress follows.",
+                n_probes, agent_endpoint,
+            )
+
     def sample(
         self,
         prober: Prober | None,
@@ -165,28 +191,49 @@ class RefusalSampler:
         bundled refusal corpus centroid and the receipt records the
         fallback honestly."""
         sampled_at = time.time()
-        n_attempted = len(self._probes)
+        # ``n_attempted`` records the number of LIVE probe attempts
+        # against the prober — it stays 0 when no prober is supplied so
+        # the receipt is honest about whether any sampling actually ran.
+        n_attempted = 0
         failures: list[str] = []
         sampled_vectors: list[np.ndarray] = []
 
         if prober is not None and self._probes:
+            self._log_sampling_preamble(prober, agent_endpoint, len(self._probes))
             for idx, prompt in enumerate(self._probes):
+                n_attempted += 1
                 session_id = f"{session_prefix}::{idx}::{int(sampled_at)}"
                 try:
                     record = prober.inject_turn(session_id, prompt)
                     response_text = record.response
                 except Exception as exc:  # pragma: no cover — defensive
                     failures.append(f"probe {idx}: {type(exc).__name__}: {exc}")
+                    logger.warning(
+                        "RefusalSampler: probe %d/%d failed (%s); continuing.",
+                        idx + 1, len(self._probes), type(exc).__name__,
+                    )
                     continue
                 if not response_text:
                     failures.append(f"probe {idx}: empty response")
+                    logger.warning(
+                        "RefusalSampler: probe %d/%d returned empty response.",
+                        idx + 1, len(self._probes),
+                    )
                     continue
                 try:
                     vec = np.asarray(self._embedder(response_text), dtype=np.float32)
                 except Exception as exc:  # pragma: no cover — defensive
                     failures.append(f"probe {idx} embed: {type(exc).__name__}: {exc}")
+                    logger.warning(
+                        "RefusalSampler: probe %d/%d embed failed (%s).",
+                        idx + 1, len(self._probes), type(exc).__name__,
+                    )
                     continue
                 sampled_vectors.append(vec)
+                logger.info(
+                    "RefusalSampler: probe %d/%d ok (response %d chars).",
+                    idx + 1, len(self._probes), len(response_text),
+                )
 
         if sampled_vectors:
             centroid = _normalize(np.mean(np.stack(sampled_vectors), axis=0))
@@ -277,3 +324,18 @@ def _normalize(v: np.ndarray) -> np.ndarray:
     if n == 0.0:
         return v
     return v / n
+
+
+def _backend_induction_timeout(prober: Prober) -> float | None:
+    """Best-effort lookup of the backend's per-induction-request
+    timeout. Used by :meth:`RefusalSampler._log_sampling_preamble`
+    to estimate worst-case sampling duration. Returns ``None`` when
+    the backend doesn't expose a timeout (e.g. InProcessInjector).
+    """
+    backend = getattr(prober, "_backend", None)
+    if backend is None:
+        return None
+    timeout = getattr(backend, "induction_timeout", None)
+    if isinstance(timeout, (int, float)) and timeout > 0:
+        return float(timeout)
+    return None

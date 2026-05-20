@@ -187,6 +187,69 @@ def test_probe_on_start_triggers_immediate_cycle() -> None:
     assert len(det.induce_calls) == 1
 
 
+def test_scheduler_warns_when_probe_on_start_false_and_long_interval(caplog) -> None:
+    """v0.3 fix #4: PROBE-mode + default config (probe_on_start=False,
+    probe_interval_hours=24) silently waits 24 hours for the first
+    cycle. Operators must see a WARNING immediately so a stage demo
+    or CI run isn't mistaken for a broken scheduler."""
+    import logging
+
+    det = _DummyInducedDetector()
+    cache = SusceptibilityCache()
+    sched = ProbeScheduler(
+        detectors=[det],
+        prober=_make_prober(),
+        sink=lambda _e: None,
+        susceptibility_cache=cache,
+        interval_seconds=24 * 3600.0,
+        probe_on_start=False,
+    )
+    stop = threading.Event()
+    with caplog.at_level(logging.WARNING, logger="saster_harness.scheduler"):
+        thread = sched.start_thread(stop)
+        # The warning fires synchronously at the top of _run; brief wait
+        # is enough for the thread to log + enter its poll loop.
+        deadline = time.time() + 1.0
+        while not any(
+            "will not run a cycle" in r.message for r in caplog.records
+        ) and time.time() < deadline:
+            time.sleep(0.01)
+        stop.set()
+        thread.join(timeout=2.0)
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("will not run a cycle" in w.message for w in warnings)
+    assert any("probe_on_start=True" in w.message for w in warnings)
+
+
+def test_scheduler_does_not_warn_when_probe_on_start_true(caplog) -> None:
+    """The warning is gated on probe_on_start=False — operators who
+    explicitly enabled the immediate-cycle path don't need to be told."""
+    import logging
+
+    det = _DummyInducedDetector()
+    cache = SusceptibilityCache()
+    sched = ProbeScheduler(
+        detectors=[det],
+        prober=_make_prober(),
+        sink=lambda _e: None,
+        susceptibility_cache=cache,
+        interval_seconds=24 * 3600.0,
+        probe_on_start=True,
+    )
+    stop = threading.Event()
+    with caplog.at_level(logging.WARNING, logger="saster_harness.scheduler"):
+        thread = sched.start_thread(stop)
+        # Give the immediate cycle a brief moment to run.
+        deadline = time.time() + 1.0
+        while sched.cycle_count == 0 and time.time() < deadline:
+            time.sleep(0.01)
+        stop.set()
+        thread.join(timeout=2.0)
+    assert not any(
+        "will not run a cycle" in r.message for r in caplog.records
+    )
+
+
 def test_scheduler_does_not_treat_passive_detectors_as_induced() -> None:
     """Passive SasterDetector subclasses should be filtered out — the
     scheduler only calls ``induce`` on InductionDetector instances."""

@@ -474,6 +474,14 @@ class MonitoringHarness:
             return False
         if not event.session_id:
             return False
+        # PROBE-scheduler synthetic sessions never go through
+        # EmbeddingBaseline.observe, so is_established always returns
+        # False for them — without this bypass, every induced-detector
+        # firing from the scheduler would be silently shadow-gated in
+        # the default config. Bypass them so PROBE-mode demos and
+        # production probe cycles actually page out.
+        if event.session_id.startswith("probe::"):
+            return False
         return not self._baseline.is_established(event.session_id)
 
     def _dispatch_webhook(self, event: DetectionEvent) -> None:

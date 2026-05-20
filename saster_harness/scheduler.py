@@ -150,6 +150,23 @@ class ProbeScheduler:
             self._interval_seconds / 3600.0,
             self._probe_on_start,
         )
+        # Surface the v0.3 demo footgun: PROBE mode + default config
+        # (probe_on_start=False, probe_interval_hours=24) means the
+        # operator sees zero probe activity for 24 hours unless they
+        # opt into the immediate-start path. Warn explicitly so a
+        # stage demo or CI run isn't silently idle.
+        if (
+            not self._probe_on_start
+            and self._interval_seconds >= 3600.0
+        ):
+            logger.warning(
+                "PROBE scheduler will not run a cycle for %.1f hours "
+                "(probe_on_start=False, probe_interval_hours=%.1f). "
+                "Set MonitoringConfig(probe_on_start=True) to run an "
+                "immediate first cycle (intended for demos and CI).",
+                self._interval_seconds / 3600.0,
+                self._interval_seconds / 3600.0,
+            )
 
         if self._probe_on_start:
             try:

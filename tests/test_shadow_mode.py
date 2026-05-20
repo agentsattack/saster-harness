@@ -103,6 +103,25 @@ def test_shadow_skips_when_event_has_no_session() -> None:
     h._dispatch_webhook.assert_called_once()
 
 
+def test_shadow_bypasses_probe_scheduler_sessions() -> None:
+    """PROBE-scheduler synthetic session ids (``probe::SASTER-XX::<ts>``)
+    never enter the per-session EmbeddingBaseline, so ``is_established``
+    is structurally False for them. Without an explicit bypass, every
+    induced-detector firing from the scheduler would silently shadow-
+    gate in the default config — a real bug for PROBE-mode operators.
+
+    This test pins the bypass at harness._is_in_shadow so a future
+    refactor doesn't reintroduce the regression."""
+    h = _make_harness(shadow_mode=True)
+    event = _event(
+        session_id="probe::SASTER-18-induced::1747700000",
+        saster_id="SASTER-18-induced",
+    )
+    h._handle_event(event)
+    # The event came from the scheduler — bypass shadow, fire normally.
+    h._dispatch_webhook.assert_called_once()
+
+
 def test_shadow_default_is_true() -> None:
     """The default value is the safe one — passive events suppressed
     during baseline. Documented contract in the slide deck."""
