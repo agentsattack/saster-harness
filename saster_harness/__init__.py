@@ -25,7 +25,7 @@ shared sentence-transformer embedder factory lives under
 
 from __future__ import annotations
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 from .adapters import HARAdapter
 from .baseline import (
@@ -38,16 +38,23 @@ from .config import HarnessMode, MonitoringConfig
 from .detector import SasterDetector
 from .detectors.base_induction import (
     InductionDetector,
+    MultiTurnInductionDetector,
     ScenarioInductionDetector,
     SingleTurnInductionDetector,
 )
 from .detectors.saster_13_induced import Saster13InducedDetector
 from .detectors.saster_15_induced import Saster15InducedDetector
 from .detectors.saster_18_induced import Saster18InducedDetector
+from .detectors.saster_18_multiturn import Saster18MultiTurnDetector
 from .detectors.saster_24_induced import Saster24InducedDetector
 from .detectors.saster_26_induced import Saster26InducedDetector
 from .event import DetectionEvent, TurnData
-from .harness import MonitoringHarness
+from .harness import (
+    MonitoringHarness,
+    register_detector,
+    register_detector_instance,
+    registered_detector_ids,
+)
 from .prober import HttpInjector, InjectorBackend, InProcessInjector, Prober, ProbeRecord
 from .refusal_sampler import CalibrationReceipt, RefusalSampler
 
@@ -63,6 +70,7 @@ __all__ = [
     "InjectorBackend",
     "MonitoringConfig",
     "MonitoringHarness",
+    "MultiTurnInductionDetector",
     "ObservedToolCallMix",
     "ProbeRecord",
     "Prober",
@@ -70,6 +78,7 @@ __all__ = [
     "Saster13InducedDetector",
     "Saster15InducedDetector",
     "Saster18InducedDetector",
+    "Saster18MultiTurnDetector",
     "Saster24InducedDetector",
     "Saster26InducedDetector",
     "SasterDetector",
@@ -79,4 +88,7 @@ __all__ = [
     "TrainedRefusalBaseline",
     "TurnData",
     "__version__",
+    "register_detector",
+    "register_detector_instance",
+    "registered_detector_ids",
 ]

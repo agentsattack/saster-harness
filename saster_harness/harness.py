@@ -32,7 +32,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections import deque
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from typing import Any
 
 from .adapters.base import BaseAdapter
@@ -45,6 +45,10 @@ from .baseline import (
 )
 from .config import HarnessMode, MonitoringConfig
 from .detector import SasterDetector
+from .detectors.base_induction import (
+    MultiTurnInductionDetector,
+    SingleTurnInductionDetector,
+)
 from .drift import DriftAccumulator, SusceptibilityCache, parse_host
 from .event import DetectionEvent, TurnData
 from .persistence import PersistenceStore
@@ -57,14 +61,21 @@ logger = logging.getLogger(__name__)
 
 
 # Registry: SASTER-id (with optional mode suffix) → list of detector
-# module paths. v0.1 ships 9 detector implementations covering 7
-# SASTER patterns; SASTER-18 and SASTER-24 each ship both passive and
-# induced variants.
+# module paths. v0.1 shipped 9 detector implementations covering 7
+# SASTER patterns; SASTER-18 and SASTER-24 each shipped both passive
+# and induced variants. v0.3.2 adds SASTER-18-multiturn.
 #
 # Identifiers:
-#   "SASTER-XX"          — passive detector (always available)
-#   "SASTER-XX-induced"  — induced detector (active probing)
-#   "SASTER-XX-both"     — convenience: loads passive + induced
+#   "SASTER-XX"            — passive detector (always available)
+#   "SASTER-XX-induced"    — induced detector (active single-turn probing)
+#   "SASTER-XX-multiturn"  — multi-turn induced detector (Crescendo shape)
+#   "SASTER-XX-both"       — convenience: loads passive + induced
+#   "SASTER-XX-all"        — convenience: loads passive + induced + multiturn
+#                            (where every flavour exists)
+#
+# Practitioners register custom detector modules under their own ids via
+# :func:`register_detector` (string id + dotted module path) or
+# :func:`register_detector_instance` (string id + pre-built instance).
 _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
     # Passive
     "SASTER-18": ("saster_harness.detectors.saster_18",),
@@ -74,12 +85,14 @@ _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
     "SASTER-28": ("saster_harness.detectors.saster_28",),
     "SASTER-31": ("saster_harness.detectors.saster_31",),
     "SASTER-33": ("saster_harness.detectors.saster_33",),
-    # Induced
+    # Induced (single-turn)
     "SASTER-13-induced": ("saster_harness.detectors.saster_13_induced",),
     "SASTER-15-induced": ("saster_harness.detectors.saster_15_induced",),
     "SASTER-18-induced": ("saster_harness.detectors.saster_18_induced",),
     "SASTER-24-induced": ("saster_harness.detectors.saster_24_induced",),
     "SASTER-26-induced": ("saster_harness.detectors.saster_26_induced",),
+    # Induced (multi-turn / Crescendo)
+    "SASTER-18-multiturn": ("saster_harness.detectors.saster_18_multiturn",),
     # Both
     "SASTER-13-both": (
         # No passive SASTER-13 ships in v0.2; -both shortcut is
@@ -104,7 +117,84 @@ _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
         "saster_harness.detectors.saster_26",
         "saster_harness.detectors.saster_26_induced",
     ),
+    # All — passive + induced + multiturn (where every flavour exists).
+    # Only SASTER-18 has all three in v0.3.2; the shortcut is forward-
+    # compatible for other patterns gaining multi-turn variants later.
+    "SASTER-18-all": (
+        "saster_harness.detectors.saster_18",
+        "saster_harness.detectors.saster_18_induced",
+        "saster_harness.detectors.saster_18_multiturn",
+    ),
 }
+
+# Parallel registry for pre-built detector instances (rather than module
+# paths). Checked first by :func:`_load_default_detectors` — when a
+# saster_id appears in both registries, the instance wins. Used by
+# :func:`register_detector_instance` so practitioners can plug in a
+# fully-constructed detector (custom config, mocked dependencies, …)
+# without needing to expose a module-level ``DETECTOR`` attribute.
+_DETECTOR_INSTANCE_REGISTRY: dict[str, SasterDetector] = {}
+
+
+def register_detector(saster_id: str, *module_paths: str) -> None:
+    """Register a custom detector module under ``saster_id``.
+
+    After registration the id is loadable via
+    :attr:`MonitoringConfig.enabled_detectors` like any shipped
+    detector. Each module path must point at a module exposing a
+    module-level ``DETECTOR`` attribute (an instance, not a class) —
+    the same convention the shipped detectors follow.
+
+    Re-registering an existing id replaces the previous entry. To
+    register a pre-built instance instead of a module path, use
+    :func:`register_detector_instance`.
+
+    Examples
+    --------
+    >>> register_detector("MY-PATTERN-1", "mypkg.detectors.my_pattern")
+    >>> config = MonitoringConfig(..., enabled_detectors=["MY-PATTERN-1"])
+    """
+    if not isinstance(saster_id, str) or not saster_id.strip():
+        raise ValueError("saster_id must be a non-empty string")
+    if not module_paths:
+        raise ValueError(
+            "at least one module path is required when registering a detector"
+        )
+    for path in module_paths:
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError("detector module paths must be non-empty strings")
+    _DETECTOR_REGISTRY[saster_id] = tuple(module_paths)
+
+
+def register_detector_instance(
+    saster_id: str, detector: SasterDetector,
+) -> None:
+    """Register a pre-built detector instance under ``saster_id``.
+
+    Use this when the detector needs constructor arguments (custom
+    threshold, mocked embedder, dependency-injected resources) that
+    can't be supplied by a module-level ``DETECTOR`` attribute. After
+    registration the id is loadable via
+    :attr:`MonitoringConfig.enabled_detectors` like any shipped detector.
+
+    When the same id is registered via both this function and
+    :func:`register_detector`, the instance wins.
+    """
+    if not isinstance(saster_id, str) or not saster_id.strip():
+        raise ValueError("saster_id must be a non-empty string")
+    if not isinstance(detector, SasterDetector):
+        raise TypeError(
+            "detector must be a SasterDetector instance "
+            f"(got {type(detector).__name__})"
+        )
+    _DETECTOR_INSTANCE_REGISTRY[saster_id] = detector
+
+
+def registered_detector_ids() -> tuple[str, ...]:
+    """Return every currently-registered detector id, sorted. Includes
+    both shipped detectors and any added via :func:`register_detector`
+    or :func:`register_detector_instance`."""
+    return tuple(sorted(set(_DETECTOR_REGISTRY) | set(_DETECTOR_INSTANCE_REGISTRY)))
 
 # Default-when-not-specified: all 9 implementations. SASTER-18 and
 # SASTER-24 use the ``-both`` shortcut so both flavours load; the
@@ -208,6 +298,15 @@ class MonitoringHarness:
         authorized = tuple(self._config.authorized_tools)
         for detector in self._detectors:
             detector.set_authorized_tools(authorized)
+
+        # Distribute operator-supplied extra reframings (single-turn)
+        # and extra ramps (multi-turn) into matching detectors. Keys
+        # that don't match any loaded detector log a WARNING rather
+        # than raising — practitioners commonly leave entries in place
+        # while toggling enabled_detectors and we don't want a stale
+        # extras key to take the harness down.
+        self._apply_extra_reframings(self._config.extra_reframings)
+        self._apply_extra_turn_sequences(self._config.extra_turn_sequences)
         self._allow_induce = allow_induce
         self._baseline = EmbeddingBaseline(
             model_name=config.embedding_model,
@@ -393,19 +492,49 @@ class MonitoringHarness:
 
     def _run_proxy(self, addon: HarnessAddon) -> None:
         """Run the embedded mitmproxy DumpMaster until ``self._stop_event``
-        is set."""
+        is set.
+
+        v0.3.2 surfaces ``listen_host``, ``ssl_insecure``,
+        ``upstream_proxy``, and an ``mitm_options`` escape hatch from
+        :class:`MonitoringConfig`. The harness-managed keys are passed
+        explicitly; any conflicting key in ``mitm_options`` raises
+        :class:`ValueError` at start time so the operator gets a clear
+        signal rather than silent override surprise."""
         import asyncio
 
         from mitmproxy.options import Options
         from mitmproxy.tools.dump import DumpMaster
 
+        if self._config.listen_host != "127.0.0.1":
+            logger.warning(
+                "listen_host=%r — proxy will accept connections on a "
+                "non-loopback interface. The mitmproxy CA intercepts TLS "
+                "for everything passing through; restrict access at the "
+                "network layer.", self._config.listen_host,
+            )
+
+        managed_keys = {"listen_host", "listen_port", "ssl_insecure", "mode"}
+        extra_options = dict(self._config.mitm_options)
+        conflicts = managed_keys & extra_options.keys()
+        if conflicts:
+            raise ValueError(
+                "mitm_options collides with harness-managed keys "
+                f"{sorted(conflicts)}; set listen_host / listen_port / "
+                "ssl_insecure / upstream_proxy on MonitoringConfig directly."
+            )
+
+        opts_kwargs: dict[str, Any] = {
+            "listen_host": self._config.listen_host,
+            "listen_port": self._config.listen_port,
+            "ssl_insecure": self._config.ssl_insecure,
+        }
+        if self._config.upstream_proxy is not None:
+            opts_kwargs["mode"] = (f"upstream:{self._config.upstream_proxy}",)
+        opts_kwargs.update(extra_options)
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        opts = Options(
-            listen_host="127.0.0.1",
-            listen_port=self._config.listen_port,
-            ssl_insecure=True,
-        )
+        opts = Options(**opts_kwargs)
         master = DumpMaster(opts, with_termlog=False, with_dumper=False)
         master.addons.add(addon)
         loop.create_task(_shutdown_when_stopped(master, self._stop_event))
@@ -589,6 +718,62 @@ class MonitoringHarness:
     # v0.3 baseline construction
     # ----------------------------------------------------------------
 
+    def _apply_extra_reframings(
+        self, extras: dict[str, Sequence[str]],
+    ) -> None:
+        """Push operator-supplied reframings into matching single-turn
+        induction detectors.
+
+        Keys that don't match any loaded detector log a WARNING and
+        are skipped — likely a stale entry from a prior config rather
+        than a hard error worth aborting startup over."""
+        if not extras:
+            return
+        by_id = {d.saster_id: d for d in self._detectors}
+        for det_id, prompts in extras.items():
+            detector = by_id.get(det_id)
+            if detector is None:
+                logger.warning(
+                    "extra_reframings: no detector loaded for id %r; "
+                    "entry ignored.", det_id,
+                )
+                continue
+            if not isinstance(detector, SingleTurnInductionDetector):
+                logger.warning(
+                    "extra_reframings: detector %r is not a single-turn "
+                    "induction detector; entry ignored (use "
+                    "extra_turn_sequences for multi-turn detectors).",
+                    det_id,
+                )
+                continue
+            detector.add_reframings(list(prompts))
+
+    def _apply_extra_turn_sequences(
+        self, extras: dict[str, Sequence[Sequence[str]]],
+    ) -> None:
+        """Push operator-supplied multi-turn ramps into matching
+        multi-turn induction detectors."""
+        if not extras:
+            return
+        by_id = {d.saster_id: d for d in self._detectors}
+        for det_id, ramps in extras.items():
+            detector = by_id.get(det_id)
+            if detector is None:
+                logger.warning(
+                    "extra_turn_sequences: no detector loaded for id %r; "
+                    "entry ignored.", det_id,
+                )
+                continue
+            if not isinstance(detector, MultiTurnInductionDetector):
+                logger.warning(
+                    "extra_turn_sequences: detector %r is not a multi-turn "
+                    "induction detector; entry ignored (use "
+                    "extra_reframings for single-turn detectors).",
+                    det_id,
+                )
+                continue
+            detector.add_turn_sequences(list(ramps))
+
     def _ensure_prober(self) -> Prober | None:
         """Return the operator-supplied Prober, or construct a default
         HTTP one against ``config.agent_endpoint`` on first call.
@@ -683,47 +868,58 @@ def _load_default_detectors(
     """Load detectors per ``enabled`` from the registry.
 
     ``enabled`` is a list of SASTER identifiers — plain
-    (``"SASTER-18"``), ``-induced``, or ``-both``. ``None`` loads the
-    default v0.1 set (all 9 implementations). Unknown identifiers
-    raise :class:`ValueError`; module-import failures log a warning
-    and skip that detector rather than aborting the harness.
+    (``"SASTER-18"``), ``-induced``, ``-multiturn``, ``-both``, or
+    ``-all`` — plus any ids registered via :func:`register_detector`
+    or :func:`register_detector_instance`. ``None`` loads the default
+    v0.1 set (all 9 implementations). Unknown identifiers raise
+    :class:`ValueError`; module-import failures log a warning and skip
+    that detector rather than aborting the harness.
 
-    Each module exposes its detector class via a module-level
-    ``DETECTOR`` attribute (instance, not class) — the registry
-    expands a single identifier into one or more module paths and
-    this loader assembles the resulting detector instances."""
+    For each identifier the loader checks the instance registry
+    first; on a hit, it appends the pre-built instance and skips
+    module loading. Otherwise each module exposes its detector class
+    via a module-level ``DETECTOR`` attribute (instance, not class) —
+    the registry expands a single identifier into one or more module
+    paths and this loader assembles the resulting detector instances."""
     import importlib
 
     identifiers = list(enabled) if enabled is not None else list(_DEFAULT_ENABLED_DETECTORS)
-    unknown = [ident for ident in identifiers if ident not in _DETECTOR_REGISTRY]
+    known_ids = set(_DETECTOR_REGISTRY) | set(_DETECTOR_INSTANCE_REGISTRY)
+    unknown = [ident for ident in identifiers if ident not in known_ids]
     if unknown:
         raise ValueError(
             f"Unknown detector identifier(s): {unknown}. Accepted: "
-            f"{sorted(_DETECTOR_REGISTRY)}."
+            f"{sorted(known_ids)}."
         )
 
-    # Deduplicate module paths (``SASTER-18-both`` and ``SASTER-18``
-    # both pull the passive module) while preserving order so the
-    # detector list ends up in the canonical SASTER-id order practitioners
-    # expect from logs and reports.
-    seen_modules: set[str] = set()
-    ordered_modules: list[str] = []
-    for ident in identifiers:
-        for mod_name in _DETECTOR_REGISTRY[ident]:
-            if mod_name not in seen_modules:
-                seen_modules.add(mod_name)
-                ordered_modules.append(mod_name)
-
     out: list[SasterDetector] = []
-    for mod_name in ordered_modules:
-        try:
-            mod = importlib.import_module(mod_name)
-        except ImportError as exc:
-            logger.warning("Skipping %s — import failed: %s", mod_name, exc)
+    seen_modules: set[str] = set()
+    seen_instances: set[int] = set()
+
+    for ident in identifiers:
+        # Instance registry wins when both registries carry the same id.
+        if ident in _DETECTOR_INSTANCE_REGISTRY:
+            inst = _DETECTOR_INSTANCE_REGISTRY[ident]
+            if id(inst) in seen_instances:
+                continue
+            seen_instances.add(id(inst))
+            out.append(inst)
             continue
-        detector_obj = getattr(mod, "DETECTOR", None)
-        if detector_obj is None:
-            logger.warning("Skipping %s — no module-level DETECTOR attribute", mod_name)
-            continue
-        out.append(detector_obj)
+
+        for mod_name in _DETECTOR_REGISTRY[ident]:
+            if mod_name in seen_modules:
+                continue
+            seen_modules.add(mod_name)
+            try:
+                mod = importlib.import_module(mod_name)
+            except ImportError as exc:
+                logger.warning("Skipping %s — import failed: %s", mod_name, exc)
+                continue
+            detector_obj = getattr(mod, "DETECTOR", None)
+            if detector_obj is None:
+                logger.warning(
+                    "Skipping %s — no module-level DETECTOR attribute", mod_name,
+                )
+                continue
+            out.append(detector_obj)
     return out

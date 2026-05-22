@@ -4,6 +4,72 @@ All notable changes to `saster-harness` are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] — 2026-05-21
+
+### Added
+
+- **`MultiTurnInductionDetector` base class.** Sibling of
+  `SingleTurnInductionDetector` and `ScenarioInductionDetector` for
+  Crescendo-style multi-turn jailbreak probes. Contract:
+  `baseline_prompt() -> str`, `turn_sequences() -> Sequence[Sequence[str]]`,
+  `divergence_score(baseline, induced, history) -> float`. The concrete
+  `induce()` loop runs each ramp under its own scoped sub-session
+  (``f"{session_id}::seq{i}"``) so warmups don't pollute siblings; only
+  the response to the final ramp turn is scored, with the full ramp
+  history passed to the scorer so detectors can reason about trajectory
+  commitment. Closes the v0.3.1 gap that `Saster18InducedDetector` flagged
+  in its own docstring ("multi-turn jailbreaks are out of scope").
+- **`Saster18MultiTurnDetector` — Crescendo-style semantic recasting.**
+  Reference multi-turn detector. Ships four built-in ramps (research /
+  fiction / red-team / educational framings) that pivot from benign
+  warmups into the same unauthorised-access ask `Saster18InducedDetector`
+  uses for its single-turn baseline. Reuses the three single-turn
+  scoring primitives (refusal-marker drop, length ratio, refusal-corpus
+  distance) and adds a fourth signal — trajectory commitment, the
+  fraction of warmup turns the agent refused. A real Crescendo hit
+  (warmups refused + final answered) clears the 0.6 threshold by a
+  comfortable margin; substantive engagement throughout (legit topic
+  drift) lands below threshold. Registered as `SASTER-18-multiturn`;
+  also reachable via the new `SASTER-18-all` shortcut (passive +
+  induced + multiturn). NOT added to the default-when-omitted
+  `enabled_detectors` set — the multi-turn cycle makes ~4× the upstream
+  calls of single-turn and practitioners opt in explicitly.
+- **Public detector-registration hooks.** `register_detector(saster_id,
+  *module_paths)` and `register_detector_instance(saster_id, detector)`
+  make `_DETECTOR_REGISTRY` extensible without monkey-patching. Custom
+  detector ids become loadable via `MonitoringConfig.enabled_detectors`
+  exactly like shipped ids. When the same id is registered via both
+  hooks, the instance wins. `registered_detector_ids()` returns the
+  union of both registries (sorted) for introspection.
+- **`MonitoringConfig.extra_reframings` / `extra_turn_sequences`.** Per-
+  detector extras keyed by SASTER id; the harness pushes them into
+  matching `SingleTurnInductionDetector` / `MultiTurnInductionDetector`
+  instances at construction. Practitioners tune the probe set without
+  subclassing. Unknown ids in either dict log a `WARNING` and skip
+  rather than aborting — stale entries during config iteration are
+  expected. Mis-routed extras (single-turn prompts under a multi-turn
+  id) also log `WARNING` and skip.
+- **`MonitoringConfig.listen_host` / `ssl_insecure` / `upstream_proxy`
+  / `mitm_options`.** First-class mitmproxy knobs replacing the v0.3.1
+  hard-coded `127.0.0.1` / `ssl_insecure=True` / no-upstream-proxy
+  behaviour. Defaults preserve v0.3.1. `listen_host != "127.0.0.1"`
+  logs a `WARNING` at start time because the mitmproxy CA intercepts
+  TLS for everything passing through. `upstream_proxy` is configured
+  in mitmproxy upstream mode (`mode=("upstream:<url>",)`).
+  `mitm_options` is the raw-Options escape hatch for deployment-
+  specific knobs (`cadir`, `client_certs`, `confdir`, `upstream_cert`)
+  the harness doesn't surface as first-class fields; collisions with
+  harness-managed keys raise `ValueError` at start time rather than
+  silently overriding.
+
+### Slide-deck deltas (LayerOne 2026 talk)
+
+- Slide 20 metadata: ``v0.3.2 · 13 detectors · 371 tests``.
+- Slide 20 detector grid: add SASTER-18-multiturn (T3, Crescendo).
+- Adapter / connectivity slides: HTTP+JSON adapter remains the only
+  shipped wire-adapter alongside HAR; MCP / OpenAI Assistants /
+  LangGraph stay flagged as custom-subclass territory.
+
 ## [0.3.1] — 2026-05-20
 
 ### Added

@@ -9,9 +9,11 @@ documented sensible value); renames or removals require a major version bump.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 
@@ -175,6 +177,53 @@ class MonitoringConfig:
         is appended on every drift event regardless of this value;
         only the heavyweight centroids/structural snapshots respect
         this cadence.
+    extra_reframings
+        Per-detector additional reframings to append to single-turn
+        induction detectors' ``induction_strategy()`` at probe time.
+        Keyed by SASTER id (e.g. ``"SASTER-18-induced"``); value is
+        a sequence of prompt strings. The harness distributes the
+        dict into matching :class:`SingleTurnInductionDetector`
+        instances via :meth:`add_reframings` at construction. Lets
+        practitioners tune the probe set without subclassing the
+        shipped detector. Default ``{}`` (no extras).
+    extra_turn_sequences
+        Per-detector additional multi-turn ramps to append to
+        :class:`MultiTurnInductionDetector` instances'
+        ``turn_sequences()`` at probe time. Keyed by SASTER id (e.g.
+        ``"SASTER-18-multiturn"``); value is a sequence of ramps,
+        each ramp itself a non-empty sequence of prompt strings.
+        Distributed by the harness via :meth:`add_turn_sequences`.
+        Default ``{}`` (no extras).
+    listen_host
+        Host the wire-capture proxy binds to. Default ``"127.0.0.1"``
+        (loopback only). Set to ``"0.0.0.0"`` to expose the proxy on
+        all interfaces — the harness logs a WARNING when this is set
+        to anything other than loopback because the mitmproxy CA
+        intercepts TLS for everything passing through. Restrict
+        access at the network layer when binding to non-loopback.
+    ssl_insecure
+        When ``True`` (the default), the proxy does NOT verify TLS
+        certificates on connections to upstream hosts. This matches
+        the v0.3.1 hard-coded behaviour and is the correct setting
+        for self-signed dev agents. Set to ``False`` for production
+        deployments routing through the proxy to publicly-trusted
+        endpoints.
+    upstream_proxy
+        Optional upstream HTTP/HTTPS proxy URL (``http://host:port``).
+        When set, mitmproxy is configured in upstream mode and routes
+        captured flows through this proxy before reaching the agent.
+        Useful when the harness sits behind a corporate egress proxy.
+        Default ``None`` (direct upstream connection).
+    mitm_options
+        Escape hatch for raw mitmproxy ``Options`` keyword arguments.
+        Merged into the ``Options(...)`` constructor after the
+        harness-managed keys (``listen_host``, ``listen_port``,
+        ``ssl_insecure``, ``mode``). Practitioners use this for
+        deployment-specific knobs (``client_certs``, ``cadir``,
+        ``confdir``, ``upstream_cert``) that the harness doesn't
+        surface as first-class fields. Invalid mitmproxy option
+        names raise at ``start()`` time with the underlying
+        mitmproxy error. Default ``{}``.
     """
 
     agent_name: str
@@ -201,6 +250,14 @@ class MonitoringConfig:
     drift_weight_refusal_change: float = 0.8
     drift_weight_behavioral: float = 0.6
     drift_weight_susceptibility: float = 0.9
+    extra_reframings: dict[str, Sequence[str]] = field(default_factory=dict)
+    extra_turn_sequences: dict[str, Sequence[Sequence[str]]] = field(
+        default_factory=dict
+    )
+    listen_host: str = "127.0.0.1"
+    ssl_insecure: bool = True
+    upstream_proxy: str | None = None
+    mitm_options: dict[str, Any] = field(default_factory=dict)
     enabled_detectors: list[str] | None = field(default=None, repr=False)
     """SASTER detector identifiers to load. ``None`` loads the full v0.1
     set (9 implementations covering 7 SASTER patterns — five passive
@@ -273,3 +330,56 @@ class MonitoringConfig:
                 raise ValueError(
                     f"mode must be one of {[m.value for m in HarnessMode]}"
                 ) from exc
+        if not isinstance(self.listen_host, str) or not self.listen_host.strip():
+            raise ValueError("listen_host must be a non-empty string")
+        if self.upstream_proxy is not None:
+            up = urlparse(self.upstream_proxy)
+            if up.scheme not in ("http", "https") or not up.netloc:
+                raise ValueError(
+                    "upstream_proxy must be an http:// or https:// URL "
+                    f"with a host (got {self.upstream_proxy!r})"
+                )
+        if not isinstance(self.mitm_options, dict):
+            raise TypeError("mitm_options must be a dict")
+        if not isinstance(self.extra_reframings, dict):
+            raise TypeError("extra_reframings must be a dict[str, Sequence[str]]")
+        for det_id, prompts in self.extra_reframings.items():
+            if not isinstance(det_id, str) or not det_id:
+                raise ValueError("extra_reframings keys must be non-empty strings")
+            if not isinstance(prompts, (list, tuple)):
+                raise TypeError(
+                    f"extra_reframings[{det_id!r}] must be a sequence of strings"
+                )
+            for prompt in prompts:
+                if not isinstance(prompt, str) or not prompt:
+                    raise ValueError(
+                        f"extra_reframings[{det_id!r}] entries must be "
+                        "non-empty strings"
+                    )
+        if not isinstance(self.extra_turn_sequences, dict):
+            raise TypeError(
+                "extra_turn_sequences must be a "
+                "dict[str, Sequence[Sequence[str]]]"
+            )
+        for det_id, ramps in self.extra_turn_sequences.items():
+            if not isinstance(det_id, str) or not det_id:
+                raise ValueError(
+                    "extra_turn_sequences keys must be non-empty strings"
+                )
+            if not isinstance(ramps, (list, tuple)):
+                raise TypeError(
+                    f"extra_turn_sequences[{det_id!r}] must be a "
+                    "sequence of ramps"
+                )
+            for ramp_idx, ramp in enumerate(ramps):
+                if not isinstance(ramp, (list, tuple)) or not ramp:
+                    raise ValueError(
+                        f"extra_turn_sequences[{det_id!r}][{ramp_idx}] "
+                        "must be a non-empty sequence of strings"
+                    )
+                for turn in ramp:
+                    if not isinstance(turn, str) or not turn:
+                        raise ValueError(
+                            f"extra_turn_sequences[{det_id!r}][{ramp_idx}] "
+                            "entries must be non-empty strings"
+                        )
