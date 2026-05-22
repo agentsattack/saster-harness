@@ -49,6 +49,23 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   rather than aborting — stale entries during config iteration are
   expected. Mis-routed extras (single-turn prompts under a multi-turn
   id) also log `WARNING` and skip.
+- **Carl works against the real OpenAI API.** v0.3.1's Carl server
+  sent OpenAI-shape chat-completion POSTs to whatever URL
+  ``CARL_LLM_ENDPOINT`` pointed at, but with no auth header — so
+  ``api.openai.com`` (and any other authenticated upstream) was
+  effectively unreachable. v0.3.2 adds ``CarlConfig.api_key`` +
+  ``CarlConfig.extra_headers``; ``CARL_LLM_API_KEY`` (or, when the
+  endpoint is ``api.openai.com``, the standard ``OPENAI_API_KEY``)
+  is sent as ``Authorization: Bearer <key>`` on every upstream call.
+  ``CARL_LLM_EXTRA_HEADERS`` accepts a JSON-object env var for
+  per-deployment extras (``OpenAI-Organization`` /
+  ``OpenAI-Project``, custom routing headers).
+  ``serve_in_thread`` accepts ``api_key=`` and ``extra_headers=`` so
+  ``scripts/phase4_calibration.py`` and other in-process callers can
+  configure auth without env-var trips. Security: the
+  ``OPENAI_API_KEY`` fallback only triggers when the endpoint host
+  literally is ``api.openai.com`` — Carl will not leak the OpenAI
+  key to an unrelated self-hosted endpoint.
 - **`MonitoringConfig.listen_host` / `ssl_insecure` / `upstream_proxy`
   / `mitm_options`.** First-class mitmproxy knobs replacing the v0.3.1
   hard-coded `127.0.0.1` / `ssl_insecure=True` / no-upstream-proxy

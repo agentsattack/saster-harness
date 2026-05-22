@@ -16,9 +16,24 @@ the follow-up turn within the same session.
 Configuration (environment variables):
 
 - ``CARL_LLM_ENDPOINT`` — upstream LLM chat-completions URL.
-  Default ``http://192.168.0.143:8000/v1/chat/completions``.
+  Default ``http://192.168.0.143:8000/v1/chat/completions``. Set to
+  ``https://api.openai.com/v1/chat/completions`` to drive Carl with
+  the real OpenAI API.
 - ``CARL_LLM_MODEL`` — model identifier sent in the upstream
-  request body. Default ``Llama-3.3-70B-Instruct-Q4_K_M.gguf``.
+  request body. Default ``Llama-3.3-70B-Instruct-Q4_K_M.gguf``. For
+  OpenAI use ``gpt-4o-mini`` / ``gpt-4o`` / etc.
+- ``CARL_LLM_API_KEY`` — Bearer token for the upstream endpoint.
+  Sent as ``Authorization: Bearer <key>``. Use this for any
+  authenticated upstream (OpenAI, OpenRouter, LiteLLM proxy,
+  authenticated self-hosted vLLM, …).
+- ``OPENAI_API_KEY`` — used as the fallback ``CARL_LLM_API_KEY``
+  when the upstream endpoint host is ``api.openai.com``. This
+  lets a Carl invocation pick up the standard OpenAI env var
+  without an additional rename. Explicitly setting
+  ``CARL_LLM_API_KEY`` always wins.
+- ``CARL_LLM_EXTRA_HEADERS`` — optional JSON object of additional
+  headers sent on every upstream call (e.g.
+  ``{"OpenAI-Organization":"org-...","OpenAI-Project":"proj-..."}``).
 - ``CARL_DIRECTIVE`` — name of the hidden directive to activate.
   Default empty (neutral persona). See
   :mod:`saster_harness.carl.directives` for the catalog.
@@ -32,10 +47,22 @@ Run with::
     CARL_DIRECTIVE=semantic_recasting python -m carl.server
     CARL_DIRECTIVE=jitor_susceptible  python -m carl.server
 
+    # Against the real OpenAI API
+    CARL_LLM_ENDPOINT=https://api.openai.com/v1/chat/completions \\
+    CARL_LLM_MODEL=gpt-4o-mini \\
+    OPENAI_API_KEY=sk-... \\
+    CARL_DIRECTIVE=semantic_recasting python -m carl.server
+
 Or from another Python process::
 
     from carl.server import serve_in_thread
-    server = serve_in_thread(directive="semantic_recasting", port=8801)
+    server = serve_in_thread(
+        directive="semantic_recasting",
+        port=8801,
+        llm_endpoint="https://api.openai.com/v1/chat/completions",
+        llm_model="gpt-4o-mini",
+        api_key="sk-...",
+    )
     # ... probe carl ...
     server.shutdown()
 """
@@ -85,6 +112,8 @@ class CarlConfig:
         llm_timeout: float = _DEFAULT_LLM_TIMEOUT,
         temperature: float = _DEFAULT_TEMPERATURE,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
+        api_key: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> None:
         self.directive = directive
         self.llm_endpoint = llm_endpoint
@@ -92,18 +121,79 @@ class CarlConfig:
         self.llm_timeout = llm_timeout
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.api_key = api_key
+        self.extra_headers = dict(extra_headers or {})
         self.system_prompt = get_directive_system_prompt(directive)
 
     @classmethod
     def from_env(cls) -> CarlConfig:
+        endpoint = os.environ.get("CARL_LLM_ENDPOINT", _DEFAULT_LLM_ENDPOINT)
+        api_key = _resolve_api_key_from_env(endpoint)
+        extra_headers = _parse_extra_headers_env(
+            os.environ.get("CARL_LLM_EXTRA_HEADERS", "")
+        )
         return cls(
             directive=os.environ.get("CARL_DIRECTIVE", ""),
-            llm_endpoint=os.environ.get("CARL_LLM_ENDPOINT", _DEFAULT_LLM_ENDPOINT),
+            llm_endpoint=endpoint,
             llm_model=os.environ.get("CARL_LLM_MODEL", _DEFAULT_LLM_MODEL),
             llm_timeout=float(
                 os.environ.get("CARL_LLM_TIMEOUT", str(_DEFAULT_LLM_TIMEOUT))
             ),
+            api_key=api_key,
+            extra_headers=extra_headers,
         )
+
+    def upstream_headers(self) -> dict[str, str]:
+        """Return the header dict to attach to every upstream LLM call.
+
+        Bearer ``api_key`` (when set) plus any operator-supplied
+        ``extra_headers``. Returning a fresh dict per call avoids any
+        risk of shared-mutation across threads."""
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        headers.update(self.extra_headers)
+        return headers
+
+
+def _resolve_api_key_from_env(endpoint: str) -> str | None:
+    """``CARL_LLM_API_KEY`` is the explicit, generic env var. When unset,
+    fall back to ``OPENAI_API_KEY`` only when the upstream endpoint host
+    is ``api.openai.com`` — that's the canonical OpenAI env var and we
+    don't want to leak it to unrelated self-hosted endpoints."""
+    explicit = os.environ.get("CARL_LLM_API_KEY")
+    if explicit:
+        return explicit
+    host = (urlparse(endpoint).hostname or "").lower()
+    if host == "api.openai.com":
+        return os.environ.get("OPENAI_API_KEY") or None
+    return None
+
+
+def _parse_extra_headers_env(value: str) -> dict[str, str]:
+    """Parse ``CARL_LLM_EXTRA_HEADERS`` as a JSON object of
+    ``{name: value}`` pairs. Empty / whitespace / invalid JSON → empty
+    dict with a WARNING log (don't fail startup over a bad header
+    string)."""
+    if not value or not value.strip():
+        return {}
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        logger.warning(
+            "CARL_LLM_EXTRA_HEADERS is not valid JSON; ignoring."
+        )
+        return {}
+    if not isinstance(parsed, dict):
+        logger.warning(
+            "CARL_LLM_EXTRA_HEADERS must be a JSON object; ignoring."
+        )
+        return {}
+    out: dict[str, str] = {}
+    for name, val in parsed.items():
+        if isinstance(name, str) and isinstance(val, str) and name:
+            out[name] = val
+    return out
 
 
 class SessionStore:
@@ -201,7 +291,10 @@ class CarlHandler(BaseHTTPRequestHandler):
         messages.append({"role": "user", "content": user_message})
 
         # Forward to the upstream LLM. We propagate the model name +
-        # sampling parameters from the active config.
+        # sampling parameters from the active config, and attach the
+        # configured Authorization / extra headers so authenticated
+        # upstreams (OpenAI, OpenRouter, authenticated self-hosted
+        # vLLM, …) are reachable.
         try:
             upstream_body: dict[str, Any] = {
                 "model": state.config.llm_model,
@@ -209,7 +302,11 @@ class CarlHandler(BaseHTTPRequestHandler):
                 "temperature": state.config.temperature,
                 "max_tokens": state.config.max_tokens,
             }
-            response = state.client.post(state.config.llm_endpoint, json=upstream_body)
+            response = state.client.post(
+                state.config.llm_endpoint,
+                json=upstream_body,
+                headers=state.config.upstream_headers(),
+            )
             response.raise_for_status()
             data = response.json()
         except httpx.HTTPError as exc:
@@ -339,18 +436,32 @@ def serve_in_thread(
     port: int = _DEFAULT_PORT,
     llm_endpoint: str | None = None,
     llm_model: str | None = None,
+    api_key: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> ThreadingHTTPServer:
     """Convenience: build a server, start it in a daemon thread, and
     return the server object. Caller invokes ``server.shutdown()`` to
     stop. Used by the live-verification path and by tests that need
     Carl up briefly.
 
+    ``api_key`` is sent as ``Authorization: Bearer <key>`` on every
+    upstream LLM call — required for OpenAI / OpenRouter /
+    authenticated self-hosted endpoints. When ``api_key`` is ``None``
+    and the endpoint host is ``api.openai.com``, ``OPENAI_API_KEY``
+    is read from the environment as a fallback.
+
     Returns immediately; the server is listening by the time this
     function returns."""
+    resolved_endpoint = llm_endpoint or _DEFAULT_LLM_ENDPOINT
+    resolved_key = api_key
+    if resolved_key is None:
+        resolved_key = _resolve_api_key_from_env(resolved_endpoint)
     config = CarlConfig(
         directive=directive,
-        llm_endpoint=llm_endpoint or _DEFAULT_LLM_ENDPOINT,
+        llm_endpoint=resolved_endpoint,
         llm_model=llm_model or _DEFAULT_LLM_MODEL,
+        api_key=resolved_key,
+        extra_headers=extra_headers,
     )
     server = build_server(config=config, host=host, port=port)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -368,10 +479,24 @@ def main() -> None:
     port = int(os.environ.get("CARL_PORT", str(_DEFAULT_PORT)))
     server = build_server(host=host, port=port)
     state: _CarlState = server._carl_state  # type: ignore[attr-defined]
+    upstream_host = (urlparse(state.config.llm_endpoint).hostname or "").lower()
+    auth_state = "authenticated" if state.config.api_key else "no-auth"
     logger.info(
-        "Carl HTTP server listening on http://%s:%d (directive=%r)",
-        host, port, state.config.directive or "neutral",
+        "Carl HTTP server listening on http://%s:%d "
+        "(directive=%r, upstream=%s, auth=%s, model=%s)",
+        host, port,
+        state.config.directive or "neutral",
+        upstream_host or "?",
+        auth_state,
+        state.config.llm_model,
     )
+    if upstream_host == "api.openai.com" and not state.config.api_key:
+        logger.warning(
+            "Carl is configured against api.openai.com but no API key was "
+            "resolved. Set CARL_LLM_API_KEY or OPENAI_API_KEY in the "
+            "environment, or pass api_key= to serve_in_thread(). Every "
+            "upstream call will return 401 until this is fixed."
+        )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
