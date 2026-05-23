@@ -279,6 +279,50 @@ distance scoring:
   shape diverges from the centroid (i.e., it stopped refusing the
   way it used to).
 
+### Embedding cost surface — when the embedder runs, when it doesn't
+
+The harness builds **one** sentence-transformer embedder per
+process (`harness.py:278-279`, default `all-MiniLM-L6-v2`) and
+shares it across the session baseline, the refusal sampler, and
+every hybrid induced detector that exposes `set_embedder()`.
+There is no per-detector duplicate model load — one cold-cache
+load (~5-15 s), then per-call inference.
+
+**Where embeddings run:**
+
+| Event | Embeddings | When |
+|---|---|---|
+| First embed call (model cold-load) | 0 inference; ~5-15 s loading the model | Once per process (lazy) |
+| Boot-time refusal sampling | 10 if live sampling succeeded, 50 if corpus fallback, 0 if `source="unset"` | Once at `start()` |
+| Per non-empty captured wire turn | 1 (via `EmbeddingBaseline.observe` at `baseline.py:151-167`) | Every turn that flows through the mitmproxy adapter, every session, pre- and post-baseline-lock |
+| Per `.induce()` call by a hybrid detector | 1-5 (varies per detector — SASTER-18-induced embeds the induced response; SASTER-26-induced embeds recon-vs-neutral spans) | Each PROBE-mode scheduler cycle or explicit `.induce()` call |
+
+**Where embeddings DO NOT run:**
+
+- **HAR-import mode** (`saster-har` CLI). `har_cli.py:134-146`
+  iterates HAR turns and calls `detector.evaluate(turn)` directly
+  with no `EmbeddingBaseline.observe()` call in the loop.
+  `turn.boundary_proximity` stays `None` for every turn; the
+  `behavioral_anomaly` signal contributes `0.0` to every drift
+  composite in HAR audits. Hybrid detectors still embed
+  per-firing if they're enabled.
+- **Direct scenario runs** (`carl.run_recon`, `carl.run_exfil`).
+  These feed pre-built `TurnData` objects to detectors without
+  routing through `EmbeddingBaseline`.
+- **Tool-call POSTs with no user/assistant text**. The
+  `baseline.observe()` short-circuit at `baseline.py:165-167`
+  returns `None` for empty/whitespace text without calling the
+  embedder.
+
+**TRAINED-centroid reuse across detectors.** After `start()`
+samples the TRAINED centroid, the harness pushes it into every
+induced detector that exposes `set_refusal_centroid`
+(`harness.py:392-396`). Those detectors then reuse the
+harness-built centroid instead of re-embedding the bundled
+refusal corpus from scratch. The 10 (or 50) embeddings at boot
+are therefore the **only** corpus-side embedding cost — not
+repeated per detector.
+
 ### Refusal sampling — timing and tuning
 
 At every `start()` the harness probes the agent with the 10
