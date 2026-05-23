@@ -359,10 +359,11 @@ the default produced a misleading "timeout" failure that looked
 like a detector regression but was actually an infrastructure
 underprovision.
 
-For v0.1, use `HttpInjector(timeout=180.0)` explicitly whenever you
-construct a probe path for an induction-mode detector. v0.2 will
-add a separate `induction_timeout` parameter with a 180-s default
-so this stops being a discovery burden.
+`HttpInjector` exposes a separate `induction_timeout` parameter
+(default 180s in v0.3.x) independent of the general `timeout`
+(default 30s). The induce-path probes use the induction timeout
+automatically; pass `HttpInjector(induction_timeout=300.0)` (or
+higher) if your agent is slower than the 180s default supports.
 
 ### Writing reference targets — explicit susceptibility encoding
 

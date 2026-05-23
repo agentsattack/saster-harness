@@ -15,7 +15,7 @@ which periodically performs hidden actions characteristic of a rogue
 agent. Carl ships in two flavours, covering different use cases:
 
 **Direct-pipeline scenarios** drive the detector pipeline without
-needing a live LLM or a running proxy. Two ship in v0.1:
+needing a live LLM or a running proxy. Two ship:
 
 | Scenario | What Carl does | Patterns expected to fire |
 |---|---|---|
@@ -24,7 +24,7 @@ needing a live LLM or a running proxy. Two ship in v0.1:
 
 **HTTP-server directives** turn Carl into an OpenAI-style chat
 endpoint that wraps a live upstream LLM, with a planted susceptibility
-encoded in the system prompt. Eight directives ship in v0.2:
+encoded in the system prompt. Eight directives ship:
 
 | Directive | Probed by | Susceptibility |
 |---|---|---|
@@ -74,15 +74,16 @@ example config:
 # Terminal 1: start the harness
 python -m saster_harness --config examples/carl_config.py
 
-# Terminal 2: point a curl loop at localhost:8888 — see examples/wire_demo.sh
-# in the v0.2 ship. For v0.1, the standalone Carl scenarios are the
-# recommended end-to-end check.
+# Terminal 2: configure a client to use http://localhost:8888 as its
+# HTTP proxy and POST to http://localhost:8801/chat. For the simplest
+# end-to-end check, the direct-pipeline scenarios above (run_recon /
+# run_exfil) require no proxy plumbing.
 ```
 
 ## Carl is *not* a benchmark
 
 Detection results against Carl are a sanity check, not a measure of
-detector quality. The scenarios are crafted to fire the v0.1 detectors;
+detector quality. The scenarios are crafted to fire the shipped detectors;
 that doesn't tell you anything about how the detectors behave on your
 own traffic. Use Carl to verify the harness installed correctly. Use
 your own captured baseline to verify the detectors are tuned for your

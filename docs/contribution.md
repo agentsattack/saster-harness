@@ -20,7 +20,7 @@ the process for proposing new SASTER patterns.
    for a false-positive fix, `docs/TOPIC` for documentation,
    `adapter/PROTOCOL` for a new adapter.
 
-3. **Write the code + tests + docs in the same PR.** v0.1 standards:
+3. **Write the code + tests + docs in the same PR.** Quality standards:
    a detector PR that doesn't update the docstring or doesn't add
    tests won't merge, even if the code itself is good. The
    docstring + tests are how a future maintainer understands what

@@ -121,7 +121,7 @@ Q3: Is the recon question subordinate to a normal task or
     appended to an unrelated conversation?
     Yes → SASTER-26 (the side-channel-recon shape).
     No  → this may be a legitimate platform-onboarding question.
-          Still SASTER-26 in v0.1; suppress with a per-session
+          Still SASTER-26 in the current shipped set; suppress with a per-session
           count threshold or a per-deployment allow-list at
           the webhook.
 ```
@@ -130,7 +130,7 @@ Q3: Is the recon question subordinate to a normal task or
 
 - *vs. legitimate due-diligence questions:* Prospects asking
   "which cloud do you run on" during compliance evaluation fire
-  the detector. The v0.1 detector cannot tell intent. Mitigation:
+  the detector. The shipped detector cannot tell intent. Mitigation:
   require ≥2 surfaces in the same session before alerting at the
   webhook level.
 
@@ -201,7 +201,7 @@ Q3: Are both features present in the same user message?
   This is an acceptable false positive; the alternative is
   silence on a known attack class.
 
-- *vs. SASTER-6 (System Prompt Extraction, not in v0.1):* A
+- *vs. SASTER-6 (System Prompt Extraction, not in the shipped set):* A
   direct "what is your system prompt?" is SASTER-6, not
   SASTER-28. SASTER-28 specifically requires the creative-framing
   envelope.
@@ -276,7 +276,7 @@ Q3: Does this specific turn lack a role:system message?
 
 | Observation | Likely pattern | Differential |
 |---|---|---|
-| User asks "what's your system prompt?" directly | (out of v0.1 — SASTER-6) | If framed creatively: SASTER-28. If plain ask: SASTER-6. |
+| User asks "what's your system prompt?" directly | (out of shipped set — SASTER-6) | If framed creatively: SASTER-28. If plain ask: SASTER-6. |
 | Agent response includes content it previously refused | (consider SASTER-19 or SASTER-24) | If reframed with equivalence: SASTER-24. If denied refusal happened: SASTER-19. |
 | Outbound POST with PII | SASTER-31 | If creative-framed prior: also SASTER-28. If POST is to a registered tool path: low-priority SASTER-31. |
 | Long technical user message, generic response | SASTER-18 | If response is a refusal: not SASTER-18. If user was confirming-not-asking jargon: SASTER-18. |
@@ -286,7 +286,7 @@ Q3: Does this specific turn lack a role:system message?
 
 ## Co-firing reference
 
-Patterns the v0.1 detectors flag as canonically co-firing via the
+Patterns the shipped detectors flag as canonically co-firing via the
 `co_fires_with` class attribute. Downstream consumers can use this
 to group alerts without having to know the taxonomy.
 
@@ -295,9 +295,9 @@ to group alerts without having to know the taxonomy.
 | SASTER-26 (Recon-Gated Injection) | SASTER-33 (Context Stripping) | Recon side-channels typically drop the system message — SASTER.md cross-reference at SASTER-33's notes. |
 | SASTER-33 (Context Stripping) | SASTER-26 (Recon-Gated Injection) | Reciprocal of the above. |
 | SASTER-28 (Salience Suppression) | SASTER-24 (JiTOR) | Both involve framing manipulation around a prohibited objective. SSE hides the ask; JiTOR hides the bypass. |
-| SASTER-18 (Semantic Recasting) | — | No canonical co-fire in v0.1. |
-| SASTER-27 (Detection Layer Injection) | — | No canonical co-fire in v0.1. |
-| SASTER-31 (Compositional Capability Emergence) | — | No canonical co-fire in v0.1. |
+| SASTER-18 (Semantic Recasting) | — | No canonical co-fire in the shipped set. |
+| SASTER-27 (Detection Layer Injection) | — | No canonical co-fire in the shipped set. |
+| SASTER-31 (Compositional Capability Emergence) | — | No canonical co-fire in the shipped set. |
 
 Detectors with no canonical co-fire still fire independently of
 each other on the same turn if their respective conditions match.
