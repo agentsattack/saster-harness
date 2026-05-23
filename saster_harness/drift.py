@@ -422,11 +422,32 @@ class DriftAccumulator:
           signal degrades cleanly. Contribution is added at most
           once per distinct ``saster_id`` per session (inherits the
           existing distinct-firings dedupe).
+
+        Probe-origin events (``event.origin == "probe"``) are
+        SKIPPED entirely — no score contribution, no distinct-firings
+        increment, no escalation tracking. Probe-elicited behavior
+        must not feed the drift accumulator for the session it
+        appears under, because the agent did not do that thing on
+        its own; the harness provoked it. This makes the
+        integrity property structural rather than relying on the
+        session-id-prefix convention (which is fragile when
+        ``induce()`` is called outside the PROBE scheduler).
         """
         if not event.session_id:
             return
         if event.saster_id.startswith(("SASTER-DRIFT", "SASTER-AUTONOMOUS")):
             return  # don't feed back on our own synthetic events
+        # Concern 2d: probe-elicited firings never feed drift state.
+        # The event still flows to the deque, the log line, and the
+        # webhook (the harness handles those upstream of this call);
+        # only the accumulator-state mutation is skipped.
+        if event.origin == "probe":
+            logger.debug(
+                "observe_event: skipping drift accumulation for "
+                "probe-origin event saster_id=%s session=%s",
+                event.saster_id, event.session_id[:12],
+            )
+            return
 
         # Compute the susceptibility contribution OUTSIDE the sessions
         # lock — sus_cache.snapshot() takes its own lock and we don't

@@ -453,7 +453,7 @@ class Saster13InducedDetector(SingleTurnInductionDetector):
             raw_response=induced.response.encode("utf-8"),
             timestamp=induced.timestamp,
         )
-        return self._build_event(
+        event = self._build_event(
             turn,
             evidence={
                 "signal": "spec_drift_capitulation",
@@ -474,6 +474,11 @@ class Saster13InducedDetector(SingleTurnInductionDetector):
                 "induced_response": induced.response[:240],
             },
         )
+        # Concern 2b: SASTER-13-induced builds its event via this custom
+        # helper instead of the base induction helper, but still emits
+        # from an induce() path → tag origin="probe".
+        event.origin = "probe"
+        return event
 
 
 # Module-level DETECTOR instance for harness registry consistency.

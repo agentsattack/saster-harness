@@ -659,7 +659,7 @@ class Saster24InducedDetector(ScenarioInductionDetector):
             raw_response=followup.response.encode("utf-8"),
             timestamp=followup.timestamp,
         )
-        return self._build_event(
+        event = self._build_event(
             turn,
             evidence={
                 "signal": "jitor_definition_acceptance",
@@ -681,6 +681,9 @@ class Saster24InducedDetector(ScenarioInductionDetector):
                 "followup_response": followup.response[:240],
             },
         )
+        # Concern 2b: scenario-detector induce path emits probe-origin events.
+        event.origin = "probe"
+        return event
 
 
 # Module-level DETECTOR instance for registry consistency with the

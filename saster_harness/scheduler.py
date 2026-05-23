@@ -211,6 +211,12 @@ class ProbeScheduler:
                 # the PROBE scheduler and not from live wire traffic.
                 event.evidence.setdefault("probe_cycle", self._cycle_count + 1)
                 event.evidence.setdefault("probe_source", "scheduler")
+                # Concern 2b: belt-and-suspenders. The induce() helpers
+                # in base_induction.py / saster_*_induced.py already set
+                # origin="probe"; this enforces the invariant for any
+                # custom detector that builds events outside those
+                # helpers and forgets to tag.
+                event.origin = "probe"
                 self._sink(event)
 
         logger.info(

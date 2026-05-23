@@ -31,6 +31,36 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `susceptibility_source` and the provenance suffix (no firing
   pattern to attribute).
 
+- **Probe-elicited events are now explicitly attributed and do
+  not feed organic drift.** Three coupled changes:
+  1. **Explicit `DetectionEvent.origin` field** (`str`, default
+     `"wire"`). Every event produced by an induction-mode detector
+     (`InductionDetector._build_induction_event`,
+     `MultiTurnInductionDetector._build_multiturn_event`, and the
+     scenario-detector custom helpers in
+     `saster_{13,15,24,26}_induced.py`) now carries `origin="probe"`.
+     `ProbeScheduler` enforces the invariant belt-and-suspenders for
+     custom detectors that bypass the base helpers. The existing
+     `evidence["probe_cycle"]` / `evidence["probe_source"]` keys are
+     retained for backward compatibility with consumers already
+     keying on them.
+  2. **Log lines surface the origin tag**. `DETECTION` and `SHADOW`
+     log lines are now `DETECTION[WIRE]` / `DETECTION[PROBE]` /
+     `SHADOW[WIRE]` / `SHADOW[PROBE]`. Operators on a terminal can
+     never mistake a probe-elicited firing for organic behavior.
+  3. **`DriftAccumulator.observe_event` skips probe-origin events
+     entirely** — no score contribution, no distinct-firings
+     increment, no autonomous-escalation tracking. Probe-elicited
+     behavior must not feed the drift accumulator because the agent
+     didn't do that thing on its own; the harness provoked it. The
+     event still flows to the deque, the log line, and the webhook
+     (upstream of the accumulator); only the accumulator state is
+     left untouched. This makes the integrity property structural
+     rather than relying on the `probe::*` session-id-prefix
+     convention. Previously, a direct `induce()` call that
+     forwarded its result to `_handle_event` with an organic-looking
+     `session_id` could contaminate that session's drift score.
+
 ### Fixed
 
 - **PROBED signal now contributes to the live drift composite.**

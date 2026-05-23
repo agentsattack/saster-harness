@@ -595,3 +595,111 @@ def test_drift_log_line_omits_provenance_suffix_on_per_turn_crossing(
     line = crossing_lines[0]
     assert "u=1.00" in line  # unauthorized drove the crossing
     assert "from " not in line  # no provenance suffix on per-turn path
+
+
+# ---------------------------------------------------------------------------
+# Concern 2d: probe-origin events do NOT feed drift state
+# ---------------------------------------------------------------------------
+
+
+def _probe_origin_event(saster_id: str, session_id: str = "s1") -> DetectionEvent:
+    """Same shape as ``_firing_event`` but tagged as probe-origin —
+    the kind of event ``base_induction._build_induction_event`` and
+    siblings now emit."""
+    return DetectionEvent(
+        saster_id=saster_id,
+        pattern_name=saster_id,
+        tier=3,
+        agent_name="test-agent",
+        session_id=session_id,
+        turn_idx=0,
+        evidence={"signal": "induction_divergence", "detail": "fixture"},
+        origin="probe",
+    )
+
+
+def test_probe_origin_event_does_not_advance_drift_score() -> None:
+    """Integrity check: a probe-elicited firing must NOT advance the
+    session's drift score, even when the susceptibility cache has a
+    matching entry. The harness provoked this behavior; it isn't
+    organic drift."""
+    acc = _make_accumulator(max_drift=99.0)
+    acc._sus_cache.update("SASTER-18", 1.0)  # would normally add 0.9
+
+    acc.observe_event(_probe_origin_event("SASTER-18"))
+
+    assert acc.score_for("s1") == 0.0
+
+
+def test_probe_origin_event_does_not_count_toward_autonomous_escalation() -> None:
+    """A burst of probe-elicited firings (e.g. the scheduler running
+    five different induced detectors against a susceptible agent)
+    must NOT emit SASTER-AUTONOMOUS-ESCALATION for the session those
+    events nominally belong to. Escalation tracks organic-only
+    distinct firings."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(max_autonomous=2, sink_recorder=sink)
+
+    for sid in ("SASTER-18", "SASTER-24", "SASTER-26", "SASTER-13", "SASTER-15"):
+        acc.observe_event(_probe_origin_event(sid))
+
+    assert sink == []  # no escalation event despite 5 distinct probe firings
+
+
+def test_wire_origin_event_still_advances_drift_and_escalates() -> None:
+    """Regression guard: the probe-origin bail-out must NOT affect
+    organic (origin='wire') events. The default origin on
+    DetectionEvent is 'wire', so existing accumulation behavior
+    must be unchanged."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(max_drift=99.0, max_autonomous=2, sink_recorder=sink)
+    acc._sus_cache.update("SASTER-18", 0.8)
+
+    # Default origin is "wire" — the fixture _firing_event doesn't
+    # touch the origin field, so this exercises the default.
+    organic = _firing_event("SASTER-18")
+    assert organic.origin == "wire", "fixture must use default origin"
+    acc.observe_event(organic)
+
+    assert acc.score_for("s1") == pytest.approx(0.9 * 0.8)
+
+    # Three distinct organic firings → escalation (max_autonomous=2,
+    # strict greater-than).
+    acc.observe_event(_firing_event("SASTER-24"))
+    acc.observe_event(_firing_event("SASTER-26"))
+    escalations = [e for e in sink if e.saster_id == SASTER_AUTONOMOUS_ESCALATION]
+    assert len(escalations) == 1
+
+
+def test_mixed_probe_and_wire_events_isolate_correctly() -> None:
+    """Same session id, mixed origins: only the wire events advance
+    drift; the probe events go through (deque, webhook, log) but
+    leave drift state alone. This is the structural property — even
+    if a probe-induced event arrives on an organic session_id (e.g.
+    a custom integration that forwards induce() results without
+    routing through the probe::* synthetic session naming), it does
+    not contaminate."""
+    acc = _make_accumulator(max_drift=99.0)
+    acc._sus_cache.update("SASTER-18", 1.0)
+    acc._sus_cache.update("SASTER-24", 0.5)
+
+    # Probe firing on an organic-looking session id → no contamination
+    acc.observe_event(_probe_origin_event("SASTER-18", session_id="org-1"))
+    assert acc.score_for("org-1") == 0.0
+
+    # Subsequent organic firing on the same session DOES advance
+    acc.observe_event(_firing_event("SASTER-24", session_id="org-1"))
+    assert acc.score_for("org-1") == pytest.approx(0.9 * 0.5)
+
+
+def test_detection_event_default_origin_is_wire() -> None:
+    """The default origin on DetectionEvent must be 'wire' so the
+    new field doesn't accidentally re-tag passive detections.
+    Backwards compatibility: any consumer constructing a
+    DetectionEvent without the origin kwarg keeps the v0.3 meaning."""
+    e = DetectionEvent(
+        saster_id="SASTER-18", pattern_name="x", tier=3,
+        agent_name="t", session_id="s", turn_idx=0,
+        evidence={"signal": "x", "detail": "x"},
+    )
+    assert e.origin == "wire"

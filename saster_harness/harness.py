@@ -558,6 +558,13 @@ class MonitoringHarness:
         if self._store is not None:
             self._store.append_drift_event(event)
 
+        # Concern 2c: surface origin on the log line so operators can
+        # never mistake a probe-elicited firing for organic wire
+        # behavior. Anything other than the known "wire"/"probe" labels
+        # passes through verbatim so future origin categories work
+        # without a code change.
+        origin_tag = (event.origin or "wire").upper()
+
         in_shadow = self._is_in_shadow(event)
         if in_shadow:
             # Shadow mode: record + log only; do NOT page out via the
@@ -570,7 +577,8 @@ class MonitoringHarness:
                 logger.info if self._config.log_shadow_events else logger.debug
             )
             shadow_log(
-                "SHADOW %s · %s · T%d · session=%s turn=%d (baseline not yet established)",
+                "SHADOW[%s] %s · %s · T%d · session=%s turn=%d (baseline not yet established)",
+                origin_tag,
                 event.saster_id,
                 event.pattern_name,
                 event.tier,
@@ -580,7 +588,8 @@ class MonitoringHarness:
             return
 
         logger.info(
-            "DETECTION %s · %s · T%d · session=%s turn=%d",
+            "DETECTION[%s] %s · %s · T%d · session=%s turn=%d",
+            origin_tag,
             event.saster_id,
             event.pattern_name,
             event.tier,

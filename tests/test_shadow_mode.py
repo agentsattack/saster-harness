@@ -222,9 +222,14 @@ def test_log_shadow_events_surfaces_shadow_line_at_info(
     with caplog.at_level(logging.INFO, logger="saster_harness.harness"):
         h._handle_event(_event("s1"))
 
+    # The shadow line is prefixed with the origin tag — "SHADOW[WIRE]"
+    # for organic events, "SHADOW[PROBE]" for induce-path events
+    # (Concern 2c). For this test we fire an organic SASTER-18 so the
+    # expected prefix is [WIRE].
     shadow_records = [
-        r for r in caplog.records if r.message.startswith("SHADOW ")
+        r for r in caplog.records if r.message.startswith("SHADOW[")
     ]
     assert len(shadow_records) == 1, "expected exactly one SHADOW log record"
     assert shadow_records[0].levelno == logging.INFO
+    assert shadow_records[0].message.startswith("SHADOW[WIRE] ")
     h._dispatch_webhook.assert_not_called()

@@ -137,7 +137,7 @@ class InductionDetector(SasterDetector):
             raw_response=induced.response.encode("utf-8"),
             timestamp=induced.timestamp,
         )
-        return self._build_event(
+        event = self._build_event(
             turn,
             evidence={
                 "signal": "induction_divergence",
@@ -161,6 +161,13 @@ class InductionDetector(SasterDetector):
                 "induced_response": induced.response[:240],
             },
         )
+        # Concern 2b: every event constructed from an induce() path
+        # carries origin="probe" so downstream consumers (drift
+        # accumulator, log lines, webhook payloads) can distinguish
+        # provoked behavior from organic wire behavior — regardless
+        # of session-id-prefix convention.
+        event.origin = "probe"
+        return event
 
 
 class SingleTurnInductionDetector(InductionDetector):
@@ -535,7 +542,7 @@ class MultiTurnInductionDetector(InductionDetector):
             timestamp=induced.timestamp,
         )
         threshold = self.divergence_threshold()
-        return self._build_event(
+        event = self._build_event(
             turn,
             evidence={
                 "signal": "multi_turn_induction_divergence",
@@ -558,3 +565,6 @@ class MultiTurnInductionDetector(InductionDetector):
                 ],
             },
         )
+        # Concern 2b: same probe-origin tagging as single-turn induction.
+        event.origin = "probe"
+        return event

@@ -411,7 +411,7 @@ class Saster15InducedDetector(ScenarioInductionDetector):
             raw_response=target.response.encode("utf-8"),
             timestamp=target.timestamp,
         )
-        return self._build_event(
+        event = self._build_event(
             turn,
             evidence={
                 "signal": "intent_erosion_capitulation",
@@ -435,6 +435,10 @@ class Saster15InducedDetector(ScenarioInductionDetector):
                 ],
             },
         )
+        # Concern 2b: scenario-detector induce path emits probe-origin
+        # events same as the standard single-turn / multi-turn paths.
+        event.origin = "probe"
+        return event
 
 
 # Module-level DETECTOR instance for harness registry consistency.

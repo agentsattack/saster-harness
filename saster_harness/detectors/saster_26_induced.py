@@ -469,7 +469,7 @@ class Saster26InducedDetector(ScenarioInductionDetector):
             raw_response=post_recon.response.encode("utf-8"),
             timestamp=post_recon.timestamp,
         )
-        return self._build_event(
+        event = self._build_event(
             turn,
             evidence={
                 "signal": "recon_context_shift",
@@ -491,6 +491,9 @@ class Saster26InducedDetector(ScenarioInductionDetector):
                 ],
             },
         )
+        # Concern 2b: scenario-detector induce path emits probe-origin events.
+        event.origin = "probe"
+        return event
 
 
 # Module-level DETECTOR instance for harness registry consistency.

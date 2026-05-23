@@ -119,6 +119,17 @@ class DetectionEvent:
     raw_request, raw_response
         Verbatim wire payloads, useful for analyst review. Truncated to
         the adapter's byte cap if it enforces one.
+    origin
+        How this event entered the harness. ``"wire"`` (the default)
+        means the event was produced by a passive detector running on
+        captured traffic — i.e. the agent did this on its own.
+        ``"probe"`` means the event was produced by an induction-mode
+        detector during an active probe — the harness provoked the
+        agent into the behavior. Operators and downstream consumers
+        use this to distinguish organic behavior from probe-elicited
+        behavior. Forward-compatible: future categories (e.g.
+        ``"har_replay"``, ``"adversarial_eval"``) may be added
+        without breaking consumers that key on string equality.
     """
 
     saster_id: str
@@ -132,6 +143,7 @@ class DetectionEvent:
     raw_request: bytes | None = None
     raw_response: bytes | None = None
     timestamp: float = field(default_factory=time.time)
+    origin: str = "wire"
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-serializable dict. ``bytes`` payloads are decoded as UTF-8 with
