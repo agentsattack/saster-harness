@@ -22,8 +22,9 @@ when_to_use: |
 # saster-harness — operational guide
 
 `saster-harness` is the open-source ADR harness for the SASTER
-agentic-failure taxonomy. v0.2 ships 12 detector implementations
-covering 10 SASTER patterns, 4 operating modes, and three audit
+agentic-failure taxonomy. v0.3.2 ships 13 detector implementations
+covering 9 SASTER patterns (13, 15, 18, 24, 26, 27, 28, 31, 33),
+three operating modes (OBSERVE / PROBE / INDUCE), and three audit
 paths: live mitmproxy capture, HAR file import, and
 direct-pipeline scenario validation.
 
@@ -70,21 +71,27 @@ config = MonitoringConfig(
 harness = MonitoringHarness(config)
 
 # Explicit trigger — drives the probe cycle now:
-prober = Prober(HttpInjector(endpoint=config.agent_endpoint, timeout=180.0))
+prober = Prober(HttpInjector(endpoint=config.agent_endpoint))
+# induction_timeout defaults to 180s in v0.3.x — sufficient for
+# 70B-parameter models. Override on HttpInjector if your agent is slower.
 event = Saster18InducedDetector().induce(prober, session_id="probe-1")
 if event:
     print(f"Detected: {event.saster_id} — {event.evidence['detail']}")
 ```
 
-The harness's PROBE mode (v0.2+) will schedule induced probes
-automatically. For v0.1 you call `.induce()` explicitly from a
-script, a cron job, or your own orchestrator.
+The harness's PROBE mode schedules induced probes automatically
+(daemon thread, wakes every `probe_interval_hours`). For one-off
+invocations call `.induce()` explicitly from a script. With default
+`probe_on_start=False` and `probe_interval_hours=24` the scheduler
+sleeps 24h before its first cycle and logs a WARNING — set
+`probe_on_start=True` to run an immediate first cycle (intended for
+stage demos and CI).
 
-**HttpInjector timeout for induction:** the default `timeout=30.0`
-is sufficient for single-shot probes but NOT for induction-mode
-follow-ups against LLM-shaped agents. Use `timeout=180.0` for any
-HttpInjector you hand to an induced detector — the Phase 4
-calibration against Llama-3.3-70B required this margin.
+**HttpInjector timeouts:** v0.3.x splits `timeout` (30s default,
+for general POSTs) and `induction_timeout` (180s default, used by
+probes). The 180s default is calibrated for 70B-parameter models
+generating 400-600 tokens of compliance text — override per-deployment
+if your agent is slower.
 
 ---
 
@@ -113,8 +120,9 @@ Convenience identifiers for `MonitoringConfig.enabled_detectors`:
 - `"SASTER-24-both"` — passive + induced flavours together
 - `"SASTER-26-both"` — same for SASTER-26
 
-Default-when-omitted loads all 12 implementations
-(`["SASTER-13-induced", "SASTER-15-induced", "SASTER-18-both",
+Default-when-omitted loads 12 of the 13 implementations
+(`SASTER-18-multiturn` is opt-in; identifiers expanded:
+`["SASTER-13-induced", "SASTER-15-induced", "SASTER-18-both",
 "SASTER-24-both", "SASTER-26-both", "SASTER-27", "SASTER-28",
 "SASTER-31", "SASTER-33"]`).
 
@@ -146,6 +154,65 @@ for the privacy walkthrough.
 
 ---
 
+## DECLARED allow-list (`authorized_tools`)
+
+`MonitoringConfig.authorized_tools` is the DECLARED source in the
+slide-11 boundary calculation — the operator's allow-list of hosts
+the agent is permitted to call. It is matched against
+`turn.target_host` (the URL host portion captured by the adapter),
+case-insensitive, **bidirectional substring**. Declare host
+fragments, not tool names.
+
+```python
+config = MonitoringConfig(
+    ...,
+    authorized_tools=["api.openai.com", "internal-kb.corp.example"],
+)
+```
+
+Two footguns to know about:
+
+- `"openai"` would whitelist `evil.openai-attacker.com` — the
+  allow-list entry is a substring of the host.
+- `"api.openai.com"` would whitelist bare `openai.com` — the host
+  is a substring of the allow-list entry.
+
+Prefer the most specific host you're willing to allow. Empty
+allow-list (`authorized_tools=[]`) means "do not fire the
+unauthorized-tool-use signal at all" — the harness will not
+fabricate violations against an empty declaration.
+
+---
+
+## Drift composite
+
+The `DriftAccumulator` integrates four signals per session into a
+cumulative score:
+
+    drift = 1.0·unauthorized + 0.8·refusal_change + 0.6·behavioral + 0.9·susceptibility
+
+The first three accumulate per captured turn via `observe_turn`.
+The fourth — PROBED susceptibility — flows via `observe_event`:
+when a passive detector fires for `SASTER-X`, the accumulator
+adds `0.9 × cached_score_for(X)` (or its `-induced` companion)
+once per distinct firing. Empty cache → zero contribution; the
+signal degrades cleanly.
+
+**Probe-elicited events do NOT feed organic drift.** Events with
+`origin="probe"` — every event from an `.induce()` path — are
+skipped entirely by `observe_event`. The harness provoked the
+behavior; the agent didn't do it on its own.
+
+When cumulative score crosses `max_drift_score` (default `25`) the
+accumulator emits one `SASTER-DRIFT-COMPOSITE` event per session,
+carrying `evidence.signals`, `evidence.weights`, and on the
+per-firing path `evidence.susceptibility_source` (firing
+saster_id, resolved cache key, score). A separate
+`SASTER-AUTONOMOUS-ESCALATION` fires when distinct organic firings
+exceed `max_autonomous_hits` (default `2`, strict greater-than).
+
+---
+
 ## Operating modes
 
 ```python
@@ -154,7 +221,7 @@ from saster_harness import HarnessMode, MonitoringConfig
 config = MonitoringConfig(
     ...,
     mode=HarnessMode.OBSERVE,  # default; passive wire capture
-    # mode=HarnessMode.PROBE,  # v0.2: scheduled induced probes (no-op in v0.1)
+    # mode=HarnessMode.PROBE,  # scheduled induced probes (daemon thread)
     # mode=HarnessMode.INDUCE, # active adversarial — gated by allow_induce=True
 )
 ```
@@ -163,6 +230,32 @@ The `IMPORT` mode referenced by the LayerOne talk is the
 `saster-har` CLI path documented above — there's no separate
 `HarnessMode.IMPORT` enum value because HAR import doesn't need
 the harness object at all.
+
+---
+
+## Terminal visibility
+
+The CLI defaults to `WARNING` verbosity, so at default settings an
+operator running `python -m saster_harness --config ...` sees nothing
+event-related on the terminal during normal operation. Three knobs
+to surface events:
+
+- `-v` (INFO) — shows `DETECTION[WIRE] ...` and `DETECTION[PROBE] ...`
+  lines for unmasked firings, plus the drift-crossing
+  `DRIFT threshold crossed ... [u=… r=… b=… s=…]` line.
+- `-vv` (DEBUG) — additionally shows `SHADOW[WIRE]` / `SHADOW[PROBE]`
+  lines for events shadow-suppressed before the session baseline
+  locks, plus per-detector debug traces.
+- `MonitoringConfig(log_shadow_events=True)` — surfaces SHADOW lines
+  at INFO instead of DEBUG, so a `-v` run shows them too. Webhook
+  behavior is unchanged. Intended for live demos where the operator
+  wants to see shadow firings during the baseline window without
+  dropping the whole harness to `-vv`.
+
+The `[WIRE]` / `[PROBE]` log-line markers come from
+`DetectionEvent.origin` (default `"wire"`, set to `"probe"` by every
+`.induce()` path). Probe-elicited firings are unambiguously
+distinguishable from organic wire firings on the terminal.
 
 ---
 
@@ -194,7 +287,7 @@ What HAR under-fires:
 
 | Concern | Passive detectors | Induced detectors |
 |---|---|---|
-| **When does it fire?** | Automatically on every captured turn | Only when you call `.induce()` (manual) or via PROBE mode (v0.2) |
+| **When does it fire?** | Automatically on every captured turn | Only when you call `.induce()` (manual) or via PROBE mode |
 | **Does it modify agent traffic?** | No | Yes — actively sends probe turns into the agent's session |
 | **Requires agent consent?** | No (read-only observation) | YES — only run against agents in non-prod environments unless you have explicit authorization |
 | **Recommended environment** | Production OK | Staging / sandbox / dedicated probe sessions |
@@ -254,9 +347,11 @@ section above; you need to call `.induce()` explicitly or use the
 calibration script as your invocation pattern.
 
 **"The harness times out when I run an induced probe."**
-`HttpInjector(timeout=180.0)` — the default 30s is too tight for
-70B-parameter models generating 400-600 tokens of compliance text.
-v0.2 will add a separate `induction_timeout` default.
+`induction_timeout` defaults to 180s in v0.3.x and is calibrated
+for 70B-parameter models generating 400-600 tokens. If you still
+see timeouts, pass `HttpInjector(induction_timeout=300.0)` (or
+higher) to the prober — the field is independent of the general
+`timeout` parameter.
 
 **"My CI runs flag the SASTER-31 detector firing on a legitimate
 batch upload."**
@@ -264,7 +359,7 @@ SASTER-31 fires on PII pipelines by design. Allow-list the
 destination at your webhook sink, OR subclass the detector and
 override `evaluate()` to early-return for known-good hosts.
 
-**"I want to write a detector for a SASTER pattern not in v0.1."**
+**"I want to write a detector for a SASTER pattern not in the shipped set."**
 See [docs/pattern-authoring.md](docs/pattern-authoring.md). For
 induced detectors, the new pattern's reference target needs
 explicit susceptibility encoding — vague prompts produce vague
@@ -390,4 +485,4 @@ remains supported and unchanged.
 - [docs/decision-trees.md](docs/decision-trees.md) — analyst
   triage trees
 - [carl/README.md](carl/README.md) — Carl simulation disclaimer
-- [CHANGELOG.md](CHANGELOG.md) — release history + v0.2 roadmap
+- [CHANGELOG.md](CHANGELOG.md) — release history
