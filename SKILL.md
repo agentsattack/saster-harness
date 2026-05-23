@@ -440,6 +440,60 @@ your own noise floor. Watch a few days of clean traffic, then raise
 `max_drift_score` if the synthetic fires too often, lower it if
 you want earlier alerts.
 
+**Where the default 25 came from.** The number is heuristic, not
+derived. The docstring at `config.py:77-81` documents it as roughly
+2.5× a "typical legitimate session stays under 10" noise floor.
+Useful starting point; not a calibrated universal. (Side note: the
+same docstring describes drift as accumulating "as the per-turn
+boundary proximity exceeds 0.5" — the code at `drift.py:227-237`
+doesn't apply any 0.5 threshold, it accumulates every non-zero
+proximity weighted by 0.6. The 0.5 reference is narrative guidance
+about when drift becomes visible, not literal code behavior.)
+
+**The accumulation math.** With default weights and signals clamped
+to `[0, 1]`:
+
+- Max per-turn contribution (via `observe_turn`): `1.0·1 + 0.8·1 +
+  0.6·1 = 2.4` if every per-turn signal maxed.
+- Max per-firing contribution (via `observe_event`): `0.9·1 = 0.9`
+  once per distinct saster_id per session.
+
+A theoretical fastest crossing of 25 needs ~10-11 fully-anomalous
+turns. A realistic accumulation at `behavioral_anomaly` averaging
+0.3 on noisy-but-legit traffic gives `0.6 × 0.3 = 0.18` per turn →
+~140 turns to cross 25. The default keeps clean sessions comfortably
+below threshold.
+
+**Deriving your own threshold.** After running at default for a
+week:
+
+1. Sample clean-traffic session_ids.
+2. For each, query `accumulator.score_for(session_id)` at session
+   end (or read the `evidence.drift_score` on any
+   `SASTER-DRIFT-COMPOSITE` events that fired).
+3. Histogram the per-session scores.
+4. Set `max_drift_score` above the 95th percentile of that
+   distribution.
+
+**What `max_drift_score` doesn't control.** Four properties
+operators sometimes assume it tunes but it doesn't:
+
+- **Not continuous.** `SASTER-DRIFT-COMPOSITE` fires once per session
+  regardless of how far past threshold the score grows (the
+  `drift_event_emitted` flag at `drift.py:519-530`). Raising the
+  budget delays the alert; it doesn't get you stream-style
+  "drift now N over budget" updates.
+- **Not per-pattern.** One scalar across all four signals.
+  Per-signal weighting is Layer 1 (`drift_weight_*`); per-detector
+  tuning is Layer 3.
+- **No decay.** A session that crosses at turn 5 stays "over budget"
+  forever (per the strict-monotonic accumulation — no path in the
+  code reduces `state.score`). No "drift cooling" knob exists.
+- **Not cross-session.** Each session accumulates independently
+  (`_SessionDriftState` per `session_id` at `drift.py:118-124`). If
+  you want a per-user or per-tenant rollup, build it downstream
+  from the events.
+
 ### Layer 3 — Per-detector divergence thresholds (detector constructor)
 
 Each induced detector ships its own threshold. **Not** on
