@@ -250,6 +250,9 @@ disclaimer and scenario index.
 - [**docs/methodology.md**](docs/methodology.md) — ADR concept,
   why wire-level rather than LLM-level, why session baseline,
   position relative to WAF / EDR / SIEM / DLP.
+- [**docs/detectors.md**](docs/detectors.md) — full enumeration
+  of the 13 shipped detector implementations grouped by base
+  pattern, with by-mode and by-implementation cross-tabs.
 - [**docs/har_import.md**](docs/har_import.md) — offline HAR
   audit, privacy / consent, redaction model, session correlation
   strategies.
