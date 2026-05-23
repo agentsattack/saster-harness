@@ -259,6 +259,100 @@ distinguishable from organic wire firings on the terminal.
 
 ---
 
+## Centroids, refusal sampling, and what happens when the agent changes
+
+### What's a centroid
+
+Two centroids — the L2-normalized mean of a set of embedding
+vectors. The harness uses them as reference points for cosine-
+distance scoring:
+
+- **OBSERVED** (per-session): the mean of the first `baseline_turns`
+  (default 10) in-band turn embeddings of one session. Once locked
+  in (`baseline.py:170-184`), every subsequent turn is scored as
+  `1 − cosine(turn_embedding, session_centroid)` ∈ `[0, 1]` —
+  the per-turn `behavioral_anomaly` signal in the drift composite.
+- **TRAINED** (per-agent): the mean of the agent's responses to
+  the bundled refusal-eliciting probes, computed at boot by
+  `RefusalSampler` (`refusal_sampler.py:181`). Used by
+  `refusal_pattern_change` to detect when the agent's refusal
+  shape diverges from the centroid (i.e., it stopped refusing the
+  way it used to).
+
+### Refusal sampling — timing and tuning
+
+At every `start()` the harness probes the agent with the 10
+refusal-eliciting prompts in `saster_harness/corpora/refusal_probes.txt`
+and builds the TRAINED centroid from the responses. The loop is
+synchronous — `start()` blocks until sampling completes or the
+budget is exhausted.
+
+Defaults:
+- 10 probes, one per non-blank line in the bundled corpus.
+- 180s per individual probe (`HttpInjector.induction_timeout`).
+- 60s total wall-clock budget
+  (`MonitoringConfig.sampling_timeout_seconds=60.0`).
+
+Whichever probes complete inside the budget feed the centroid. If
+zero complete, the sampler falls back to the bundled 50-phrase
+`corpora/refusals.txt` corpus centroid; if even that's empty,
+`TrainedRefusalBaseline.source="unset"` and the
+`refusal_pattern_change` signal contributes `0.0` to drift.
+
+To extend the budget — e.g., when your upstream LLM is slow
+(local Llama-70B, o-series reasoning models):
+
+```python
+config = MonitoringConfig(
+    ...,
+    sampling_timeout_seconds=300.0,  # 5-minute cap on the boot
+                                     # sampling pass. start() will
+                                     # block for up to this long.
+)
+```
+
+`sampling_timeout_seconds=0.0` disables the cap entirely
+(unbounded — worst case 10 × 180s = 30 min if every probe hits
+`induction_timeout`). Don't use on a fast-startup path.
+
+### What's automatically re-built vs persisted vs lost at restart
+
+| State | At restart |
+|---|---|
+| TRAINED refusal centroid | **Re-sampled** from the agent — fresh probes, fresh centroid, fresh `calibration_receipt.json`. The previous centroid vector is not persisted to disk. |
+| OBSERVED per-session centroids | **Restored from `centroids.npz`** if `state_dir` is set; new sessions get fresh baselines. |
+| `SusceptibilityCache` (PROBED) | **Empty at boot** — in-memory only. Repopulates on the next PROBE-mode scheduler cycle. |
+| `DriftAccumulator` per-session state | **Empty at boot** — in-memory only. Counts reset to zero for every session. |
+| `authorized_tools` allow-list | Read from config every `start()` — fully operator-controlled. |
+| `extra_reframings` / `extra_turn_sequences` | Read from config every `start()`. |
+
+### When the monitored agent changes — operational playbook
+
+Four kinds of "agent change" invalidate different parts of harness
+state. The standard response for most of them is **restart + re-
+calibrate + watch drift**:
+
+| Change | What goes stale | Operator action |
+|---|---|---|
+| **Upstream model swap** (GPT-4 → GPT-5, model fine-tune, new quant level) | TRAINED centroid; per-detector calibration margins; possibly drift threshold | Restart (TRAINED re-samples). Re-run `scripts/phase4_calibration.py` (or your adapted version) against the new agent. Watch drift at default `max_drift_score=25` for a few days before tuning. |
+| **System prompt revision** on the agent | TRAINED centroid; resumed-session OBSERVED centroids | Restart. If the change is large, `rm <state_dir>/<agent_name>/centroids.npz` before restart so resumed sessions don't score against stale centroids. |
+| **New tools / new hosts added** to the agent | `authorized_tools` allow-list is now incomplete → spurious unauthorized-tool-use firings | Update `authorized_tools` in config (host fragments, not tool names — see DECLARED allow-list section), restart. |
+| **New susceptibility vector** (new RAG corpus, new conversational flow, new prompt-injection surface) | Whichever detector covers that vector — its built-in reframings/scenarios are now incomplete for your deployment | Add deployment-specific reframings via `extra_reframings` / `extra_turn_sequences` in config, OR author a custom detector via `register_detector_instance`. Re-calibrate. |
+
+### Silent upstream-model rotation — the failure mode to guard against
+
+A real risk: your upstream provider rotates the model behind an
+alias (`gpt-4o-latest`, `claude-3-5-sonnet-latest`, OpenRouter
+alias updates, etc.). Your agent code didn't change; the behavior
+did. The harness won't proactively alert on this, but the
+calibration discipline will catch it: re-run `phase4_calibration.py`
+(or your adapted equivalent) on a weekly cadence. If susceptible
+cells suddenly fail or neutral cells suddenly fire, the model
+rotated under you. No margins are committed to the repo so this
+is purely operator-driven discipline.
+
+---
+
 ## Using HAR import for offline audit
 
 When the agent is browser-accessible (a chat UI, an internal LLM
