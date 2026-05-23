@@ -18,8 +18,14 @@ from saster_harness import HarnessMode, MonitoringConfig
 
 config = MonitoringConfig(
     agent_name="carl-demo",
-    agent_endpoint="http://localhost:18080/chat",
-    authorized_tools=["search_kb", "create_ticket"],
+    # Carl's default port is 8801 (carl/server.py:93). Override at
+    # Carl-server start via CARL_PORT=<port> if you need a different one.
+    agent_endpoint="http://localhost:8801/chat",
+    # Host fragments, NOT tool names — matched against turn.target_host
+    # with case-insensitive bidirectional substring. "localhost" covers
+    # both Carl's own endpoint and an upstream LLM running on the same
+    # box; see SKILL.md's DECLARED allow-list section for the footguns.
+    authorized_tools=["localhost"],
     max_drift_score=25,
     max_autonomous_hits=2,
     probe_interval_hours=0,  # no probing in OBSERVE
