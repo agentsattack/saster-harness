@@ -11,6 +11,7 @@ Covers:
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from saster_harness.baseline import (
     ObservedToolCallMix,
@@ -372,3 +373,119 @@ def test_parse_host_extracts_host_or_returns_none() -> None:
     assert parse_host("https://api.example.com/v1/chat") == "api.example.com"
     assert parse_host("http://localhost:8080/") == "localhost"
     assert parse_host("not-a-url") is None or parse_host("not-a-url") == ""
+
+
+# ---------------------------------------------------------------------------
+# Live PROBED-signal contribution via observe_event
+# ---------------------------------------------------------------------------
+
+
+def _firing_event(saster_id: str, session_id: str = "s1") -> DetectionEvent:
+    return DetectionEvent(
+        saster_id=saster_id,
+        pattern_name=saster_id,
+        tier=3,
+        agent_name="test-agent",
+        session_id=session_id,
+        turn_idx=0,
+        evidence={"signal": "x", "detail": "fixture"},
+    )
+
+
+def test_observe_event_adds_susceptibility_contribution_to_score() -> None:
+    """When a detector fires for SASTER-X and the susceptibility cache
+    holds a score for that pattern, ``observe_event`` adds
+    ``w_susceptibility * score`` to the session drift score. This is
+    the live path for the fourth signal in the slide-11 composition —
+    previously plumbed but never read."""
+    acc = _make_accumulator(max_drift=99.0)  # high so we observe score only
+    acc._sus_cache.update("SASTER-18", 0.8)
+    assert acc.score_for("s1") == 0.0
+
+    acc.observe_event(_firing_event("SASTER-18"))
+
+    # Default w_susceptibility=0.9, score=0.8 → contribution 0.72.
+    assert acc.score_for("s1") == pytest.approx(0.9 * 0.8)
+
+
+def test_observe_event_no_contribution_when_cache_empty() -> None:
+    """Empty SusceptibilityCache (no probe cycles run yet, or PROBE
+    mode never enabled) → susceptibility contribution is 0.0. The
+    signal degrades cleanly; the other three keep working."""
+    acc = _make_accumulator(max_drift=99.0)
+    assert len(acc._sus_cache) == 0
+
+    acc.observe_event(_firing_event("SASTER-18"))
+
+    assert acc.score_for("s1") == 0.0
+
+
+def test_observe_event_contributes_susceptibility_at_most_once_per_pattern() -> None:
+    """The distinct-firings dedupe also gates susceptibility addition —
+    repeated firings of the same saster_id within a session add the
+    cached score exactly once. This matches the existing escalation-
+    counter dedupe so the two signals stay consistent."""
+    acc = _make_accumulator(max_drift=99.0)
+    acc._sus_cache.update("SASTER-18", 0.5)
+
+    for _ in range(5):
+        acc.observe_event(_firing_event("SASTER-18"))
+
+    # 5 firings, dedupe → 1 contribution of 0.9 * 0.5 = 0.45.
+    assert acc.score_for("s1") == pytest.approx(0.9 * 0.5)
+
+
+def test_observe_event_resolves_induced_companion_for_passive_saster_id() -> None:
+    """When the cache only carries the ``-induced`` companion's score
+    (which is what the PROBE scheduler writes — induced detectors are
+    the only ones that produce a divergence score), a firing on the
+    passive ``SASTER-X`` parent still resolves to the companion's
+    score via ``susceptibility_match``'s induced fallback."""
+    acc = _make_accumulator(max_drift=99.0)
+    acc._sus_cache.update("SASTER-18-induced", 0.6)
+
+    acc.observe_event(_firing_event("SASTER-18"))
+
+    assert acc.score_for("s1") == pytest.approx(0.9 * 0.6)
+
+
+def test_observe_event_emits_drift_composite_when_susceptibility_crosses_threshold() -> None:
+    """A susceptibility-only contribution that crosses
+    ``max_drift_score`` must emit ``SASTER-DRIFT-COMPOSITE`` exactly
+    once — the crossing check is shared between observe_turn and
+    observe_event so a per-event crossing fires the same synthetic
+    event as a per-turn crossing would."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(max_drift=0.5, sink_recorder=sink)
+    acc._sus_cache.update("SASTER-18", 1.0)  # 0.9 * 1.0 = 0.9 ≥ 0.5
+
+    acc.observe_event(_firing_event("SASTER-18"))
+
+    assert len(sink) == 1
+    assert sink[0].saster_id == SASTER_DRIFT_COMPOSITE
+    assert sink[0].evidence["signals"]["susceptibility"] == 1.0
+    # The other per-turn signals are zero in the per-event firing path
+    # (no turn context).
+    assert sink[0].evidence["signals"]["unauthorized"] == 0.0
+    assert sink[0].evidence["signals"]["refusal_change"] == 0.0
+    assert sink[0].evidence["signals"]["behavioral"] == 0.0
+
+
+def test_observe_event_drift_composite_emitted_once_across_paths() -> None:
+    """A session that already crossed via observe_turn should NOT
+    re-emit when a subsequent observe_event also crosses; the
+    drift_event_emitted flag dedupes across both call sites."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(
+        declared=("github.com",), max_drift=0.9, sink_recorder=sink,
+    )
+    # First crossing via observe_turn: unauthorized=1.0 ≥ 0.9
+    acc.observe_turn(_turn(target_host="evil.example.com"))
+    assert len(sink) == 1
+
+    # Now fire an event with high susceptibility — would cross again
+    # if it weren't deduped.
+    acc._sus_cache.update("SASTER-18", 1.0)
+    acc.observe_event(_firing_event("SASTER-18"))
+
+    assert len(sink) == 1  # still exactly one drift composite

@@ -15,6 +15,27 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   window without dropping the whole harness to `-vv` verbosity. Webhook
   behavior is unchanged — shadowed events still do not page.
 
+### Fixed
+
+- **PROBED signal now contributes to the live drift composite.**
+  Previously the fourth slide-11 signal (`susceptibility_match`,
+  weight `0.9`) was plumbed into `_compute_signals` but never read on
+  any production path — `observe_turn` always passed
+  `contributing_saster_id=None`, short-circuiting the lookup to `0.0`
+  and silently dropping the signal. `DriftAccumulator.observe_event`
+  now looks up the firing pattern's cached susceptibility (populated
+  by the PROBE-mode scheduler) and adds `w_susceptibility * score` to
+  the session's running drift, deduped by `distinct_saster_ids` so a
+  given pattern contributes at most once per session. The
+  `max_drift_score` crossing check is shared between the per-turn and
+  per-event paths so a susceptibility-driven crossing emits exactly
+  one `SASTER-DRIFT-COMPOSITE` event. Empty cache → `0.0`
+  contribution; existing three-signal behavior is unchanged. Operators
+  with `max_drift_score` tuned against the previous (effectively
+  three-signal) behavior may want to revisit the threshold;
+  `scripts/phase4_calibration.py` margins are unaffected because they
+  calibrate per-detector divergence, not the composite.
+
 ## [0.3.2] — 2026-05-21
 
 ### Added

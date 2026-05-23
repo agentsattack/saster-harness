@@ -6,8 +6,19 @@ Implements the slide-11 boundary-calculation composition:
         unauthorized_tool_use(turn, baseline.declared) * 1.0 +
         refusal_pattern_change(turn, baseline.trained) * 0.8 +
         behavioral_anomaly(turn, baseline.observed)    * 0.6 +
-        susceptibility_match(turn, susceptibility)     * 0.9
+        susceptibility_match(event, susceptibility)    * 0.9
     )
+
+The first three signals accumulate per wire turn via
+:meth:`DriftAccumulator.observe_turn`. The fourth — PROBED — does not
+fit the per-turn shape (passive wire turns carry no firing pattern to
+attribute the cache lookup to), so it is added per firing event via
+:meth:`DriftAccumulator.observe_event`: when a detector fires for
+``SASTER-X``, the accumulator looks up the cached susceptibility score
+for that pattern (populated by the PROBE-mode scheduler) and adds
+``0.9 * score`` to the session's running drift. The dedupe on
+``distinct_saster_ids`` means a given pattern contributes its
+susceptibility at most once per session.
 
 When the accumulated session drift exceeds
 :attr:`~saster_harness.config.MonitoringConfig.max_drift_score`, a
@@ -15,6 +26,9 @@ synthetic :class:`~saster_harness.event.DetectionEvent` with
 ``saster_id="SASTER-DRIFT-COMPOSITE"`` is emitted to the harness sink.
 This is the *composite* signal — the per-detector firings still happen
 independently; drift is the cross-cutting score that integrates them.
+The crossing check is shared between the per-turn and per-event paths
+so a crossing driven by either source still emits exactly one event
+per session.
 
 The four signal functions are documented inline. Each returns a value
 in ``[0, 1]``; the weighted sum is what gets accumulated. Synthetic
@@ -361,25 +375,48 @@ class DriftAccumulator:
         with self._sessions_lock:
             state = self._sessions.setdefault(turn.session_id, _SessionDriftState())
             state.score += contribution
-            should_fire = (
-                state.score >= self._max_drift_score
-                and not state.drift_event_emitted
-            )
-            if should_fire:
-                state.drift_event_emitted = True
+            should_fire = self._consume_drift_crossing(state)
+            crossing_score = state.score
 
         if should_fire:
-            self._emit_drift_event(turn, state_score=state.score, signals=signals)
+            self._emit_drift_event(turn, state_score=crossing_score, signals=signals)
         return contribution
 
     def observe_event(self, event: DetectionEvent) -> None:
-        """Track distinct detector firings per session. When the count
-        crosses ``max_autonomous_hits``, emit one
-        ``SASTER-AUTONOMOUS-ESCALATION`` event for the session."""
+        """Process one detector firing for the session.
+
+        Two side-effects:
+
+        - **Distinct-firings tracking** — counts unique ``saster_id``
+          values per session. When the count crosses
+          :attr:`max_autonomous_hits`, emits ``SASTER-AUTONOMOUS-ESCALATION``.
+        - **PROBED-signal contribution** — looks up the firing
+          pattern's cached susceptibility score (populated by the
+          PROBE-mode scheduler) and adds
+          ``w_susceptibility * susceptibility_score`` to the session's
+          running drift score. This is the live path for the
+          fourth signal in the slide-11 composition; the per-turn
+          path (:meth:`observe_turn`) leaves susceptibility at 0.0
+          because passive wire turns have no firing pattern to
+          attribute the cache lookup to. When the cache is empty
+          (no probe cycles run yet) the contribution is 0.0 — the
+          signal degrades cleanly. Contribution is added at most
+          once per distinct ``saster_id`` per session (inherits the
+          existing distinct-firings dedupe).
+        """
         if not event.session_id:
             return
         if event.saster_id.startswith(("SASTER-DRIFT", "SASTER-AUTONOMOUS")):
             return  # don't feed back on our own synthetic events
+
+        # Compute the susceptibility contribution OUTSIDE the sessions
+        # lock — sus_cache.snapshot() takes its own lock and we don't
+        # want to nest. The lookup is read-only with respect to
+        # session state.
+        sus_score = susceptibility_match(
+            event.saster_id, self._sus_cache.snapshot(),
+        )
+        sus_contribution = self._w_susceptibility * sus_score
 
         with self._sessions_lock:
             state = self._sessions.setdefault(event.session_id, _SessionDriftState())
@@ -387,6 +424,9 @@ class DriftAccumulator:
                 return
             state.distinct_saster_ids.add(event.saster_id)
             state.n_distinct_firings += 1
+            state.score += sus_contribution
+            should_fire_drift = self._consume_drift_crossing(state)
+            crossing_score = state.score
             should_escalate = (
                 state.n_distinct_firings > self._max_autonomous_hits
                 and not state.escalation_event_emitted
@@ -394,8 +434,44 @@ class DriftAccumulator:
             if should_escalate:
                 state.escalation_event_emitted = True
 
+        if should_fire_drift:
+            # Build a minimal TurnData so ``_emit_drift_event`` can
+            # reuse its session-id / turn-idx plumbing without a
+            # second signature. Only the susceptibility signal carries
+            # non-zero contribution here — the per-turn signals don't
+            # apply to a per-event contribution.
+            synthetic_turn = TurnData(
+                session_id=event.session_id,
+                turn_idx=event.turn_idx,
+            )
+            signals = {
+                "unauthorized": 0.0,
+                "refusal_change": 0.0,
+                "behavioral": 0.0,
+                "susceptibility": float(sus_score),
+            }
+            self._emit_drift_event(
+                synthetic_turn, state_score=crossing_score, signals=signals,
+            )
         if should_escalate:
             self._emit_escalation_event(event, state)
+
+    def _consume_drift_crossing(self, state: _SessionDriftState) -> bool:
+        """Caller must hold ``self._sessions_lock``. Returns ``True``
+        iff the session score has just crossed
+        :attr:`max_drift_score` for the first time and marks the
+        state so subsequent calls return ``False``. Shared between
+        :meth:`observe_turn` (per-turn contribution path) and
+        :meth:`observe_event` (per-firing susceptibility path) so a
+        crossing driven by either source still emits exactly one
+        ``SASTER-DRIFT-COMPOSITE`` per session."""
+        if (
+            state.score >= self._max_drift_score
+            and not state.drift_event_emitted
+        ):
+            state.drift_event_emitted = True
+            return True
+        return False
 
     def score_for(self, session_id: str) -> float:
         with self._sessions_lock:
@@ -420,6 +496,13 @@ class DriftAccumulator:
             turn, self._baseline.trained.centroid, self._embedder,
         )
         b = behavioral_anomaly(turn)
+        # NOTE: ``contributing_saster_id`` is intentionally ``None`` on
+        # the per-turn path (passive wire turns carry no firing pattern
+        # to attribute a cache lookup to), so this branch is a no-op
+        # for production callers. The live PROBED-signal contribution
+        # happens in :meth:`observe_event` instead. The branch is kept
+        # for direct callers (tests, ad-hoc scoring) that DO have a
+        # saster_id in hand.
         s = (
             susceptibility_match(contributing_saster_id, self._sus_cache.snapshot())
             if contributing_saster_id
