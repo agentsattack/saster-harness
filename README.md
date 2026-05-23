@@ -4,10 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-**Wire-level Agentic Detection and Response (ADR).** 12 detectors
-covering 10 SASTER patterns (3 with both passive and induced
-coverage). 4 operating modes — OBSERVE / PROBE / INDUCE / IMPORT.
-HAR-file audit for browser-accessible agents without MITM.
+**Wire-level Agentic Detection and Response (ADR).** 13 detectors
+covering 9 SASTER patterns (3 with both passive and induced
+coverage; SASTER-18 also has a multi-turn induced variant). 3
+operating modes — OBSERVE / PROBE / INDUCE. HAR-file audit via the
+separate `saster-har` CLI for browser-accessible agents without MITM.
 
 `saster-harness` sits between your agent and its tools/network,
 establishes a behavioral baseline per session, and fires structured
@@ -78,19 +79,22 @@ The 90-line example from the LayerOne slides — also at
 
 ```python
 from saster_harness import MonitoringConfig, MonitoringHarness
-from saster_harness.adapters import HttpJsonAdapter
 
 config = MonitoringConfig(
     agent_name="support-prod",
     agent_endpoint="http://your-agent/chat",
-    authorized_tools=["search_kb", "create_ticket"],
+    # Host fragments, NOT tool names. Matched against turn.target_host
+    # with case-insensitive bidirectional substring — declare the hosts
+    # your agent is permitted to call (see SKILL.md for the two
+    # substring-match footguns before you tune this for production).
+    authorized_tools=["api.your-agent.com", "internal-kb.corp.example"],
     max_drift_score=25,
     max_autonomous_hits=2,
     probe_interval_hours=24,
     alert_webhook="https://hooks.slack.com/...",
 )
 
-harness = MonitoringHarness(config, adapter=HttpJsonAdapter())
+harness = MonitoringHarness(config)  # HttpJsonAdapter is the default
 harness.start()
 ```
 
@@ -100,13 +104,52 @@ behavioral baseline, runs each shipped detector against it, and
 POSTs structured `DetectionEvent` JSON to your alert webhook when a
 pattern fires.
 
+#### Modifying Path C for your own agent
+
+Two starting templates ship in the repo — pick the one that matches
+how you want to invoke the harness:
+
+- **`examples/runner.py`** — the embedded-Python shape above.
+  Suitable when the harness lives inside your own process (FastAPI
+  service, scheduled job, integration test, etc.). You import
+  `MonitoringConfig` + `MonitoringHarness` and call `harness.start()`
+  directly.
+- **`examples/carl_config.py`** — declares a module-level
+  `config = MonitoringConfig(...)` that the CLI loads via
+  `python -m saster_harness --config examples/carl_config.py`. Use
+  this when you want the harness to run as a standalone process
+  (systemd unit, supervisord-managed worker, container entrypoint).
+
+Either way, the minimal customization for a different agent is:
+
+1. Copy the template — `cp examples/runner.py examples/my_agent.py`
+   (or `cp examples/carl_config.py examples/my_agent_config.py` for
+   the CLI shape).
+2. Change `agent_name` to your agent's stable identifier.
+3. Change `agent_endpoint` to your agent's chat URL.
+4. Change `authorized_tools` to host fragments your agent is allowed
+   to call (the URL hosts, not tool names — see SKILL.md for the
+   substring-match semantics and the two footguns).
+5. Run.
+
+For deeper customization — adding deployment-specific reframings
+(`extra_reframings`), enabling the multi-turn detector
+(`enabled_detectors=["SASTER-18-multiturn"]` or `"SASTER-18-all"`),
+tuning drift weights, switching from OBSERVE to PROBE mode, surfacing
+SHADOW events on the terminal (`log_shadow_events=True`), persisting
+state to disk (`state_dir`), or registering a custom detector
+(`register_detector_instance(...)` at import time) — see
+[SKILL.md](SKILL.md) for the complete `MonitoringConfig` field tour.
+Every operator-facing knob lives on that one struct.
+
 ---
 
 > ### ⚠️ Heads-up: induced detectors don't fire on captured events
 >
-> Five of the twelve detectors — **SASTER-13-induced**,
-> **SASTER-15-induced**, **SASTER-18-induced**, **SASTER-24-induced**,
-> and **SASTER-26-induced** — run in *induction mode*. They do NOT
+> Six of the thirteen detectors — **SASTER-13-induced**,
+> **SASTER-15-induced**, **SASTER-18-induced**, **SASTER-18-multiturn**,
+> **SASTER-24-induced**, and **SASTER-26-induced** — run in *induction
+> mode*. They do NOT
 > fire from passively-captured traffic. They probe agent sessions
 > actively, sending a baseline request, waiting for a response, then
 > sending follow-up turns (or full scenarios) to test whether the
@@ -125,10 +168,11 @@ pattern fires.
 
 ---
 
-## What ships in v0.2
+## What ships in v0.3.2
 
-**12 detectors covering 10 SASTER patterns** (3 with both passive and
-induced coverage):
+**13 detectors covering 9 SASTER patterns** (3 with both passive and
+induced coverage; SASTER-18 additionally has a multi-turn induced
+variant):
 
 | # | Pattern | Tier | Mode | Description |
 |---|---|---|---|---|
@@ -136,6 +180,7 @@ induced coverage):
 | **SASTER-15-induced** | Intent Erosion (Induced) | T2 | induced | Active probe: 4 scenarios of baseline refusal + 4–5 adjacency-normalizing turns + target re-ask; fires when agent capitulates after erosion |
 | **SASTER-18** | Semantic Recasting | T3 | passive | Distinctive-term retention heuristic on user-message vocabulary vs. agent-response vocabulary |
 | **SASTER-18-induced** | Semantic Recasting (Induced) | T3 | induced | Active probe: baseline refusal + 4 canonical reframings; fires on response divergence |
+| **SASTER-18-multiturn** | Semantic Recasting (Multi-Turn) | T3 | induced (multi-turn) | Active probe: 4 Crescendo-style ramps × 3 turns each (research / fiction / red-team / educational framings); fires on capitulation at the final ask of a ramp. Opt-in — enable via `"SASTER-18-multiturn"` or `"SASTER-18-all"`. |
 | **SASTER-24** | Just-in-Time Ontological Reframing | T3 | passive | Self-narrated reframe regex — refusal clause + equivalence claim + substitute framing |
 | **SASTER-24-induced** | JiTOR (Induced) | T3 | induced | Active probe: 4 redefinition scenarios; fires on definition-acceptance shift |
 | **SASTER-26** | Recon-Gated Injection | T4 | passive | Vocabulary regex over 4 recon surfaces (compute, identity, pipeline, observability) |
@@ -145,13 +190,18 @@ induced coverage):
 | **SASTER-31** | Compositional Capability Emergence | T3 | passive | Wire-format signature: record-list POST + sensitive field names |
 | **SASTER-33** | Context Stripping | T4 | passive | Per-session structural baseline on `role:system` message presence |
 
-7 detectors fire passively on captured traffic. 5 detectors (the
-`-induced` variants) run active probes against agent sessions —
-see the callout above. SASTER-18, SASTER-24, and SASTER-26 ship in
-both flavours because the patterns have observable passive *and*
-active manifestations; you can enable either, or both via
+7 detectors fire passively on captured traffic. 6 detectors (the
+`-induced` and `-multiturn` variants) run active probes against
+agent sessions — see the callout above. SASTER-18, SASTER-24, and
+SASTER-26 ship in both flavours because the patterns have observable
+passive *and* active manifestations; you can enable either, or both
+via the `-both` convenience shortcuts:
 `MonitoringConfig(enabled_detectors=["SASTER-18-both",
-"SASTER-24-both", "SASTER-26-both", ...])`.
+"SASTER-24-both", "SASTER-26-both", ...])`. To additionally include
+the Crescendo-style multi-turn detector, use `"SASTER-18-all"` in
+place of `"SASTER-18-both"` (passive + single-turn induced + multi-
+turn). Default-when-omitted loads 12 of the 13 implementations —
+`SASTER-18-multiturn` is the one opt-in.
 
 Each detector docstring quotes its canonical SASTER.md definition
 verbatim, documents operational shape at the wire level, lists
@@ -163,16 +213,23 @@ before opening the alert valve fully.
 
 ## Verifying against the bundled reference agent
 
-Carl is a simulated agent with four planted susceptibilities:
-infrastructure recon (Carl 2a), database exfil (Carl 2b),
-semantic-recasting reframing (Carl 4), and JiTOR redefinition
-(Carl 4). The scenarios are deterministic and run against
-localhost — no real systems are touched.
+Carl is a simulated reference agent with 8 hidden directives
+(`carl/directives.py`) — 6 susceptibility variants
+(`semantic_recasting`, `jitor_susceptible`,
+`intent_erosion_susceptible`, `recon_acting`,
+`spec_drift_susceptible`, `recon_emitter`) and 2 negative baselines
+(`""` neutral and `customer_support_scoped`). The directive is
+selected via the `CARL_DIRECTIVE` environment variable at server
+start.
 
-Carl 1–2 drive the detector pipeline directly via canned scripts;
-Carl 3–4 ship as an HTTP server that calls a real upstream LLM with
-a hidden directive system prompt, so the induced detectors can
-verify end-to-end against realistic LLM-shaped text:
+Carl ships in two shapes:
+
+- **Canned scenarios** (`carl/run_recon.py`, `carl/run_exfil.py`)
+  drive the detector pipeline directly via deterministic scripts —
+  no LLM, no network. Fast smoke tests for the passive detectors.
+- **HTTP server** (`python -m carl.server`) calls a real upstream
+  LLM with the directive's system prompt, so the induced detectors
+  can verify end-to-end against realistic LLM-shaped text:
 
 ```bash
 # Spin up Carl in induction-mode susceptibility:
@@ -180,7 +237,7 @@ CARL_DIRECTIVE=jitor_susceptible \
 CARL_LLM_ENDPOINT=http://your-llm/v1/chat/completions \
 python -m carl.server
 
-# In another terminal, run the calibration script — drives both
+# In another terminal, run the calibration script — drives all five
 # induced detectors against live Carl with the production embedder:
 python scripts/phase4_calibration.py
 ```
@@ -214,16 +271,35 @@ disclaimer and scenario index.
 
 ## Roadmap
 
-- **v0.2** — detector calibration toolkit, more T3 detectors, live
-  dashboard reference implementation,
-  `SingleTurnInductionDetector` / `ScenarioInductionDetector`
-  split, separate `induction_timeout` on `HttpInjector`, embedding-
-  similarity check for SASTER-18, formal susceptibility-encoding
-  contract for reference targets.
-- **v0.3** — multi-agent correlation, action-graph reasoning for
-  compositional patterns (full SASTER-31 detection beyond wire
-  signatures).
-- **v0.4** — PROBE-mode generators auto-derived from SASTER pattern
+Shipped through v0.3.x:
+
+- Detector-base-class split: `SingleTurnInductionDetector` /
+  `MultiTurnInductionDetector` / `ScenarioInductionDetector`.
+- Separate `induction_timeout` on `HttpInjector` (180s default,
+  independent of the general 30s `timeout`).
+- Crescendo-style multi-turn induction detector
+  (`SASTER-18-multiturn`).
+- PROBE-mode scheduler — induced detectors run automatically on a
+  configurable cadence; susceptibility scores feed the live drift
+  composite via `DriftAccumulator.observe_event`.
+- Explicit probe-origin attribution on `DetectionEvent` — probe-
+  elicited events are flagged and excluded from organic drift
+  accumulation.
+- Detector-extension hooks: `extra_reframings` /
+  `extra_turn_sequences` config fields; `register_detector_instance`
+  for custom probes.
+- Calibration toolkit (`scripts/phase4_calibration.py`) covering all
+  five shipped induced detectors against Carl's directive matrix.
+- Tunable drift weights (`drift_weight_*` config fields).
+- Per-deployment shadow-mode controls (`shadow_mode`,
+  `log_shadow_events`).
+
+Still aspirational:
+
+- Live dashboard reference implementation.
+- Multi-agent correlation; action-graph reasoning for full
+  SASTER-31 detection beyond wire signatures.
+- PROBE-mode generators auto-derived from SASTER pattern
   definitions; full INDUCE-mode adversarial probe library.
 
 ## Talk + recordings
