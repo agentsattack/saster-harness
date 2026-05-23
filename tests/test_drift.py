@@ -10,6 +10,8 @@ Covers:
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pytest
 
@@ -489,3 +491,107 @@ def test_observe_event_drift_composite_emitted_once_across_paths() -> None:
     acc.observe_event(_firing_event("SASTER-18"))
 
     assert len(sink) == 1  # still exactly one drift composite
+
+
+# ---------------------------------------------------------------------------
+# Concern 1: susceptibility-source provenance + log-line breakdown
+# ---------------------------------------------------------------------------
+
+
+def test_drift_event_carries_susceptibility_source_provenance() -> None:
+    """A drift crossing driven by observe_event must surface which
+    cache entry resolved the multiplier — operators and webhook
+    consumers should not have to guess which probe cycle's score
+    amplified this firing."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(max_drift=0.5, sink_recorder=sink)
+    acc._sus_cache.update("SASTER-18-induced", 0.9)
+
+    acc.observe_event(_firing_event("SASTER-18"))  # passive parent fires
+
+    assert len(sink) == 1
+    src = sink[0].evidence["susceptibility_source"]
+    assert src == {
+        "firing_saster_id": "SASTER-18",
+        "resolved_cache_key": "SASTER-18-induced",
+        "score": pytest.approx(0.9),
+    }
+
+
+def test_drift_event_susceptibility_source_records_exact_id_when_no_fallback() -> None:
+    """When the cache holds the exact id (not the induced companion),
+    the resolved_cache_key reflects that — no spurious fallback."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(max_drift=0.5, sink_recorder=sink)
+    acc._sus_cache.update("SASTER-18", 0.7)
+
+    acc.observe_event(_firing_event("SASTER-18"))
+
+    assert sink[0].evidence["susceptibility_source"]["resolved_cache_key"] == "SASTER-18"
+
+
+def test_drift_event_from_observe_turn_has_no_susceptibility_source() -> None:
+    """Per-turn drift crossings have no firing pattern to attribute
+    susceptibility to. The provenance key is OMITTED from evidence on
+    the per-turn path (not set to None or empty dict — absent), so
+    consumers can use its presence as a signal that the crossing came
+    from a per-event contribution."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(
+        declared=("github.com",), max_drift=0.9, sink_recorder=sink,
+    )
+    acc.observe_turn(_turn(target_host="evil.example.com"))
+    assert len(sink) == 1
+    assert "susceptibility_source" not in sink[0].evidence
+
+
+def test_drift_log_line_surfaces_signal_breakdown_at_info(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The INFO log line that announces a drift crossing must show
+    the four-signal breakdown so operators see WHICH signal drove the
+    crossing at -v verbosity, not just the total score."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(max_drift=0.5, sink_recorder=sink)
+    acc._sus_cache.update("SASTER-18", 0.8)
+
+    with caplog.at_level(logging.INFO, logger="saster_harness.drift"):
+        acc.observe_event(_firing_event("SASTER-18"))
+
+    crossing_lines = [
+        r.message for r in caplog.records
+        if "DRIFT threshold crossed" in r.message
+    ]
+    assert len(crossing_lines) == 1
+    line = crossing_lines[0]
+    # Breakdown shorthand: u=… r=… b=… s=…
+    assert "u=0.00" in line
+    assert "r=0.00" in line
+    assert "b=0.00" in line
+    assert "s=0.80" in line
+    # Provenance suffix when the crossing came via observe_event.
+    assert "SASTER-18" in line  # resolved cache key surfaced
+
+
+def test_drift_log_line_omits_provenance_suffix_on_per_turn_crossing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Per-turn crossings get the signal breakdown but no
+    ``(susceptibility=… from …)`` suffix — there's no resolved cache
+    key to report when the contribution didn't come from observe_event."""
+    sink: list[DetectionEvent] = []
+    acc = _make_accumulator(
+        declared=("github.com",), max_drift=0.9, sink_recorder=sink,
+    )
+
+    with caplog.at_level(logging.INFO, logger="saster_harness.drift"):
+        acc.observe_turn(_turn(target_host="evil.example.com"))
+
+    crossing_lines = [
+        r.message for r in caplog.records
+        if "DRIFT threshold crossed" in r.message
+    ]
+    assert len(crossing_lines) == 1
+    line = crossing_lines[0]
+    assert "u=1.00" in line  # unauthorized drove the crossing
+    assert "from " not in line  # no provenance suffix on per-turn path

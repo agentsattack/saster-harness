@@ -49,6 +49,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import urlparse
 
 import numpy as np
@@ -251,14 +252,32 @@ def susceptibility_match(
     When no probe has run yet (``susceptibility_scores`` empty), or
     the firing detector has no induced companion, returns ``0.0``.
     """
+    score, _ = _susceptibility_lookup(saster_id, susceptibility_scores)
+    return score
+
+
+def _susceptibility_lookup(
+    saster_id: str,
+    susceptibility_scores: dict[str, float],
+) -> tuple[float, str | None]:
+    """Internal: same resolution rules as :func:`susceptibility_match`
+    but also returns the resolved cache key so callers can surface
+    provenance. Returns ``(score, resolved_key)`` — ``resolved_key``
+    is ``None`` when no entry matched and the score is ``0.0``."""
     if not susceptibility_scores:
-        return 0.0
+        return 0.0, None
     if saster_id in susceptibility_scores:
-        return float(max(0.0, min(1.0, susceptibility_scores[saster_id])))
+        return (
+            float(max(0.0, min(1.0, susceptibility_scores[saster_id]))),
+            saster_id,
+        )
     induced_key = f"{saster_id}-induced"
     if induced_key in susceptibility_scores:
-        return float(max(0.0, min(1.0, susceptibility_scores[induced_key])))
-    return 0.0
+        return (
+            float(max(0.0, min(1.0, susceptibility_scores[induced_key]))),
+            induced_key,
+        )
+    return 0.0, None
 
 
 # ---------------------------------------------------------------------------
@@ -413,7 +432,11 @@ class DriftAccumulator:
         # lock — sus_cache.snapshot() takes its own lock and we don't
         # want to nest. The lookup is read-only with respect to
         # session state.
-        sus_score = susceptibility_match(
+        # Concern 1b: capture both the score AND the resolved cache key
+        # so we can surface provenance on the emitted drift event. The
+        # public ``susceptibility_match`` returns a float; we inline the
+        # same lookup logic here to keep its signature untouched.
+        sus_score, sus_resolved_key = _susceptibility_lookup(
             event.saster_id, self._sus_cache.snapshot(),
         )
         sus_contribution = self._w_susceptibility * sus_score
@@ -450,8 +473,21 @@ class DriftAccumulator:
                 "behavioral": 0.0,
                 "susceptibility": float(sus_score),
             }
+            # Concern 1b: provenance describing which cache entry drove
+            # the susceptibility contribution. ``firing_saster_id`` is
+            # the saster_id of the detector that fired; ``resolved_cache_key``
+            # is the cache key that ``susceptibility_match`` ended up
+            # using (it falls back from the bare id to its ``-induced``
+            # companion). When the cache had no entry, ``resolved_cache_key``
+            # is ``None`` and ``score`` is ``0.0``.
+            sus_source = {
+                "firing_saster_id": event.saster_id,
+                "resolved_cache_key": sus_resolved_key,
+                "score": float(sus_score),
+            }
             self._emit_drift_event(
                 synthetic_turn, state_score=crossing_score, signals=signals,
+                susceptibility_source=sus_source,
             )
         if should_escalate:
             self._emit_escalation_event(event, state)
@@ -534,8 +570,34 @@ class DriftAccumulator:
         }
 
     def _emit_drift_event(
-        self, turn: TurnData, state_score: float, signals: dict[str, float],
+        self,
+        turn: TurnData,
+        state_score: float,
+        signals: dict[str, float],
+        susceptibility_source: dict[str, Any] | None = None,
     ) -> None:
+        # Concern 1b: ``susceptibility_source`` carries provenance for
+        # contributions added via :meth:`observe_event`. Per-turn
+        # crossings (from :meth:`observe_turn`) leave it ``None`` —
+        # the per-turn path has no firing pattern to attribute.
+        evidence: dict[str, Any] = {
+            "signal": "drift_threshold_crossed",
+            "detail": (
+                f"Session cumulative drift score {state_score:.2f} crossed "
+                f"max_drift_score={self._max_drift_score:.2f}. "
+                f"Composition: "
+                f"unauthorized={signals['unauthorized']:.2f} "
+                f"refusal_change={signals['refusal_change']:.2f} "
+                f"behavioral={signals['behavioral']:.2f} "
+                f"susceptibility={signals['susceptibility']:.2f}."
+            ),
+            "drift_score": round(state_score, 3),
+            "max_drift_score": self._max_drift_score,
+            "signals": {k: round(v, 3) for k, v in signals.items()},
+            "weights": self.weights(),
+        }
+        if susceptibility_source is not None:
+            evidence["susceptibility_source"] = susceptibility_source
         event = DetectionEvent(
             saster_id=SASTER_DRIFT_COMPOSITE,
             pattern_name="Boundary Drift Composite",
@@ -543,27 +605,32 @@ class DriftAccumulator:
             agent_name=self._agent_name,
             session_id=turn.session_id,
             turn_idx=turn.turn_idx,
-            evidence={
-                "signal": "drift_threshold_crossed",
-                "detail": (
-                    f"Session cumulative drift score {state_score:.2f} crossed "
-                    f"max_drift_score={self._max_drift_score:.2f}. "
-                    f"Composition: "
-                    f"unauthorized={signals['unauthorized']:.2f} "
-                    f"refusal_change={signals['refusal_change']:.2f} "
-                    f"behavioral={signals['behavioral']:.2f} "
-                    f"susceptibility={signals['susceptibility']:.2f}."
-                ),
-                "drift_score": round(state_score, 3),
-                "max_drift_score": self._max_drift_score,
-                "signals": {k: round(v, 3) for k, v in signals.items()},
-                "weights": self.weights(),
-            },
+            evidence=evidence,
         )
-        logger.info(
-            "DRIFT threshold crossed for session=%s score=%.2f",
-            turn.session_id[:12], state_score,
+        # Concern 1c: surface the signal breakdown on the INFO log line
+        # so operators see WHICH signal drove the crossing without
+        # having to inspect the webhook payload or event buffer. The
+        # provenance suffix is only added on the per-event path where
+        # we have a cache source.
+        breakdown = (
+            f"u={signals['unauthorized']:.2f} "
+            f"r={signals['refusal_change']:.2f} "
+            f"b={signals['behavioral']:.2f} "
+            f"s={signals['susceptibility']:.2f}"
         )
+        if susceptibility_source and susceptibility_source.get("resolved_cache_key"):
+            logger.info(
+                "DRIFT threshold crossed for session=%s score=%.2f [%s] "
+                "(susceptibility=%.2f from %s)",
+                turn.session_id[:12], state_score, breakdown,
+                signals["susceptibility"],
+                susceptibility_source["resolved_cache_key"],
+            )
+        else:
+            logger.info(
+                "DRIFT threshold crossed for session=%s score=%.2f [%s]",
+                turn.session_id[:12], state_score, breakdown,
+            )
         self._sink(event)
 
     def _emit_escalation_event(

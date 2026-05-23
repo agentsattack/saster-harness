@@ -15,6 +15,22 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   window without dropping the whole harness to `-vv` verbosity. Webhook
   behavior is unchanged — shadowed events still do not page.
 
+### Changed
+
+- **Drift events surface susceptibility provenance and a signal
+  breakdown on the log line.** When a `SASTER-DRIFT-COMPOSITE` event
+  is emitted via the per-firing path (Option A), `evidence` now
+  carries a `susceptibility_source` dict with the firing pattern's
+  `saster_id`, the resolved susceptibility-cache key (the bare id or
+  its `-induced` companion), and the score that drove the multiplier.
+  The INFO log line that announces a crossing also includes the
+  four-signal shorthand (`u=… r=… b=… s=…`) and, on the per-event
+  path, a `(susceptibility=… from <cache_key>)` suffix — operators at
+  `-v` verbosity can now see WHICH signal drove the crossing without
+  inspecting the webhook payload. Per-turn crossings omit
+  `susceptibility_source` and the provenance suffix (no firing
+  pattern to attribute).
+
 ### Fixed
 
 - **PROBED signal now contributes to the live drift composite.**
