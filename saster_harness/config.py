@@ -132,6 +132,15 @@ class MonitoringConfig:
         alerts from turn 0, restoring the v0.2 behavior. The default
         matches the operational story in the LayerOne slide deck:
         the harness OBSERVES before it ALERTS.
+    log_shadow_events
+        When ``True``, surface shadow-suppressed events on the
+        ``SHADOW ...`` log line at ``INFO`` level instead of the
+        default ``DEBUG``. Useful for live demos and stage runs
+        where the operator wants to see passive detections on the
+        terminal during the baseline window without dropping the
+        whole harness to ``-vv`` verbosity. Does NOT change webhook
+        behavior — shadowed events still do not page. Default
+        ``False`` preserves v0.3 behavior.
     sample_refusal_baseline
         When ``True`` (the default), the harness probes the agent at
         ``start()`` with the bundled refusal-eliciting corpus
@@ -242,6 +251,7 @@ class MonitoringConfig:
     embedding_model: str = "all-MiniLM-L6-v2"
     mode: HarnessMode = HarnessMode.OBSERVE
     shadow_mode: bool = True
+    log_shadow_events: bool = False
     sample_refusal_baseline: bool = True
     sampling_timeout_seconds: float = 60.0
     state_dir: Path | None = None

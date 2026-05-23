@@ -9,9 +9,11 @@ baseline establishes, the full firing path resumes.
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from saster_harness.baseline import EmbeddingBaseline
 from saster_harness.config import HarnessMode, MonitoringConfig
@@ -194,3 +196,35 @@ def test_alert_webhook_required_for_shadow_to_make_observable_difference() -> No
     # No webhook to call regardless of shadow state.
     h._handle_event(_event("s1"))
     assert len(h.recent_events()) == 1
+
+
+def test_log_shadow_events_surfaces_shadow_line_at_info(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """With ``log_shadow_events=True``, the SHADOW line is emitted at
+    INFO instead of DEBUG so live-demo terminals show shadow-suppressed
+    events without dropping to ``-vv`` verbosity. Webhook MUST still
+    be suppressed — only the log level changes."""
+    config = MonitoringConfig(
+        agent_name="test-agent",
+        agent_endpoint="http://localhost:9999/chat",
+        authorized_tools=[],
+        baseline_turns=3,
+        shadow_mode=True,
+        log_shadow_events=True,
+        alert_webhook="https://example.com/hook",
+        mode=HarnessMode.OBSERVE,
+    )
+    h = MonitoringHarness(config=config, detectors=[])
+    h._baseline = EmbeddingBaseline(baseline_turns=3, embedder=_fake_embedder)
+    h._dispatch_webhook = MagicMock()  # type: ignore[method-assign]
+
+    with caplog.at_level(logging.INFO, logger="saster_harness.harness"):
+        h._handle_event(_event("s1"))
+
+    shadow_records = [
+        r for r in caplog.records if r.message.startswith("SHADOW ")
+    ]
+    assert len(shadow_records) == 1, "expected exactly one SHADOW log record"
+    assert shadow_records[0].levelno == logging.INFO
+    h._dispatch_webhook.assert_not_called()

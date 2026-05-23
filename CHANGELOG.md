@@ -4,6 +4,17 @@ All notable changes to `saster-harness` are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`MonitoringConfig.log_shadow_events`** (`bool`, default `False`).
+  When `True`, the `SHADOW ...` line emitted by `_handle_event` for
+  shadow-suppressed events logs at `INFO` instead of `DEBUG`, so live
+  demos surface passive detections on the terminal during the baseline
+  window without dropping the whole harness to `-vv` verbosity. Webhook
+  behavior is unchanged — shadowed events still do not page.
+
 ## [0.3.2] — 2026-05-21
 
 ### Added

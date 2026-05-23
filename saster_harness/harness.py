@@ -560,11 +560,16 @@ class MonitoringHarness:
 
         in_shadow = self._is_in_shadow(event)
         if in_shadow:
-            # Shadow mode: record + DEBUG-log only; do NOT page out via
-            # the alert webhook. The event is still available on the
+            # Shadow mode: record + log only; do NOT page out via the
+            # alert webhook. The event is still available on the
             # in-memory buffer and the stream iterator for tests and
-            # analyst tooling.
-            logger.debug(
+            # analyst tooling. Log level defaults to DEBUG; flipping
+            # ``MonitoringConfig.log_shadow_events`` to True surfaces
+            # the line at INFO for live-demo terminals.
+            shadow_log = (
+                logger.info if self._config.log_shadow_events else logger.debug
+            )
+            shadow_log(
                 "SHADOW %s · %s · T%d · session=%s turn=%d (baseline not yet established)",
                 event.saster_id,
                 event.pattern_name,
