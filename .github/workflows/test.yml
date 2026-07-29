@@ -34,5 +34,12 @@ jobs:
       - name: Type check
         run: mypy saster_harness
 
+      - name: Taxonomy sync guard
+        # Fails if any detector's declared id/name/tier or its quoted
+        # canonical definition drifts from the pinned SASTER taxonomy, or
+        # if the README detector/pattern counts stop matching what ships.
+        # Refresh procedure: tests/data/README.md.
+        run: pytest tests/test_taxonomy_sync.py -q
+
       - name: Tests
         run: pytest -q

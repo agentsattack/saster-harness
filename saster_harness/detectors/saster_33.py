@@ -7,7 +7,9 @@ Canonical definition (from SASTER.md):
         contextual scaffolding — system role markers, conversation history
         references, declared persona cues, tool-availability preambles —
         to observe how the agent's behavior degrades or shifts when its
-        operational context is partially absent.
+        operational context is partially absent. The technique is
+        primarily reconnaissance: it maps which contextual elements the
+        agent depends on for its policy enforcement.
 
     Detection:
         Structural anomaly detection against a baseline of turn-shape
@@ -16,7 +18,17 @@ Canonical definition (from SASTER.md):
         elements in an inbound prompt, paired with the agent's continued
         attempt to respond authoritatively, fires the pattern. Often
         co-occurs with SASTER-22 (Cross-Model Compositional) and SASTER-26
-        (Recon-Gated Injection) during active reconnaissance.
+        (Recon-Gated Injection) during active reconnaissance. Layered
+        detection across these patterns has been validated against live
+        attack traffic.
+
+    Example:
+        An attacker sends a series of prompts where the user turn omits
+        the standard task framing the agent's deployment context provides.
+        The agent attempts to respond as if context were present; the
+        responses reveal which contextual elements the agent treats as
+        authoritative versus advisory. The attacker uses the resulting map
+        to design a more targeted prompt-injection in a later session.
 
 Operational shape at the wire level
 -----------------------------------
