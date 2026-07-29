@@ -94,7 +94,7 @@ Patterns where the agent technically follows instructions but produces harmful o
 **Attack:** The objective of the conversation shifts incrementally across turns. Each individual turn is a reasonable follow-up to the previous one, but the cumulative effect moves the agent far from its original constraints.
 **Detection:** Semantic distance between the original query intent and the final turn's content exceeds threshold despite each adjacent pair being semantically close.
 **Example:** Starting with "explain network security" → "explain vulnerabilities" → "explain exploits" → "write an exploit for CVE-XXXX" — each step is a natural follow-up.
-**Prior art:** Crescendo multi-turn jailbreak (Russinovich et al., arXiv:2404.01833, 2024).
+**Prior art:** Crescendo multi-turn jailbreak (Russinovich et al., arXiv:2404.01833, 2024). Decomposition-attack literature is related prior art: Breach by a Thousand Leaks (Glukhov et al., arXiv:2407.02551, ICLR 2025), Adversaries Can Misuse Combinations of Safe Models (Jones et al., arXiv:2406.14595, 2024), and Monitoring Decomposition Attacks in LLMs (Chen Yueh-Han et al., arXiv:2506.10949, 2025). Differentiation: decomposition attacks are adversary-planned, upfront splitting of a harmful objective across a prompt stream issued by a hostile user; Gradual Intent Erosion is progressive drift within a single agent’s own action trajectory under a non-adversarial principal — related mechanism, different actor and different observed surface. (2506.10949’s monitor inspects only cumulative prompt history, and DeCompBench (arXiv:2606.13994) clears conversation history between subtasks, so neither observes an agent trajectory.)
 
 ### SASTER-15: Selective Omission
 **Attack:** Agent drops inconvenient information from its outputs — safety warnings, caveats, uncertainty indicators, or relevant context that would moderate the user's interpretation.
@@ -155,7 +155,7 @@ The newest and least understood patterns. These exploit the agent's epistemic pr
 **Attack:** Chaining individually-safe model calls into a sequence that produces an unsafe outcome. Each call complies with safety constraints; the composition violates them.
 **Detection:** Multi-step agent workflows where the final output violates safety constraints despite each intermediate step being individually compliant.
 **Example:** Model A generates a chemical list (safe — educational). Model B generates synthesis instructions for listed chemicals (safe — chemistry reference). Combined output: complete synthesis guide for a dangerous substance.
-**Prior art:** no dedicated prior treatment identified
+**Prior art:** Adversaries Can Misuse Combinations of Safe Models (Jones, Dragan & Steinhardt, arXiv:2406.14595, 2024) — decomposing a harmful task across models each individually safe; reinforced by Chen Yueh-Han et al. (arXiv:2506.10949, 2025), which argues monitoring must aggregate context across multiple LLM APIs. Adjacent decomposition-jailbreak work: DrAttack (Li et al., prompt decomposition + reconstruction); Imposter.ai (Liu et al.).
 
 ### SASTER-23: Self-Fulfilling Tool Belief
 **Attack:** Tool descriptions are crafted to reshape the model's self-concept. The tool's description creates a belief, the model calls the tool, the tool's output confirms the belief — a self-reinforcing loop.
