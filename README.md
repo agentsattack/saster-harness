@@ -25,6 +25,16 @@ logs, specifically to catch them.
 
 This release accompanies the LayerOne 2026 talk on ADR.
 
+**Why trajectory-level detection.** The CSA Hugging Face CISO
+post-mortem (Knostic / CSA / SANS et al., DRAFT v0.8, 27 Jul 2026,
+CC BY-NC 4.0) independently reaches the same conclusion this harness is
+built on: an action-level allow-list "would have happily approved every
+single step," so teams should "deploy trajectory-level detection" and
+target the "departure from approved objectives" rather than any single
+call. That corroborates the approach — it is not prior art for any
+SASTER pattern. See
+[cloudsecurityalliance.org/artifacts/hugging-face-ciso-post-mortem](https://cloudsecurityalliance.org/artifacts/hugging-face-ciso-post-mortem).
+
 ---
 
 ## Install + first detection in 5 minutes
