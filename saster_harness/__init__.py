@@ -57,6 +57,14 @@ from .harness import (
     register_detector_instance,
     registered_detector_ids,
 )
+from .instrumentation import (
+    CallbackProcessPlaneAdapter,
+    InstrumentationProfile,
+    InstrumentationState,
+    ObservationPlane,
+    ProcessPlaneAdapter,
+    resolve_profile,
+)
 from .prober import HttpInjector, InjectorBackend, InProcessInjector, Prober, ProbeRecord
 from .refusal_sampler import CalibrationReceipt, RefusalSampler
 
@@ -68,10 +76,15 @@ __all__ = [
     "HarnessMode",
     "HttpInjector",
     "InProcessInjector",
+    "CallbackProcessPlaneAdapter",
     "InductionDetector",
     "InjectorBackend",
+    "InstrumentationProfile",
+    "InstrumentationState",
     "MonitoringConfig",
     "MonitoringHarness",
+    "ObservationPlane",
+    "ProcessPlaneAdapter",
     "MultiTurnInductionDetector",
     "ObservedToolCallMix",
     "ProbeRecord",
@@ -93,6 +106,7 @@ __all__ = [
     "register_detector",
     "register_detector_instance",
     "registered_detector_ids",
+    "resolve_profile",
 ]
 
 # Deprecated class-name aliases (v0.4.0 renumbering). The

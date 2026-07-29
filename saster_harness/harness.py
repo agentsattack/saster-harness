@@ -337,6 +337,15 @@ class MonitoringHarness:
         for detector in self._detectors:
             detector.set_authorized_tools(authorized)
 
+        # Instrumentation state (v0.5.0). ``standard`` (the default) is
+        # tool-plane-only and reproduces v0.4.0 exactly. The config
+        # validated that the profile resolves, so this cannot raise.
+        from .instrumentation import InstrumentationState, resolve_profile
+        self._instrumentation = InstrumentationState(
+            resolve_profile(config.instrumentation_profile, config.custom_profiles),
+            custom_profiles=config.custom_profiles,
+        )
+
         # Distribute operator-supplied extra reframings (single-turn)
         # and extra ramps (multi-turn) into matching detectors. Keys
         # that don't match any loaded detector log a WARNING rather
@@ -379,6 +388,31 @@ class MonitoringHarness:
     @property
     def detectors(self) -> list[SasterDetector]:
         return list(self._detectors)
+
+    # ----------------------------------------------------------------
+    # Instrumentation (v0.5.0)
+    # ----------------------------------------------------------------
+
+    @property
+    def active_profile(self) -> str:
+        """Name of the currently active instrumentation profile."""
+        return self._instrumentation.active_profile
+
+    def switch_profile(self, profile_name: str, reason: str = "manual") -> None:
+        """Switch the active instrumentation profile at runtime. The
+        transition (with measured overhead) is recorded on the trajectory."""
+        self._instrumentation.switch(profile_name, reason)
+
+    def detector_availability(self) -> dict[str, str]:
+        """Per-detector ``available`` / ``unavailable`` under the active
+        profile. A detector on an inactive plane is unavailable, never
+        clean."""
+        return self._instrumentation.availability_map(self._detectors)
+
+    def instrumentation_snapshot(self) -> dict[str, object]:
+        """Active profile, active planes, recorded transitions, and
+        detector availability — the instrumentation slice of a trajectory."""
+        return self._instrumentation.to_dict(self._detectors)
 
     def start(self, *, block: bool = True) -> None:
         """Start wire capture and any mode-specific side-loops.
@@ -458,6 +492,7 @@ class MonitoringHarness:
             sink=self._handle_event,
             agent_name=self._config.agent_name,
             turn_sink=self._handle_turn,
+            instrumentation=self._instrumentation,
         )
 
         self._proxy_thread = threading.Thread(
@@ -634,6 +669,34 @@ class MonitoringHarness:
             event.session_id[:12],
             event.turn_idx,
         )
+
+        # Escalation: a genuine (non-shadow, non-synthetic, wire-origin)
+        # firing raises the instrumentation profile for subsequent turns.
+        # Overhead is measured on the switch and recorded on the transition.
+        if (
+            self._config.escalation_enabled
+            and self._config.escalation_profile
+            and (event.origin or "wire") == "wire"
+            and not any(
+                event.saster_id.startswith(p)
+                for p in ("SASTER-DRIFT", "SASTER-AUTONOMOUS", "SASTER-PROBE")
+            )
+        ):
+            transition = self._instrumentation.switch(
+                self._config.escalation_profile,
+                reason=f"escalation:{event.saster_id}",
+                session_id=event.session_id,
+                turn_idx=event.turn_idx,
+            )
+            if transition is not None:
+                logger.info(
+                    "PROFILE escalated %s -> %s (%.4fs overhead) on %s",
+                    transition.from_profile,
+                    transition.to_profile,
+                    transition.overhead_seconds,
+                    event.saster_id,
+                )
+
         if self._config.alert_webhook:
             self._dispatch_webhook(event)
 

@@ -316,6 +316,11 @@ disclaimer and scenario index.
   (bit-level for passive, procedural for induced) vs. timeliness
   (measured separately; not yet measured). What "deterministic" does
   and does not claim.
+- [**docs/instrumentation.md**](docs/instrumentation.md) — configurable
+  observation planes (tool / model / process), runtime-switchable
+  profiles (`standard` = v0.4.0), `requires_planes` and the
+  unavailable-≠-clean rule, and escalation. Research instrument, not a
+  production control plane.
 - [**docs/har_import.md**](docs/har_import.md) — offline HAR
   audit, privacy / consent, redaction model, session correlation
   strategies.

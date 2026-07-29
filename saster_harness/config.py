@@ -268,6 +268,12 @@ class MonitoringConfig:
     ssl_insecure: bool = True
     upstream_proxy: str | None = None
     mitm_options: dict[str, Any] = field(default_factory=dict)
+    # Instrumentation (v0.5.0). ``standard`` activates the tool plane only
+    # and reproduces v0.4.0 exactly. See saster_harness.instrumentation.
+    instrumentation_profile: str = "standard"
+    custom_profiles: dict[str, list[str]] = field(default_factory=dict)
+    escalation_enabled: bool = False
+    escalation_profile: str | None = None
     enabled_detectors: list[str] | None = field(default=None, repr=False)
     """SASTER detector identifiers to load. ``None`` loads the default
     set — 12 of the 13 shipped implementations (``SASTER-18-multiturn``
@@ -394,3 +400,34 @@ class MonitoringConfig:
                             f"extra_turn_sequences[{det_id!r}][{ramp_idx}] "
                             "entries must be non-empty strings"
                         )
+
+        # Instrumentation profiles + escalation (v0.5.0).
+        from .instrumentation import ObservationPlane, resolve_profile
+
+        valid_planes = {p.value for p in ObservationPlane}
+        for pname, planes in self.custom_profiles.items():
+            if not isinstance(pname, str) or not pname:
+                raise ValueError("custom_profiles keys must be non-empty strings")
+            if not planes:
+                raise ValueError(
+                    f"custom_profiles[{pname!r}] must list at least one plane"
+                )
+            for pl in planes:
+                if pl not in valid_planes:
+                    raise ValueError(
+                        f"custom_profiles[{pname!r}] has invalid plane {pl!r}; "
+                        f"valid planes: {sorted(valid_planes)}"
+                    )
+        try:
+            resolve_profile(self.instrumentation_profile, self.custom_profiles)
+        except KeyError as exc:
+            raise ValueError(str(exc)) from exc
+        if self.escalation_enabled and not self.escalation_profile:
+            raise ValueError(
+                "escalation_profile is required when escalation_enabled=True"
+            )
+        if self.escalation_profile is not None:
+            try:
+                resolve_profile(self.escalation_profile, self.custom_profiles)
+            except KeyError as exc:
+                raise ValueError(str(exc)) from exc

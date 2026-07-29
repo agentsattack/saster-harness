@@ -23,6 +23,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from .event import DetectionEvent, TurnData
+from .instrumentation import ObservationPlane
 
 
 class SasterDetector(ABC):
@@ -55,6 +56,12 @@ class SasterDetector(ABC):
     pattern_name: ClassVar[str]
     tier: ClassVar[int]
     co_fires_with: ClassVar[tuple[str, ...]] = ()
+    #: Observation planes this detector needs to run. Defaults to the wire
+    #: (tool) plane — every v0.4.0 detector operates on captured TurnData,
+    #: so the default keeps them available under the ``standard`` profile.
+    #: A detector whose required planes are not active is reported
+    #: *unavailable* (never *clean*). See :mod:`saster_harness.instrumentation`.
+    requires_planes: ClassVar[tuple[ObservationPlane, ...]] = (ObservationPlane.TOOL,)
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)

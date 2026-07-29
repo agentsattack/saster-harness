@@ -31,6 +31,7 @@ from .adapters.base import BaseAdapter
 from .baseline import EmbeddingBaseline
 from .detector import SasterDetector
 from .event import DetectionEvent, TurnData
+from .instrumentation import InstrumentationState
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class HarnessAddon:
         sink: EventSink,
         agent_name: str,
         turn_sink: TurnSink | None = None,
+        instrumentation: InstrumentationState | None = None,
     ) -> None:
         self._adapter = adapter
         self._detectors = list(detectors)
@@ -64,6 +66,12 @@ class HarnessAddon:
         self._agent_name = agent_name
         self._turn_sink = turn_sink
         self._turn_counters: dict[str, int] = {}
+        # Instrumentation: when set, detectors whose required planes are not
+        # active under the current profile are reported unavailable (never
+        # run, never clean). ``None`` = no gating (all detectors run) — the
+        # backward-compatible default for direct HarnessAddon construction.
+        self._instrumentation = instrumentation
+        self._unavailable_by_session: dict[str, set[str]] = {}
 
     # ----------------------------------------------------------------
     # mitmproxy lifecycle hooks
@@ -132,7 +140,19 @@ class HarnessAddon:
                 )
 
     def _run_detectors(self, turn: TurnData) -> None:
-        for detector in self._detectors:
+        if self._instrumentation is not None:
+            active, unavailable = self._instrumentation.partition(self._detectors)
+            if unavailable:
+                # Record as unavailable — explicitly NOT clean. Queryable
+                # per session via ``unavailable_detectors``.
+                self._unavailable_by_session.setdefault(turn.session_id, set()).update(
+                    d.saster_id for d in unavailable
+                )
+            active_profile = self._instrumentation.active_profile
+        else:
+            active = self._detectors
+            active_profile = None
+        for detector in active:
             if detector.needs_baseline() and not self._baseline.is_established(turn.session_id):
                 continue
             try:
@@ -156,4 +176,13 @@ class HarnessAddon:
                 # not — backfill defensively.
                 if not event.agent_name:
                     event.agent_name = self._agent_name
+                # Record which profile was live when the event fired, so the
+                # trajectory shows the observation context.
+                if active_profile is not None and isinstance(event.evidence, dict):
+                    event.evidence.setdefault("active_profile", active_profile)
                 self._sink(event)
+
+    def unavailable_detectors(self, session_id: str) -> set[str]:
+        """SASTER ids that were unavailable (required plane inactive) for
+        ``session_id`` — explicitly distinct from detectors that ran clean."""
+        return set(self._unavailable_by_session.get(session_id, set()))
