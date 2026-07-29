@@ -125,6 +125,14 @@ No shipped detector calls an LLM to decide whether a pattern fired.
 The "hybrid" label means embedding cosine appears in the scoring
 math, not that an LLM is in the loop.
 
+This is a claim about the *scoring* path, not an end-to-end
+reproducibility guarantee. The 7 passive detectors are bit-reproducible
+given identical input; the 6 induced detectors score **live agent
+responses** and are only reproducible procedurally (fixed probe
+sequence, recorded transcript). It is also not a timeliness claim —
+timeliness is measured separately and no measurement exists yet. See
+[determinism.md](determinism.md).
+
 ## Default detector set
 
 `MonitoringConfig.enabled_detectors=None` (omitted) loads **12 of

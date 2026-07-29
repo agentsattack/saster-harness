@@ -253,6 +253,10 @@ disclaimer and scenario index.
 - [**docs/detectors.md**](docs/detectors.md) — full enumeration
   of the 13 shipped detector implementations grouped by base
   pattern, with by-mode and by-implementation cross-tabs.
+- [**docs/determinism.md**](docs/determinism.md) — reproducibility
+  (bit-level for passive, procedural for induced) vs. timeliness
+  (measured separately; not yet measured). What "deterministic" does
+  and does not claim.
 - [**docs/har_import.md**](docs/har_import.md) — offline HAR
   audit, privacy / consent, redaction model, session correlation
   strategies.
