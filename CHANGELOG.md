@@ -6,6 +6,48 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-28
+
+### Changed — BREAKING (aliased): SASTER-13/-15-induced renumbered
+
+Two induced detectors shipped through v0.3.x under the wrong SASTER
+taxonomy numbers. Their names, scoring, tiers, and Carl susceptibilities
+all implement Specification Drift and Gradual Intent Erosion, but their
+identifiers claimed the numbers for Malicious Compliance and Selective
+Omission. Corrected to the right numbers.
+
+| Old identifier | Old label | New identifier | Canonical pattern |
+|---|---|---|---|
+| `SASTER-13-induced` | Spec Drift | `SASTER-11-induced` | SASTER-11 Specification Drift |
+| `SASTER-15-induced` | Intent Erosion | `SASTER-14-induced` | SASTER-14 Gradual Intent Erosion |
+
+Class renames: `Saster13InducedDetector` → `Saster11InducedDetector`;
+`Saster15InducedDetector` → `Saster14InducedDetector`.
+
+**Why "aliased" and not a hard break.** The old identifiers still work:
+
+- `enabled_detectors=["SASTER-13-induced"]` / `["SASTER-15-induced"]`
+  resolve to the new detector and emit a `DeprecationWarning` naming
+  both the old and new id.
+- The old `-both` shortcuts (`SASTER-13-both`, `SASTER-15-both`) are
+  removed from the registry — they only ever expanded to the induced
+  module (there is no passive SASTER-11/-14 detector), so a "-both"
+  shortcut was misleading. The old ids still resolve, via the same
+  deprecated-alias path, to the induced detector.
+- `from saster_harness import Saster13InducedDetector` (and the `-15`
+  class) still import, via a PEP 562 module `__getattr__` that warns
+  and returns the renamed class.
+
+**Deprecation removal target: v0.5.0.** The aliases (both config-string
+ids and class names) will be removed then. Migrate `enabled_detectors`
+entries and imports to the `SASTER-11`/`SASTER-14` names before 0.5.0.
+
+**Note on coverage.** SASTER-14 (Gradual Intent Erosion) now correctly
+shows a shipped detector; SASTER-13 (Malicious Compliance) and SASTER-15
+(Selective Omission) have no reference detector in saster-harness. The
+covered-pattern set is unchanged in size (9): `11, 14, 18, 24, 26, 27,
+28, 31, 33`.
+
 ### Added
 
 - **`MonitoringConfig.log_shadow_events`** (`bool`, default `False`).
