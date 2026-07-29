@@ -269,10 +269,11 @@ class MonitoringConfig:
     upstream_proxy: str | None = None
     mitm_options: dict[str, Any] = field(default_factory=dict)
     enabled_detectors: list[str] | None = field(default=None, repr=False)
-    """SASTER detector identifiers to load. ``None`` loads the full v0.1
-    set (9 implementations covering 7 SASTER patterns — five passive
-    detectors plus the two patterns that ship in both passive and
-    induced flavours).
+    """SASTER detector identifiers to load. ``None`` loads the default
+    set — 12 of the 13 shipped implementations (``SASTER-18-multiturn``
+    is opt-in), covering 9 SASTER patterns: seven passive detectors plus
+    five induced, where three patterns (SASTER-18, -24, -26) ship in
+    both passive and induced flavours.
 
     Accepted identifiers:
 

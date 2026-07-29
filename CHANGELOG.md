@@ -4,6 +4,13 @@ All notable changes to `saster-harness` are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Erratum (2026-07-28).** The [0.2.0] entry below states "12 detectors
+> covering 10 SASTER patterns"; the covered-pattern count was 9, not 10
+> — the 12-detector set spanned 9 distinct base patterns (the same 9
+> covered today). The historical entry is left unedited as a
+> point-in-time record; current coverage is authoritative in the [0.4.0]
+> entry and the README.
+
 ## [Unreleased]
 
 ## [0.4.0] — 2026-07-28
@@ -80,7 +87,7 @@ covered-pattern set is unchanged in size (9): `11, 14, 18, 24, 26, 27,
      (`InductionDetector._build_induction_event`,
      `MultiTurnInductionDetector._build_multiturn_event`, and the
      scenario-detector custom helpers in
-     `saster_{13,15,24,26}_induced.py`) now carries `origin="probe"`.
+     `saster_{11,14,24,26}_induced.py`) now carries `origin="probe"`.
      `ProbeScheduler` enforces the invariant belt-and-suspenders for
      custom detectors that bypass the base helpers. The existing
      `evidence["probe_cycle"]` / `evidence["probe_source"]` keys are

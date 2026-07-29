@@ -13,7 +13,7 @@ separate `saster-har` CLI for browser-accessible agents without MITM.
 `saster-harness` sits between your agent and its tools/network,
 establishes a behavioral baseline per session, and fires structured
 detection events when agent behavior matches a pattern from the
-[SASTER taxonomy](https://github.com/lsuto/saster).
+[SASTER taxonomy](https://github.com/agentsattack/saster).
 
 Agents that look fine in unit tests still misbehave at runtime —
 emitting covert recon questions, composing safe capabilities into

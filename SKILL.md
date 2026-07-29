@@ -23,7 +23,7 @@ when_to_use: |
 
 `saster-harness` is the open-source ADR harness for the SASTER
 agentic-failure taxonomy. v0.3.2 ships 13 detector implementations
-covering 9 SASTER patterns (13, 15, 18, 24, 26, 27, 28, 31, 33),
+covering 9 SASTER patterns (11, 14, 18, 24, 26, 27, 28, 31, 33),
 three operating modes (OBSERVE / PROBE / INDUCE), and three audit
 paths: live mitmproxy capture, HAR file import, and
 direct-pipeline scenario validation.

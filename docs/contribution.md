@@ -152,7 +152,7 @@ naming, scope. Empty if none.)
 If you observe an agent failure mode that no catalogued SASTER
 pattern covers, the harness is the wrong place to propose the
 taxonomy expansion. SASTER lives at
-[github.com/lsuto/saster](https://github.com/lsuto/saster); patterns
+[github.com/agentsattack/saster](https://github.com/agentsattack/saster); patterns
 are catalogued there, in the canonical taxonomy.
 
 The SASTER repo distinguishes **Candidate** patterns (proposed,

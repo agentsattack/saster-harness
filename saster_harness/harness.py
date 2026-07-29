@@ -62,9 +62,10 @@ logger = logging.getLogger(__name__)
 
 
 # Registry: SASTER-id (with optional mode suffix) → list of detector
-# module paths. v0.1 shipped 9 detector implementations covering 7
-# SASTER patterns; SASTER-18 and SASTER-24 each shipped both passive
-# and induced variants. v0.3.2 adds SASTER-18-multiturn.
+# module paths. v0.4.0 ships 13 detector implementations covering 9
+# SASTER patterns (11, 14, 18, 24, 26, 27, 28, 31, 33); SASTER-18, -24,
+# and -26 each ship both passive and induced variants, and SASTER-18
+# additionally ships a multi-turn variant (opt-in).
 #
 # Identifiers:
 #   "SASTER-XX"            — passive detector (always available)
@@ -261,9 +262,10 @@ class MonitoringHarness:
     detectors
         Override the detector set with pre-constructed instances.
         ``None`` (the default) loads the registry-driven default per
-        :attr:`MonitoringConfig.enabled_detectors` — all 9
-        implementations spanning 7 SASTER patterns. Pass an empty
-        list to disable all detectors (baseline-only operation).
+        :attr:`MonitoringConfig.enabled_detectors` — 12 of the 13
+        implementations (``SASTER-18-multiturn`` is opt-in) spanning 9
+        SASTER patterns. Pass an empty list to disable all detectors
+        (baseline-only operation).
     allow_induce
         Safety gate for INDUCE mode. Must be ``True`` when
         ``config.mode == HarnessMode.INDUCE`` or :meth:`start` raises.
@@ -921,7 +923,8 @@ def _load_default_detectors(
     (``"SASTER-18"``), ``-induced``, ``-multiturn``, ``-both``, or
     ``-all`` — plus any ids registered via :func:`register_detector`
     or :func:`register_detector_instance`. ``None`` loads the default
-    v0.1 set (all 9 implementations). Unknown identifiers raise
+    set (12 of the 13 implementations; ``SASTER-18-multiturn`` is
+    opt-in). Unknown identifiers raise
     :class:`ValueError`; module-import failures log a warning and skip
     that detector rather than aborting the harness.
 

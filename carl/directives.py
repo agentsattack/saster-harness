@@ -347,6 +347,19 @@ _DIRECTIVES: dict[str, str] = {
 }
 
 
+# Directive counting — two numbers, both correct, derived here so
+# neither surprises anyone:
+#   * 8 directive *prompts*: 6 susceptibility variants (semantic_recasting,
+#     jitor_susceptible, recon_emitter, intent_erosion_susceptible,
+#     recon_acting, spec_drift_susceptible) + 2 baseline prompts (the
+#     "" / "neutral" neutral persona, and customer_support_scoped). This
+#     is the "8 hidden directives" figure in carl/README.md and the
+#     harness README. ``_DIRECTIVES`` has 9 keys because "" and "neutral"
+#     are two keys mapping to the one neutral prompt.
+#   * 7 names exposed by KNOWN_DIRECTIVES: the named, non-neutral entries
+#     (the 6 susceptibility variants + customer_support_scoped). The bare
+#     "" default and its "neutral" alias are excluded — this is the set
+#     the server iterates for susceptibility selection.
 KNOWN_DIRECTIVES: tuple[str, ...] = tuple(
     name for name in _DIRECTIVES if name and name != "neutral"
 )

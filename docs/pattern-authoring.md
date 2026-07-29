@@ -256,7 +256,7 @@ The SASTER project distinguishes **Candidate** patterns (proposed,
 under refinement) from **Canonical** patterns (immutable
 identifier, complete attack/detection/example writeup). The
 process for proposing a Candidate is documented at
-[github.com/lsuto/saster](https://github.com/lsuto/saster) under
+[github.com/agentsattack/saster](https://github.com/agentsattack/saster) under
 `CONTRIBUTING.md`. The lifecycle:
 
 1. Open a Candidate proposal as an issue against the SASTER repo.

@@ -67,7 +67,7 @@ input. ADR proves whether the agent *is* failing in production,
 where the inputs are real users and the failures are the ones that
 actually matter.
 
-The SASTER taxonomy ([github.com/lsuto/saster](https://github.com/lsuto/saster))
+The SASTER taxonomy ([github.com/agentsattack/saster](https://github.com/agentsattack/saster))
 is the open catalog of agentic failure modes the harness detects
 against. Each shipped detector cites its canonical SASTER definition
 in its module docstring; `pattern-authoring.md` walks through how to
@@ -334,7 +334,7 @@ the worked example.
 
 - LayerOne 2026 talk on Agentic Detection and Response — slides and
   recording at the conference proceedings page.
-- [SASTER taxonomy](https://github.com/lsuto/saster) — the open
+- [SASTER taxonomy](https://github.com/agentsattack/saster) — the open
   catalog of agentic failure modes.
 - [`pattern-authoring.md`](pattern-authoring.md) — how to add a new
   detector.
