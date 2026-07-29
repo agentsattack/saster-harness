@@ -168,7 +168,7 @@ Every operator-facing knob lives on that one struct.
 
 ---
 
-## What ships in v0.3.2
+## What ships in v0.4.0
 
 **13 detectors covering 9 SASTER patterns** (3 with both passive and
 induced coverage; SASTER-18 additionally has a multi-turn induced
@@ -210,6 +210,55 @@ tuned toward false negatives over false positives — deploy with
 `max_drift_score` and per-detector thresholds at the defaults for
 a few days, then tune sensitivity upward against baseline traffic
 before opening the alert valve fully.
+
+## Coverage across the SASTER taxonomy
+
+**13 detectors covering 9 of the 32 SASTER patterns** (SASTER-32 is
+reserved). The other 23 patterns are specification-only — defined in the
+taxonomy, with no reference detector in saster-harness v0.4.x. Partial
+coverage is stated here plainly rather than left to be inferred.
+
+| # | Pattern | Tier | Detector? | Mode | Note |
+|---|---|---|:---:|---|---|
+| 1 | Instruction Injection | 1 | — | — | specification only |
+| 2 | Document Injection | 1 | — | — | specification only |
+| 3 | Role Hijacking | 1 | — | — | specification only |
+| 4 | Persona Override | 1 | — | — | specification only |
+| 5 | Context Window Poisoning | 1 | — | — | specification only |
+| 6 | System Prompt Extraction | 1 | — | — | specification only |
+| 7 | Tool Name Disclosure | 1 | — | — | specification only |
+| 8 | Multi-Modal Injection | 1 | — | — | specification only |
+| 9 | Serialization Attacks | 1 | — | — | specification only |
+| 10 | Encoding Bypass | 1 | — | — | specification only |
+| 11 | Specification Drift | 2 | ✓ | induced | **induced-only** — cannot run against a static corpus |
+| 12 | Proxy Optimization | 2 | — | — | specification only |
+| 13 | Malicious Compliance | 2 | — | — | specification only |
+| 14 | Gradual Intent Erosion | 2 | ✓ | induced | **induced-only** — cannot run against a static corpus |
+| 15 | Selective Omission | 2 | — | — | specification only |
+| 16 | Confidence Miscalibration | 2 | — | — | specification only |
+| 17 | Intent Alteration Without Disclosure (EFT) | 3 | — | — | specification only |
+| 18 | Semantic Recasting (EFT) | 3 | ✓ | passive + induced + multi-turn | |
+| 19 | Contradiction Denial (EFT) | 3 | — | — | specification only |
+| 20 | Alteration Denial / Gaslighting (EFT) | 3 | — | — | specification only |
+| 21 | MCP Tool Trust Exploitation | 3 | — | — | specification only |
+| 22 | Cross-Model Compositional Weaponization | 3 | — | — | specification only |
+| 23 | Self-Fulfilling Tool Belief | 3 | — | — | specification only |
+| 24 | Just-in-Time Ontological Reframing (JiTOR) | 3 | ✓ | passive + induced | |
+| 25 | Resource Exhaustion Attack (REA) | 4 | — | — | specification only |
+| 26 | Recon-Gated Injection (RGI) | 4 | ✓ | passive + induced | |
+| 27 | Detection Layer Injection (DLI) | 4 | ✓ | passive | |
+| 28 | Salience Suppression Exfiltration (SSE) | 4 | ✓ | passive | |
+| 29 | Stylistic Distribution Shift | 2 | — | — | specification only |
+| 30 | Temporal Anchoring | 3 | — | — | specification only |
+| 31 | Compositional Capability Emergence | 3 | ✓ | passive | |
+| 32 | *(reserved)* | — | — | — | reserved; not assigned |
+| 33 | Context Stripping | 4 | ✓ | passive | |
+
+Covered set: **11, 14, 18, 24, 26, 27, 28, 31, 33**. Two of these —
+**SASTER-11 and SASTER-14 — are induced-only**: they actively probe a
+live agent and have no passive detector, so they **cannot run against a
+static corpus** (relevant to anyone benchmarking against recorded
+trajectory datasets; only the 7 passive detectors apply there).
 
 ## Verifying against the bundled reference agent
 
