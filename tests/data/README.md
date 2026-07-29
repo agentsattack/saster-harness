@@ -5,7 +5,7 @@ the taxonomy-sync CI guard (`tests/test_taxonomy_sync.py`) runs
 hermetically without a network fetch or a second checked-out repo.
 
 - **Upstream:** <https://github.com/agentsattack/saster> — `SASTER.md`
-- **Pinned upstream commit:** `484fed0` (SASTER v1.1 + Phase 2.3 prior-art fields, 32 patterns,
+- **Pinned upstream commit:** `d98a0c7` (SASTER v1.1 + Phase 2.3 prior-art fields, 32 patterns,
   SASTER-32 reserved)
 - **Integrity:** `SASTER.md.sha256` holds the SHA-256 of the vendored
   file. `test_taxonomy_sync.py` verifies the file against it on every
