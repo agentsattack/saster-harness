@@ -640,7 +640,7 @@ def test_probe_origin_event_does_not_count_toward_autonomous_escalation() -> Non
     sink: list[DetectionEvent] = []
     acc = _make_accumulator(max_autonomous=2, sink_recorder=sink)
 
-    for sid in ("SASTER-18", "SASTER-24", "SASTER-26", "SASTER-13", "SASTER-15"):
+    for sid in ("SASTER-18", "SASTER-24", "SASTER-26", "SASTER-11", "SASTER-14"):
         acc.observe_event(_probe_origin_event(sid))
 
     assert sink == []  # no escalation event despite 5 distinct probe firings

@@ -25,6 +25,8 @@ shared sentence-transformer embedder factory lives under
 
 from __future__ import annotations
 
+from typing import Any
+
 __version__ = "0.3.2"
 
 from .adapters import HARAdapter
@@ -42,8 +44,8 @@ from .detectors.base_induction import (
     ScenarioInductionDetector,
     SingleTurnInductionDetector,
 )
-from .detectors.saster_13_induced import Saster13InducedDetector
-from .detectors.saster_15_induced import Saster15InducedDetector
+from .detectors.saster_11_induced import Saster11InducedDetector
+from .detectors.saster_14_induced import Saster14InducedDetector
 from .detectors.saster_18_induced import Saster18InducedDetector
 from .detectors.saster_18_multiturn import Saster18MultiTurnDetector
 from .detectors.saster_24_induced import Saster24InducedDetector
@@ -75,8 +77,8 @@ __all__ = [
     "ProbeRecord",
     "Prober",
     "RefusalSampler",
-    "Saster13InducedDetector",
-    "Saster15InducedDetector",
+    "Saster11InducedDetector",
+    "Saster14InducedDetector",
     "Saster18InducedDetector",
     "Saster18MultiTurnDetector",
     "Saster24InducedDetector",
@@ -92,3 +94,31 @@ __all__ = [
     "register_detector_instance",
     "registered_detector_ids",
 ]
+
+# Deprecated class-name aliases (v0.4.0 renumbering). The
+# Specification Drift and Gradual Intent Erosion induced detectors
+# shipped under the wrong taxonomy numbers (13/15) through v0.3.x; they
+# are now Saster11InducedDetector / Saster14InducedDetector. The old
+# names remain importable via PEP 562 module ``__getattr__`` with a
+# DeprecationWarning; removal target v0.5.0.
+_DEPRECATED_CLASS_ALIASES = {
+    "Saster13InducedDetector": ("Saster11InducedDetector", Saster11InducedDetector),
+    "Saster15InducedDetector": ("Saster14InducedDetector", Saster14InducedDetector),
+}
+
+
+def __getattr__(name: str) -> Any:
+    entry = _DEPRECATED_CLASS_ALIASES.get(name)
+    if entry is not None:
+        import warnings
+
+        new_name, obj = entry
+        warnings.warn(
+            f"{name} is deprecated and will be removed in v0.5.0; use "
+            f"{new_name} instead (SASTER-13/-15-induced were renumbered "
+            f"to SASTER-11/-14-induced in v0.4.0).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return obj
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

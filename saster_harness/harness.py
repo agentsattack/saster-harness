@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import warnings
 from collections import deque
 from collections.abc import Iterable, Iterator, Sequence
 from typing import Any
@@ -86,25 +87,21 @@ _DETECTOR_REGISTRY: dict[str, tuple[str, ...]] = {
     "SASTER-31": ("saster_harness.detectors.saster_31",),
     "SASTER-33": ("saster_harness.detectors.saster_33",),
     # Induced (single-turn)
-    "SASTER-13-induced": ("saster_harness.detectors.saster_13_induced",),
-    "SASTER-15-induced": ("saster_harness.detectors.saster_15_induced",),
+    "SASTER-11-induced": ("saster_harness.detectors.saster_11_induced",),
+    "SASTER-14-induced": ("saster_harness.detectors.saster_14_induced",),
     "SASTER-18-induced": ("saster_harness.detectors.saster_18_induced",),
     "SASTER-24-induced": ("saster_harness.detectors.saster_24_induced",),
     "SASTER-26-induced": ("saster_harness.detectors.saster_26_induced",),
     # Induced (multi-turn / Crescendo)
     "SASTER-18-multiturn": ("saster_harness.detectors.saster_18_multiturn",),
-    # Both
-    "SASTER-13-both": (
-        # No passive SASTER-13 ships in v0.2; -both shortcut is
-        # forward-compatible.
-        "saster_harness.detectors.saster_13_induced",
-    ),
-    "SASTER-15-both": (
-        # No passive SASTER-15 ships in v0.2; -both shortcut is
-        # forward-compatible — when the passive detector ships in a
-        # future release the registry entry expands.
-        "saster_harness.detectors.saster_15_induced",
-    ),
+    # Both — defined ONLY for patterns that ship both a passive and an
+    # induced detector. SASTER-11 and SASTER-14 ship induced-only, so
+    # they intentionally have no "-both" shortcut. (v0.1–v0.3.x shipped
+    # "SASTER-13-both"/"SASTER-15-both" entries that expanded to the
+    # induced module alone — a "-both" that silently meant "induced
+    # only". Those were removed in v0.4.0; the old ids resolve as
+    # deprecated aliases to the induced detector — see
+    # ``_DEPRECATED_ALIASES``.)
     "SASTER-18-both": (
         "saster_harness.detectors.saster_18",
         "saster_harness.detectors.saster_18_induced",
@@ -196,12 +193,13 @@ def registered_detector_ids() -> tuple[str, ...]:
     or :func:`register_detector_instance`."""
     return tuple(sorted(set(_DETECTOR_REGISTRY) | set(_DETECTOR_INSTANCE_REGISTRY)))
 
-# Default-when-not-specified: all 9 implementations. SASTER-18 and
-# SASTER-24 use the ``-both`` shortcut so both flavours load; the
-# five other passive patterns load directly.
+# Default-when-not-specified: 12 of the 13 implementations
+# (``SASTER-18-multiturn`` is opt-in). SASTER-18/24/26 use the
+# ``-both`` shortcut so both flavours load; the induced-only patterns
+# (SASTER-11, SASTER-14) and the passive-only patterns load directly.
 _DEFAULT_ENABLED_DETECTORS: tuple[str, ...] = (
-    "SASTER-13-induced",
-    "SASTER-15-induced",
+    "SASTER-11-induced",
+    "SASTER-14-induced",
     "SASTER-18-both",
     "SASTER-24-both",
     "SASTER-26-both",
@@ -210,6 +208,44 @@ _DEFAULT_ENABLED_DETECTORS: tuple[str, ...] = (
     "SASTER-31",
     "SASTER-33",
 )
+
+# Deprecated detector identifiers → their canonical replacement.
+# Populated in v0.4.0 when the SASTER-13/-15-induced detectors were
+# renumbered to SASTER-11/-14-induced (they had been filed under the
+# wrong taxonomy numbers: 13 is Malicious Compliance, 15 is Selective
+# Omission, but the detectors implement Specification Drift and Gradual
+# Intent Erosion — SASTER-11 and SASTER-14). The old ``-both`` forms
+# expanded to the induced module alone, so they alias to the induced
+# detector. Aliases resolve with a DeprecationWarning; removal target
+# v0.5.0.
+_DEPRECATED_ALIASES: dict[str, str] = {
+    "SASTER-13-induced": "SASTER-11-induced",
+    "SASTER-15-induced": "SASTER-14-induced",
+    "SASTER-13-both": "SASTER-11-induced",
+    "SASTER-15-both": "SASTER-14-induced",
+}
+
+
+def _resolve_detector_alias(ident: str) -> str:
+    """Map a deprecated detector identifier to its replacement.
+
+    Emits a :class:`DeprecationWarning` naming both the old and new
+    identifier. Unknown / current identifiers pass through unchanged.
+    """
+    replacement = _DEPRECATED_ALIASES.get(ident)
+    if replacement is None:
+        return ident
+    warnings.warn(
+        f"Detector identifier {ident!r} is deprecated and will be "
+        f"removed in v0.5.0; use {replacement!r} instead. The "
+        f"SASTER-13/-15-induced detectors were renumbered to "
+        f"SASTER-11/-14-induced in v0.4.0 (they implement Specification "
+        f"Drift and Gradual Intent Erosion, not Malicious Compliance / "
+        f"Selective Omission). See CHANGELOG 0.4.0.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return replacement
 
 
 class MonitoringHarness:
@@ -293,7 +329,7 @@ class MonitoringHarness:
         # Distribute the operator's declared authorized-tool allow-list
         # (Source 1: DECLARED) to every detector that consumes it.
         # SasterDetector.set_authorized_tools is a no-op on the base
-        # class; Saster13InducedDetector and future allow-list-aware
+        # class; Saster11InducedDetector and future allow-list-aware
         # detectors override.
         authorized = tuple(self._config.authorized_tools)
         for detector in self._detectors:
@@ -897,7 +933,8 @@ def _load_default_detectors(
     paths and this loader assembles the resulting detector instances."""
     import importlib
 
-    identifiers = list(enabled) if enabled is not None else list(_DEFAULT_ENABLED_DETECTORS)
+    raw_identifiers = list(enabled) if enabled is not None else list(_DEFAULT_ENABLED_DETECTORS)
+    identifiers = [_resolve_detector_alias(ident) for ident in raw_identifiers]
     known_ids = set(_DETECTOR_REGISTRY) | set(_DETECTOR_INSTANCE_REGISTRY)
     unknown = [ident for ident in identifiers if ident not in known_ids]
     if unknown:

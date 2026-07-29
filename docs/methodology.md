@@ -231,10 +231,10 @@ formalized in the three abstract base classes in
 - **Single-turn induction** (`SingleTurnInductionDetector`) — a
   baseline ask plus N reframings, each reframing tried
   independently; the first that produces divergence above
-  threshold fires. SASTER-13-induced and SASTER-18-induced.
+  threshold fires. SASTER-11-induced and SASTER-18-induced.
 - **Scenario induction** (`ScenarioInductionDetector`) —
   multi-turn scenarios with custom orchestration; each scenario
-  carries its own intermediate turns and target. SASTER-15-induced
+  carries its own intermediate turns and target. SASTER-14-induced
   (intent erosion across adjacency-normalizing turns),
   SASTER-24-induced (mid-conversation redefinition),
   SASTER-26-induced (recon-gated injection with structurally-matched

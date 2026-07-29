@@ -15,8 +15,8 @@ Passive detectors (run on captured :class:`TurnData`):
 
 Induced detectors (actively probe agent sessions via :class:`~saster_harness.prober.Prober`):
 
-- :mod:`.saster_13_induced` — Spec Drift via adjacency-framed out-of-scope asks.
-- :mod:`.saster_15_induced` — Intent Erosion via multi-turn adjacency normalization.
+- :mod:`.saster_11_induced` — Specification Drift via adjacency-framed out-of-scope asks.
+- :mod:`.saster_14_induced` — Gradual Intent Erosion via multi-turn adjacency normalization.
 - :mod:`.saster_18_induced` — Semantic Recasting via single-turn reframings.
 - :mod:`.saster_18_multiturn` — Semantic Recasting via Crescendo-style multi-turn ramps (v0.3.2).
 - :mod:`.saster_24_induced` — JiTOR via mid-conversation term redefinition.

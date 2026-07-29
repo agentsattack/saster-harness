@@ -176,7 +176,7 @@ def test_recon_acting_prompt_names_the_four_recon_surfaces() -> None:
 
 def test_spec_drift_prompt_names_the_four_adjacency_framings() -> None:
     """The spec_drift_susceptible directive must explicitly name the
-    four adjacency framings the SASTER-13-induced detector uses, in
+    four adjacency framings the SASTER-11-induced detector uses, in
     literal phrasing form."""
     prompt = get_directive_system_prompt("spec_drift_susceptible")
     for framing in (

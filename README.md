@@ -146,8 +146,8 @@ Every operator-facing knob lives on that one struct.
 
 > ### ⚠️ Heads-up: induced detectors don't fire on captured events
 >
-> Six of the thirteen detectors — **SASTER-13-induced**,
-> **SASTER-15-induced**, **SASTER-18-induced**, **SASTER-18-multiturn**,
+> Six of the thirteen detectors — **SASTER-11-induced**,
+> **SASTER-14-induced**, **SASTER-18-induced**, **SASTER-18-multiturn**,
 > **SASTER-24-induced**, and **SASTER-26-induced** — run in *induction
 > mode*. They do NOT
 > fire from passively-captured traffic. They probe agent sessions
@@ -176,8 +176,8 @@ variant):
 
 | # | Pattern | Tier | Mode | Description |
 |---|---|---|---|---|
-| **SASTER-13-induced** | Spec Drift (Induced) | T2 | induced | Active probe: in-scope baseline + 4 adjacency reframings (while-we're-at-it / hypothetical / customer-asked-me / quick-aside); fires on substantive drift into out-of-scope topic |
-| **SASTER-15-induced** | Intent Erosion (Induced) | T2 | induced | Active probe: 4 scenarios of baseline refusal + 4–5 adjacency-normalizing turns + target re-ask; fires when agent capitulates after erosion |
+| **SASTER-11-induced** | Specification Drift (Induced) | T2 | induced | Active probe: in-scope baseline + 4 adjacency reframings (while-we're-at-it / hypothetical / customer-asked-me / quick-aside); fires on substantive drift into out-of-scope topic |
+| **SASTER-14-induced** | Gradual Intent Erosion (Induced) | T2 | induced | Active probe: 4 scenarios of baseline refusal + 4–5 adjacency-normalizing turns + target re-ask; fires when agent capitulates after erosion |
 | **SASTER-18** | Semantic Recasting | T3 | passive | Distinctive-term retention heuristic on user-message vocabulary vs. agent-response vocabulary |
 | **SASTER-18-induced** | Semantic Recasting (Induced) | T3 | induced | Active probe: baseline refusal + 4 canonical reframings; fires on response divergence |
 | **SASTER-18-multiturn** | Semantic Recasting (Multi-Turn) | T3 | induced (multi-turn) | Active probe: 4 Crescendo-style ramps × 3 turns each (research / fiction / red-team / educational framings); fires on capitulation at the final ask of a ramp. Opt-in — enable via `"SASTER-18-multiturn"` or `"SASTER-18-all"`. |

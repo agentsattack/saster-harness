@@ -10,9 +10,9 @@ same data.
 
 ## By base pattern
 
-### SASTER-13 — 1 detector
+### SASTER-11 — 1 detector
 
-- `SASTER-13-induced` (`saster_harness/detectors/saster_13_induced.py`).
+- `SASTER-11-induced` (`saster_harness/detectors/saster_11_induced.py`).
   Induced single-turn. Topic-templated reframings — the operator
   supplies `in_scope_topic` and `out_of_scope_topic` at constructor
   time; the detector expands them through 4 adjacency reframing
@@ -20,11 +20,11 @@ same data.
   `customer_asked_me`, `quick_aside`) and probes the agent
   one-by-one. Threshold default 0.55. Pure-code despite carrying
   an embedder parameter — `set_embedder` is an API-compatible no-op
-  (`saster_13_induced.py:349-352`).
+  (`saster_11_induced.py:349-352`).
 
-### SASTER-15 — 1 detector
+### SASTER-14 — 1 detector
 
-- `SASTER-15-induced` (`saster_harness/detectors/saster_15_induced.py`).
+- `SASTER-14-induced` (`saster_harness/detectors/saster_14_induced.py`).
   Induced scenario-shape. 4 default scenarios; each is a baseline
   refusal + 4-5 adjacency-normalizing turns + target re-ask.
   Threshold default 0.55. Hybrid — embedding-assisted divergence
@@ -102,8 +102,8 @@ same data.
 | Mode | Count | Detectors |
 |---|---|---|
 | Passive | 7 | SASTER-18, -24, -26, -27, -28, -31, -33 |
-| Induced single-turn | 2 | SASTER-13-induced, SASTER-18-induced |
-| Induced scenario | 3 | SASTER-15-induced, SASTER-24-induced, SASTER-26-induced |
+| Induced single-turn | 2 | SASTER-11-induced, SASTER-18-induced |
+| Induced scenario | 3 | SASTER-14-induced, SASTER-24-induced, SASTER-26-induced |
 | Induced multi-turn | 1 | SASTER-18-multiturn |
 
 The three induced shapes correspond to three abstract base classes
@@ -117,8 +117,8 @@ code-correct distinction is the two-vs-three split above.
 
 | Implementation | Count | Detectors |
 |---|---|---|
-| Pure-code | 8 | All 7 passive + SASTER-13-induced (no-op embedder) |
-| Hybrid (embedding-assisted scoring) | 5 | SASTER-15-induced, SASTER-18-induced, SASTER-18-multiturn, SASTER-24-induced, SASTER-26-induced |
+| Pure-code | 8 | All 7 passive + SASTER-11-induced (no-op embedder) |
+| Hybrid (embedding-assisted scoring) | 5 | SASTER-14-induced, SASTER-18-induced, SASTER-18-multiturn, SASTER-24-induced, SASTER-26-induced |
 | Judge-LLM | 0 | — |
 
 No shipped detector calls an LLM to decide whether a pattern fired.

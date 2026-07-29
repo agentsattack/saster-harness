@@ -68,12 +68,12 @@ def test_slide_example_constructs() -> None:
     assert harness.config.agent_name == "support-prod"
     # Default detector set in v0.2.0: twelve implementations spanning
     # ten SASTER patterns. SASTER-18, -24, and -26 ship in both
-    # passive and induced flavours; SASTER-13 and SASTER-15 ship
+    # passive and induced flavours; SASTER-11 and SASTER-14 ship
     # induced-only.
     ids = sorted(d.saster_id for d in harness.detectors)
     assert ids == [
-        "SASTER-13-induced",
-        "SASTER-15-induced",
+        "SASTER-11-induced",
+        "SASTER-14-induced",
         "SASTER-18", "SASTER-18-induced",
         "SASTER-24", "SASTER-24-induced",
         "SASTER-26", "SASTER-26-induced",

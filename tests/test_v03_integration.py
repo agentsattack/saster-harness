@@ -24,7 +24,7 @@ from saster_harness.baseline import (
     EmbeddingBaseline,
 )
 from saster_harness.config import HarnessMode, MonitoringConfig
-from saster_harness.detectors.saster_13_induced import Saster13InducedDetector
+from saster_harness.detectors.saster_11_induced import Saster11InducedDetector
 from saster_harness.event import DetectionEvent, TurnData
 from saster_harness.harness import MonitoringHarness
 from saster_harness.prober import InProcessInjector, Prober
@@ -129,8 +129,8 @@ def test_v03_refusal_sampling_populates_trained_baseline(tmp_path: Path) -> None
 
 def test_v03_authorized_tools_flow_through_to_saster13(tmp_path: Path) -> None:
     """The harness should call set_authorized_tools on every detector
-    that exposes the setter — including SASTER-13-induced."""
-    det = Saster13InducedDetector()
+    that exposes the setter — including SASTER-11-induced."""
+    det = Saster11InducedDetector()
     assert det._authorized_tools == ()
     h = _build_harness(tmp_path=tmp_path)
     h._detectors = [det]

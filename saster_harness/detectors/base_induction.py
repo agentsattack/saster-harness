@@ -11,7 +11,7 @@ v0.3 split — single-turn vs scenario shapes
 v0.2 had a single ``InductionDetector`` abstract base whose contract
 (``baseline_prompt`` / ``induction_strategy`` / ``divergence_score``)
 assumed every detector probed one baseline ask against N reframings.
-Three v0.2 detectors (SASTER-13/15/24/26-induced) don't actually
+Three v0.2 detectors (SASTER-11/14/24/26-induced) don't actually
 work that way — they run multi-turn scenarios with their own
 orchestration, and were forced to ship compat-shim placeholders for
 the abstract methods. The signature was lying about what those
@@ -32,7 +32,7 @@ turns, not a single reframing:
   baseline ask against N reframings. Carries the abstract contract
   ``baseline_prompt`` / ``induction_strategy`` / ``divergence_score``
   / ``divergence_threshold`` and a concrete ``induce()`` that drives
-  the loop. SASTER-18-induced and SASTER-13-induced inherit from
+  the loop. SASTER-18-induced and SASTER-11-induced inherit from
   this.
 
 - :class:`MultiTurnInductionDetector` — for Crescendo-style detectors
@@ -51,7 +51,7 @@ turns, not a single reframing:
   multi-turn scenarios with custom orchestration. Declares
   ``scenarios()`` abstract (for introspection by the harness and
   tests) and leaves ``induce()`` for the subclass to implement.
-  SASTER-15-induced, SASTER-24-induced, and SASTER-26-induced
+  SASTER-14-induced, SASTER-24-induced, and SASTER-26-induced
   inherit from this. No abstract method exists for ``divergence``
   because the per-scenario scoring signatures differ between
   detectors (see :meth:`Saster26InducedDetector.divergence_for_scenario`
@@ -185,7 +185,7 @@ class SingleTurnInductionDetector(InductionDetector):
     :meth:`induce` drives the standard loop.
 
     Subclasses MAY override :meth:`induce` if they need
-    session-scoping per reframing (see SASTER-13-induced) — the
+    session-scoping per reframing (see SASTER-11-induced) — the
     abstract methods remain available for tests and analysts who
     want to score hand-crafted probes outside the standard loop.
 
@@ -302,7 +302,7 @@ class ScenarioInductionDetector(InductionDetector):
     one or more target / follow-up turns whose response is what gets
     scored. The exact shape varies per detector:
 
-    - SASTER-15-induced sends baseline → N erosion turns → target.
+    - SASTER-14-induced sends baseline → N erosion turns → target.
     - SASTER-24-induced sends baseline → redefinition → follow-up.
     - SASTER-26-induced sends a recon probe and a sibling neutral
       probe, both ending in the same question, and compares them.

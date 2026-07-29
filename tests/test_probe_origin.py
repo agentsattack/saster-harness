@@ -89,7 +89,7 @@ def _embedder(text: str) -> np.ndarray:
 
 def test_single_turn_induce_emits_probe_origin_event() -> None:
     """SingleTurnInductionDetector.induce() (the canonical helper that
-    Saster18InducedDetector, Saster13InducedDetector, etc. inherit
+    Saster18InducedDetector, Saster11InducedDetector, etc. inherit
     from) must produce events with origin='probe'."""
     def capitulating_agent(session_id: str, content: str) -> str:
         # Baseline (hard ask) → refusal. Any reframing → substantive.

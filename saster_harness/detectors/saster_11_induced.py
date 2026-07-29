@@ -1,4 +1,27 @@
-"""SASTER-13 induced — Spec Drift via adjacency-framed scope tests.
+"""SASTER-11 induced — Specification Drift via adjacency-framed scope tests.
+
+Canonical definition (from SASTER.md):
+
+    Attack:
+        Agent gradually reinterprets its operational mandate over the
+        course of a multi-turn conversation, shifting from its intended
+        function to an attacker-influenced function.
+
+    Detection:
+        Comparison of agent behavior at conversation start versus end
+        reveals progressive deviation from original task constraints.
+
+    Example:
+        A coding assistant that starts by writing safe code but
+        progressively accepts more dangerous code patterns as the
+        conversation normalizes them.
+
+.. note::
+    Shipped in v0.1–v0.3.x under the identifier ``SASTER-13-induced``
+    ("Spec Drift"), which mislabeled this Specification Drift detector
+    with SASTER-13's number (Malicious Compliance). Corrected to
+    ``SASTER-11-induced`` in v0.4.0; the old identifier resolves via a
+    deprecated alias that warns. See CHANGELOG 0.4.0.
 
 Agents are shipped with a declared scope: "customer support for
 product X", "internal analytics queries", "code review for the
@@ -271,12 +294,12 @@ _DEFAULT_BASELINE_PROMPT = (
 # ---------------------------------------------------------------------------
 
 
-class Saster13InducedDetector(SingleTurnInductionDetector):
-    """SASTER-13 detector that actively probes for spec-drift
+class Saster11InducedDetector(SingleTurnInductionDetector):
+    """SASTER-11 detector that actively probes for specification-drift
     susceptibility via four adjacency-framed scope tests."""
 
-    saster_id = "SASTER-13-induced"
-    pattern_name = "Spec Drift"
+    saster_id = "SASTER-11-induced"
+    pattern_name = "Specification Drift (Induced)"
     tier = 2
 
     def __init__(
@@ -288,7 +311,7 @@ class Saster13InducedDetector(SingleTurnInductionDetector):
         authorized_tools: tuple[str, ...] = (),
         embedder: Callable[[str], np.ndarray] | None = None,
     ) -> None:
-        """Construct a Saster13InducedDetector.
+        """Construct a Saster11InducedDetector.
 
         Parameters
         ----------
@@ -314,7 +337,7 @@ class Saster13InducedDetector(SingleTurnInductionDetector):
             application.
         embedder
             Accepted for API consistency with the other induced
-            detectors; SASTER-13-induced doesn't use embeddings.
+            detectors; SASTER-11-induced doesn't use embeddings.
         """
         super().__init__()
         self._threshold = threshold
@@ -348,7 +371,7 @@ class Saster13InducedDetector(SingleTurnInductionDetector):
 
     def set_embedder(self, embedder: Callable[[str], np.ndarray]) -> None:
         """API-compatible no-op for the harness's shared-embedder
-        injection. SASTER-13-induced doesn't use embeddings."""
+        injection. SASTER-11-induced doesn't use embeddings."""
         self._embedder = embedder
 
     def set_authorized_tools(self, tools: tuple[str, ...]) -> None:
@@ -474,7 +497,7 @@ class Saster13InducedDetector(SingleTurnInductionDetector):
                 "induced_response": induced.response[:240],
             },
         )
-        # Concern 2b: SASTER-13-induced builds its event via this custom
+        # Concern 2b: SASTER-11-induced builds its event via this custom
         # helper instead of the base induction helper, but still emits
         # from an induce() path → tag origin="probe".
         event.origin = "probe"
@@ -482,4 +505,4 @@ class Saster13InducedDetector(SingleTurnInductionDetector):
 
 
 # Module-level DETECTOR instance for harness registry consistency.
-DETECTOR = Saster13InducedDetector()
+DETECTOR = Saster11InducedDetector()

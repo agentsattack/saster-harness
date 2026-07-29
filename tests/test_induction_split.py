@@ -14,19 +14,19 @@ from saster_harness.detectors.base_induction import (
     ScenarioInductionDetector,
     SingleTurnInductionDetector,
 )
-from saster_harness.detectors.saster_13_induced import Saster13InducedDetector
-from saster_harness.detectors.saster_15_induced import Saster15InducedDetector
+from saster_harness.detectors.saster_11_induced import Saster11InducedDetector
+from saster_harness.detectors.saster_14_induced import Saster14InducedDetector
 from saster_harness.detectors.saster_18_induced import Saster18InducedDetector
 from saster_harness.detectors.saster_24_induced import Saster24InducedDetector
 from saster_harness.detectors.saster_26_induced import Saster26InducedDetector
 
 _SINGLE_TURN_DETECTORS = (
-    Saster13InducedDetector,
+    Saster11InducedDetector,
     Saster18InducedDetector,
 )
 
 _SCENARIO_DETECTORS = (
-    Saster15InducedDetector,
+    Saster14InducedDetector,
     Saster24InducedDetector,
     Saster26InducedDetector,
 )
@@ -92,7 +92,7 @@ def test_polymorphic_isinstance_check_covers_both_shapes() -> None:
 def test_single_turn_carries_concrete_induce_impl() -> None:
     """SingleTurnInductionDetector ships a concrete induce() that
     drives the standard loop using the three abstract primitives.
-    Subclasses MAY override (SASTER-13 does for session scoping)."""
+    Subclasses MAY override (SASTER-11 does for session scoping)."""
     # Saster18InducedDetector inherits the base induce() without override.
     assert (
         Saster18InducedDetector.induce

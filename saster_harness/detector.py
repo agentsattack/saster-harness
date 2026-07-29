@@ -83,7 +83,7 @@ class SasterDetector(ABC):
         """Receive the operator's declared authorized-tool allow-list.
 
         Default no-op. Detectors that consume the declared baseline
-        (currently :class:`Saster13InducedDetector`; future detectors
+        (currently :class:`Saster11InducedDetector`; future detectors
         that take an allow-list) override this to update their internal
         state. The harness calls this once after construction, alongside
         ``set_embedder``."""
