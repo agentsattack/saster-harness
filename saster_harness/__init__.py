@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from .adapters import HARAdapter
 from .baseline import (
@@ -114,7 +114,7 @@ __all__ = [
 # shipped under the wrong taxonomy numbers (13/15) through v0.3.x; they
 # are now Saster11InducedDetector / Saster14InducedDetector. The old
 # names remain importable via PEP 562 module ``__getattr__`` with a
-# DeprecationWarning; removal target v0.5.0.
+# DeprecationWarning; removal target v0.6.0.
 _DEPRECATED_CLASS_ALIASES = {
     "Saster13InducedDetector": ("Saster11InducedDetector", Saster11InducedDetector),
     "Saster15InducedDetector": ("Saster14InducedDetector", Saster14InducedDetector),
@@ -128,7 +128,7 @@ def __getattr__(name: str) -> Any:
 
         new_name, obj = entry
         warnings.warn(
-            f"{name} is deprecated and will be removed in v0.5.0; use "
+            f"{name} is deprecated and will be removed in v0.6.0; use "
             f"{new_name} instead (SASTER-13/-15-induced were renumbered "
             f"to SASTER-11/-14-induced in v0.4.0).",
             DeprecationWarning,

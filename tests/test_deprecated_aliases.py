@@ -46,7 +46,7 @@ def test_current_ids_do_not_emit_renumber_warning():
         dets = _load_default_detectors(["SASTER-11-induced", "SASTER-14-induced"])
     assert {d.saster_id for d in dets} == {"SASTER-11-induced", "SASTER-14-induced"}
     assert not [
-        w for w in recorded if "removed in v0.5.0" in str(w.message)
+        w for w in recorded if "removed in v0.6.0" in str(w.message)
     ]
 
 

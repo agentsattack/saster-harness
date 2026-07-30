@@ -218,7 +218,7 @@ _DEFAULT_ENABLED_DETECTORS: tuple[str, ...] = (
 # Intent Erosion — SASTER-11 and SASTER-14). The old ``-both`` forms
 # expanded to the induced module alone, so they alias to the induced
 # detector. Aliases resolve with a DeprecationWarning; removal target
-# v0.5.0.
+# v0.6.0.
 _DEPRECATED_ALIASES: dict[str, str] = {
     "SASTER-13-induced": "SASTER-11-induced",
     "SASTER-15-induced": "SASTER-14-induced",
@@ -238,7 +238,7 @@ def _resolve_detector_alias(ident: str) -> str:
         return ident
     warnings.warn(
         f"Detector identifier {ident!r} is deprecated and will be "
-        f"removed in v0.5.0; use {replacement!r} instead. The "
+        f"removed in v0.6.0; use {replacement!r} instead. The "
         f"SASTER-13/-15-induced detectors were renumbered to "
         f"SASTER-11/-14-induced in v0.4.0 (they implement Specification "
         f"Drift and Gradual Intent Erosion, not Malicious Compliance / "

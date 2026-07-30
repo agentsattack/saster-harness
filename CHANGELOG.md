@@ -13,6 +13,52 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-30
+
+### Added
+
+- **Configurable instrumentation (`saster_harness.instrumentation`).**
+  Three observation planes — `tool` (the v0.4.0 wire MITM), `model`
+  (inference-API / reasoning signal), `process` (in-agent hooks; ships
+  the interface plus one reference adapter,
+  `CallbackProcessPlaneAdapter`). Named, runtime-switchable profiles:
+  `standard` (default) activates the tool plane only and **reproduces
+  v0.4.0 exactly**, plus `model`, `full`, and operator-defined
+  `custom_profiles`. Detectors declare `requires_planes` (default
+  `(TOOL,)`); a detector whose plane is inactive is reported
+  **unavailable, never clean** (`detector_availability()`,
+  `HarnessAddon.unavailable_detectors()`). Active profile and every
+  transition (with measured overhead) are recorded per trajectory
+  (`instrumentation_snapshot()`, `evidence.active_profile`). Optional
+  escalation raises the profile on a genuine firing (off by default).
+  New `MonitoringConfig` fields: `instrumentation_profile`,
+  `custom_profiles`, `escalation_enabled`, `escalation_profile`.
+  See [docs/instrumentation.md](docs/instrumentation.md) — a research
+  instrument, not a production control plane.
+- **[docs/determinism.md](docs/determinism.md).** Splits the
+  "deterministic" claim into reproducibility (bit-level for the 7
+  passive detectors, procedural for the 6 induced) and timeliness
+  (measured separately; not yet measured — no claim made).
+- **Taxonomy coverage table** in the README: all 32 patterns ×
+  (detector? / mode / specification-only), stated plainly as 13
+  detectors covering 9 of 32; SASTER-11/-14 flagged induced-only.
+- **[docs/incident-mapping.md](docs/incident-mapping.md)** (stub) and a
+  README motivation note citing the CSA Hugging Face CISO post-mortem
+  (DRAFT v0.8) — corroboration for trajectory-level detection, not a
+  SASTER pattern.
+
+### Changed
+
+- Vendored `tests/data/SASTER.md` refreshed for the taxonomy's Phase 2.3
+  / 2.7 prior-art fields (decomposition-attack citations on SASTER-14
+  and SASTER-22, etc.); checksum re-pinned. No detector definitions
+  changed; the taxonomy-sync guard remains green.
+- **Deprecation removal target for the SASTER-13/-15 aliases moved from
+  v0.5.0 to v0.6.0.** Since this *is* the 0.5.0 release, the config-string
+  and class-name aliases are retained here and scheduled for removal in
+  v0.6.0 instead. Migrate `enabled_detectors` entries and imports to the
+  `SASTER-11`/`SASTER-14` names before 0.6.0.
+
 ## [0.4.0] — 2026-07-28
 
 ### Changed — BREAKING (aliased): SASTER-13/-15-induced renumbered
@@ -45,9 +91,9 @@ Class renames: `Saster13InducedDetector` → `Saster11InducedDetector`;
   class) still import, via a PEP 562 module `__getattr__` that warns
   and returns the renamed class.
 
-**Deprecation removal target: v0.5.0.** The aliases (both config-string
+**Deprecation removal target: v0.6.0.** The aliases (both config-string
 ids and class names) will be removed then. Migrate `enabled_detectors`
-entries and imports to the `SASTER-11`/`SASTER-14` names before 0.5.0.
+entries and imports to the `SASTER-11`/`SASTER-14` names before 0.6.0.
 
 **Note on coverage.** SASTER-14 (Gradual Intent Erosion) now correctly
 shows a shipped detector; SASTER-13 (Malicious Compliance) and SASTER-15
