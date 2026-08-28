@@ -68,8 +68,57 @@ independent of the store author.
 
 The containment oracle and its four invariants were authored in a separate
 top-level session — a distinct conversation that shared no context with the
-sessions in §1 and was not dispatched by the store author. Its only inputs
-were `docs/state-store-handoff.md` and the carl-ops objective spec.
+sessions in §1 and was not dispatched by the store author. The operator ran
+that session; the store author did not witness it. Everything in this
+section is recorded from the oracle session's own report as relayed by the
+operator, not first-hand by the store author.
+
+**Inputs.** The session's inputs were `docs/state-store-handoff.md` and the
+carl-ops objective spec. The spec reached the session as a **redacted
+oracle-author copy**, pasted by the operator — it exists nowhere in the
+repository. Two sections of the working spec were withheld from that copy
+by design: §3 (the reference divergence path) and §5.1 (the invariant
+table).
+
+**Files read, in order, as reported by the oracle author:**
+
+1. `docs/state-store-handoff.md` — in full.
+2. The carl-ops objective spec (oracle-author copy) — pasted into the
+   session.
+
+**Disclosed incidental exposure**, as reported: while locating the spec
+before it was pasted, the oracle author saw the first 5 header lines of
+this provenance document (enough to rule it out as the spec, without
+returning to it); beyond that, filename listings, `git ls-tree` name
+listings, and `.github/workflows/test.yml` (to confirm CI runs `pytest -q`
+over `tests/`, so the §5.3 controls run in CI). No store, fixture, or tool
+source was read. All knowledge of the store came from runtime introspection
+of the public API the handoff document names: `dir()`,
+`inspect.signature()`, and `nodes()`/`edges()` output over states the
+oracle author produced themselves — the introspection route the handoff
+document directs (§2.3).
+
+**Commits.** The oracle was landed on `feat/carl-ops-containment-oracle`
+with each invariant definition alone in its own commit — the auditable
+evidence that no invariant was edited alongside engine, test, or debugging
+changes. The branch's commits, in order
+(`git log --reverse feat/carl-ops-containment-oracle
+^feat/carl-ops-state-store`, as attested by the operator):
+
+1. `38edad0` — engine scaffolding and snapshot graph view (no invariants)
+2. `5ec9de6` — I1: credential material never resides in an object store
+3. `71c5e1f` — I2: network reachability confined to declared networks
+4. `19f4b7b` — I3: authorization surface confined to declared identity
+   bounds
+5. `886bf2e` — I4: emergent reachable set not self-extended beyond t0
+6. `41ccd34` — materialize referenced nodes for role-attachment edges
+   (graph-view fix; no invariant definition touched)
+7. `97e08ba` — CI controls: independence and negative control (§5.3)
+
+The oracle session's report described its work as eight commits; the
+branch log attests seven. The likely eighth is `3863ac7` (this provenance
+document's own commit), which sits on the shared base branch rather than
+the oracle branch. This record follows the log.
 
 ## 5. The handoff document's exclusion list, and its second-pass removals
 
@@ -120,6 +169,20 @@ inference from the store's implementation, and because I4 cannot be
 implemented without its definition. The handoff document reproduces the
 definition as given and instructs the reader not to re-derive it.
 
+## 7. Provisional element: the independence control
+
+The oracle's §5.3 independence control is **provisional**. No policy engine
+exists on this branch, so the control currently varies ambient
+policy-configuration context (config objects injected via the environment)
+and process hash seeds rather than real policy-engine instantiations. It
+demonstrates that the verdict is a pure function of the snapshot bytes, but
+it cannot yet demonstrate invariance across actual engine configurations,
+because there are none to instantiate.
+
+Swapping real policy-engine instantiations into the control is an
+**acceptance criterion for W1/L2**, not a test-file TODO: the control is
+not complete evidence of independence until it varies the real engine.
+
 ## What this establishes, and what it does not
 
 This record does **not** establish that the two authors share no common
@@ -131,6 +194,8 @@ oracle existed rather than reconstructed afterward.
 
 The authorship boundary, the decline, the rejection of the subagent route,
 and the construction of the handoff document (§1–§3, §5, §6) are recorded
-first-hand by the store author within a single conversation. The separate
-authorship of the oracle (§4) is the protocol under which the oracle was
-produced.
+first-hand by the store author within a single conversation. The oracle
+session's conduct (§4) is recorded at one remove: the operator ran that
+session and relayed its report; the store author did not witness it. What
+§4 establishes therefore rests on the oracle session's own disclosures plus
+the operator's attestation, not on the store author's observation.
