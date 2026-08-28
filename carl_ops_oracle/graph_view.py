@@ -179,11 +179,14 @@ class SnapshotGraphView:
 
         for ra in d.get("role_attachments", []):
             self._add_node(_attachment_id(ra["id"]), "RoleAttachment", {})
+            self._add_node(_principal_id(ra["principal"]), "Principal", {})
             self._add_edge(
                 _principal_id(ra["principal"]), "HAS_ATTACHMENT", _attachment_id(ra["id"])
             )
+            self._add_node(_role_id(ra["role"]), "Role", {})
             self._add_edge(_attachment_id(ra["id"]), "FOR_ROLE", _role_id(ra["role"]))
             if ra.get("target"):
+                self._add_node(_hostgroup_id(ra["target"]), "HostGroup", {})
                 self._add_edge(
                     _attachment_id(ra["id"]), "ON_TARGET", _hostgroup_id(ra["target"])
                 )
