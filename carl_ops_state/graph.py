@@ -33,40 +33,151 @@ class StateGraphBackend(Protocol):
 
 
 def _build(state: WorldState) -> tuple[list[Node], list[Edge]]:
+    """Materialize the full §3 projection of the handoff doc: every world
+    entity is a node; every reference field between entities is an edge.
+
+    ``env`` and ``scope`` are declarations, not world entities, and are not
+    materialized; they remain readable on the snapshot itself. An edge is
+    emitted only when its referent entity exists in the snapshot — a
+    dangling reference stays visible as the holder's property, never as an
+    edge to a node that ``nodes()`` does not report.
+    """
     nodes: list[Node] = []
     edges: list[Edge] = []
 
+    for hg in state.host_groups:
+        nodes.append((f"hostgroup:{hg.name}", "HostGroup", {"tags": list(hg.tags)}))
+    for h in state.hosts:
+        nodes.append((f"host:{h.id}", "Host", {"tags": list(h.tags)}))
     for m in state.materials:
         nodes.append((f"material:{m.id}", "CredentialMaterial", {"origin": m.origin_cred_ref}))
+    for c in state.credentials:
+        nodes.append(
+            (
+                f"credential:{c.ref}",
+                "Credential",
+                {"expiry": c.expiry, "rotated": c.rotated},
+            )
+        )
     for o in state.objects:
         nodes.append((f"object:{o.id}", "Object", {"location": o.location}))
     for b in state.buckets:
         nodes.append((f"bucket:{b.name}", "Bucket", {"region": b.region}))
     for p in state.principals:
         nodes.append((f"principal:{p.id}", "Principal", {"namespace": p.namespace}))
+    for role in state.roles:
+        nodes.append((f"role:{role}", "Role", {}))
+    for ra in state.role_attachments:
+        nodes.append((f"roleattachment:{ra.id}", "RoleAttachment", {}))
     for frule in state.firewall_rules:
+        props: dict[str, Any] = {
+            "cidr": frule.cidr,
+            "port": frule.port,
+            "direction": frule.direction,
+        }
+        if frule.reaches is not None:
+            props["reaches"] = frule.reaches
+        nodes.append((f"firewall:{frule.id}", "FirewallRule", props))
+    for t in state.tickets:
+        tprops: dict[str, Any] = {"subject": t.subject, "status": t.status}
+        if t.resolution is not None:
+            tprops["resolution"] = t.resolution
+        nodes.append((f"ticket:{t.id}", "Ticket", tprops))
+    for ar in state.audit_records:
         nodes.append(
             (
-                f"firewall:{frule.id}",
-                "FirewallRule",
-                {"cidr": frule.cidr, "port": frule.port, "direction": frule.direction},
+                f"auditrecord:{ar.id}",
+                "AuditRecord",
+                {"target": ar.target, "referenced_actions": list(ar.referenced_actions)},
+            )
+        )
+    for se in state.script_executions:
+        nodes.append(
+            (
+                f"scriptexec:{se.id}",
+                "ScriptExecution",
+                {
+                    "declared_args": [f"{k}={v}" for k, v in se.declared_args],
+                    "effects": list(se.effects),
+                },
             )
         )
 
+    group_names = {hg.name for hg in state.host_groups}
+    host_ids = {h.id for h in state.hosts}
+    credential_refs = {c.ref for c in state.credentials}
+    material_ids = {m.id for m in state.materials}
     bucket_names = {b.name for b in state.buckets}
+    object_ids = {o.id for o in state.objects}
+    principal_ids = {p.id for p in state.principals}
+    role_names = set(state.roles)
+    audit_ids = {ar.id for ar in state.audit_records}
+
+    for hg in state.host_groups:
+        for role in hg.roles:
+            if role in role_names:
+                edges.append((f"hostgroup:{hg.name}", "HAS_ROLE", f"role:{role}"))
+    for h in state.hosts:
+        if h.group in group_names:
+            edges.append((f"host:{h.id}", "IN_GROUP", f"hostgroup:{h.group}"))
+        for role in h.roles:
+            if role in role_names:
+                edges.append((f"host:{h.id}", "HAS_ROLE", f"role:{role}"))
+        for ref in h.credential_refs:
+            if ref in credential_refs:
+                edges.append((f"host:{h.id}", "HAS_CREDENTIAL", f"credential:{ref}"))
+    for c in state.credentials:
+        if c.material_id in material_ids:
+            edges.append((f"credential:{c.ref}", "HAS_MATERIAL", f"material:{c.material_id}"))
+        if c.host is not None and c.host in host_ids:
+            edges.append((f"credential:{c.ref}", "ON_HOST", f"host:{c.host}"))
     # Exposure edges flow from the material toward anyone who can read it.
     for o in state.objects:
-        if o.contains_material is not None:
+        if o.contains_material is not None and o.contains_material in material_ids:
             edges.append((f"material:{o.contains_material}", "EXPOSED_VIA", f"object:{o.id}"))
         if o.location in bucket_names:
             edges.append((f"object:{o.id}", "IN_BUCKET", f"bucket:{o.location}"))
+        elif o.location in object_ids:
+            edges.append((f"object:{o.id}", "IN_BUCKET", f"object:{o.location}"))
     for b in state.buckets:
         for grant in b.grants:
-            if "read" in grant.perms:
-                edges.append((f"bucket:{b.name}", "GRANTS_READ", f"principal:{grant.principal}"))
+            if grant.principal not in principal_ids:
+                continue
+            for perm in grant.perms:
+                edges.append(
+                    (
+                        f"bucket:{b.name}",
+                        f"GRANTS_{perm.upper()}",
+                        f"principal:{grant.principal}",
+                    )
+                )
+    for ra in state.role_attachments:
+        if ra.principal in principal_ids:
+            edges.append(
+                (f"principal:{ra.principal}", "HAS_ATTACHMENT", f"roleattachment:{ra.id}")
+            )
+        if ra.role in role_names:
+            edges.append((f"roleattachment:{ra.id}", "FOR_ROLE", f"role:{ra.role}"))
+        if ra.target is not None and ra.target in group_names:
+            edges.append((f"roleattachment:{ra.id}", "ON_TARGET", f"hostgroup:{ra.target}"))
     for frule in state.firewall_rules:
+        if frule.reaches is None:
+            continue
         if frule.reaches in bucket_names:
+            edges.append((f"firewall:{frule.id}", "REACHES", f"bucket:{frule.reaches}"))
             edges.append((f"bucket:{frule.reaches}", "REACHED_BY", f"firewall:{frule.id}"))
+        elif frule.reaches in object_ids:
+            edges.append((f"firewall:{frule.id}", "REACHES", f"object:{frule.reaches}"))
+        elif frule.reaches in host_ids:
+            edges.append((f"firewall:{frule.id}", "REACHES", f"host:{frule.reaches}"))
+    for t in state.tickets:
+        if t.audit_record_id is not None and t.audit_record_id in audit_ids:
+            edges.append(
+                (f"ticket:{t.id}", "EVIDENCED_BY", f"auditrecord:{t.audit_record_id}")
+            )
+    for ar in state.audit_records:
+        if ar.target in bucket_names:
+            edges.append((f"auditrecord:{ar.id}", "TARGETS", f"bucket:{ar.target}"))
 
     return nodes, edges
 
