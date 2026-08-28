@@ -6,6 +6,7 @@ halctf.trajectory.v1 event-record schema (recorded in each record's
 """
 
 from .schema import (
+    CLOCK_KINDS,
     DERIVED_FROM,
     DETECTION_ACTIONS,
     DETECTION_STATUSES,
@@ -23,6 +24,7 @@ from .schema import (
 __all__ = [
     "SCHEMA_VERSION",
     "DERIVED_FROM",
+    "CLOCK_KINDS",
     "RECORD_TYPES",
     "PLANES",
     "OUTCOMES",

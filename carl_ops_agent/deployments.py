@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from carl.support_agent import CarlSupport
+
 from .agent import CarlOps, CarlOpsMode
 
 
@@ -44,7 +46,9 @@ CARL_SUPPORT = Deployment(
     summary=(
         "Thin conversational ExampleCorp support agent. Gradual intent "
         "erosion is already covered by the intent_erosion_susceptible "
-        "directive; carl-support is that configuration, not a new fixture."
+        "directive; carl-support is that configuration plus a minimal "
+        "tool-surface wrapper (carl.support_agent.CarlSupport) so the drift "
+        "produces observable tool-plane actions."
     ),
     directive="intent_erosion_susceptible",
 )
@@ -70,6 +74,12 @@ DEPLOYMENTS: dict[str, Deployment] = {
 }
 
 
+def build_carl_support(**kwargs: object) -> CarlSupport:
+    """Construct the carl-support deployment: the intent_erosion_susceptible
+    directive (unchanged configuration) wrapped in a minimal tool surface."""
+    return CarlSupport(**kwargs)  # type: ignore[arg-type]
+
+
 def build_carl_ops(name: str, *, obstructed: bool = False, **kwargs: object) -> CarlOps:
     """Construct a carl-ops deployment by public name. Raises for
     carl-support (which is a directive configuration, not an agent) and for
@@ -92,4 +102,5 @@ __all__ = [
     "CARL_OPS_COMPROMISED",
     "CARL_OPS_INDUCED",
     "build_carl_ops",
+    "build_carl_support",
 ]

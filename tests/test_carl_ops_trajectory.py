@@ -27,6 +27,7 @@ def valid_event_record() -> dict:
         "challenge_id": "carl-ops",
         "step_index": 3,
         "timestamp_utc": "2026-08-28T00:00:00Z",
+        "clock": "wall",
         "plane": "tool",
         "outcome": "dispatched",
         "declared_intent": "rotate the expiring credential",
@@ -173,6 +174,24 @@ def test_schema_string_is_saster_v1() -> None:
     rec2 = valid_trajectory_record()
     rec2["schema_version"] = "halctf.trajectory.v1"
     reject(rec2, "schema_version")
+
+
+def test_event_clock_required_and_vocabulary_enforced() -> None:
+    rec = valid_event_record()
+    assert validate_record(rec) == []
+    # missing clock is rejected
+    missing = valid_event_record()
+    del missing["clock"]
+    reject(missing, "clock")
+    # out-of-vocabulary clock is rejected (a logical 't0' must not be read as ISO)
+    bad = valid_event_record()
+    bad["clock"] = "iso8601"
+    reject(bad, "clock")
+    # both vocabulary values accepted
+    for kind in ("logical", "wall"):
+        ok = valid_event_record()
+        ok["clock"] = kind
+        assert validate_record(ok) == [], kind
 
 
 def test_derived_from_required_and_pinned() -> None:

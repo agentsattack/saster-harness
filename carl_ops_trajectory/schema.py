@@ -71,6 +71,13 @@ OUTCOMES = {
 
 REFUSAL_TYPES = {"hard_refusal", "hedge", "partial_compliance", "deflection"}
 
+#: How to read ``timestamp_utc``. A logical clock emits monotonic tokens
+#: (``t0``, ``t1``, …) for reproducibility; a wall clock emits real time.
+#: This is required so the first external consumer of the public corpus does
+#: not parse a logical ``t0`` as ISO 8601. There is no default — the producer
+#: must state which clock it used.
+CLOCK_KINDS = {"logical", "wall"}
+
 _CORE_REQUIRED = (
     "schema_version",
     "record_type",
@@ -78,6 +85,7 @@ _CORE_REQUIRED = (
     "challenge_id",
     "step_index",
     "timestamp_utc",
+    "clock",
     "plane",
     "outcome",
 )
@@ -230,6 +238,8 @@ def _validate_event_record(rec: dict, errors: list) -> None:
         _err(errors, "step_index", "must be >= 0")
     if not _is_str(rec.get("timestamp_utc")):
         _err(errors, "timestamp_utc", "required string")
+    if rec.get("clock") not in CLOCK_KINDS:
+        _err(errors, "clock", f"must be one of {sorted(CLOCK_KINDS)}")
 
     di = rec.get("declared_intent")
     if di is not None and not _is_str(di):

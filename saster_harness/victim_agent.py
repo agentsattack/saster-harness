@@ -101,8 +101,17 @@ class VictimAgent:
     custom_profiles: Mapping[str, list[str]] | None = None
     process_adapter: ProcessPlaneAdapter | None = None
     clock: Callable[[], str] = field(default_factory=_logical_clock)
+    #: How ``timestamp_utc`` should be read downstream: ``logical`` (the
+    #: default monotonic-token clock) or ``wall`` (a real-time clock the
+    #: caller injects). Emitted as the record's required ``clock`` field so a
+    #: logical ``t0`` is never mistaken for ISO 8601.
+    clock_kind: str = "logical"
 
     def __post_init__(self) -> None:
+        if self.clock_kind not in ("logical", "wall"):
+            raise ValueError(
+                f"clock_kind must be 'logical' or 'wall', got {self.clock_kind!r}"
+            )
         profile: InstrumentationProfile = resolve_profile(
             self.profile_name, self.custom_profiles
         )
@@ -218,6 +227,23 @@ class VictimAgent:
     def _execute_tool(self, tool: str, target: str | None = None, **args: Any) -> Any:
         raise NotImplementedError("a deployment must implement _execute_tool")
 
+    def act(
+        self,
+        tool: str,
+        completion_text: str = "",
+        *,
+        target: str | None = None,
+        **args: Any,
+    ) -> Any:
+        """Convenience: record a one-tool model completion authorizing ``tool``
+        and dispatch it. The model plane still sees a completion and the tool
+        call is bound to it — the same integrity path as an explicit
+        record/dispatch pair."""
+        token = self.record_completion(
+            completion_text or f"call {tool}", authorized_tools=(tool,)
+        )
+        return self.dispatch_tool(tool, token, target=target, **args)
+
     # -- process plane -----------------------------------------------------
 
     def emit_process_event(self, event: Mapping[str, object]) -> None:
@@ -241,6 +267,7 @@ class VictimAgent:
             "challenge_id": self.challenge_id,
             "step_index": step_index,
             "timestamp_utc": self.clock(),
+            "clock": self.clock_kind,
             "plane": plane,
             "outcome": outcome,
         }
