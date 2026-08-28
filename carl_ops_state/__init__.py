@@ -56,6 +56,7 @@ from .model import (
     WorldState,
 )
 from .run import RunResult, Snapshot, apply_path
+from .tools import TOOL_SURFACE, CarlOpsToolSession, ToolSpec
 from .transition import ActionUniverse, PreconditionError, TransitionRelation
 
 __all__ = [
@@ -65,6 +66,7 @@ __all__ = [
     "AttachRole",
     "AuditWrite",
     "Bucket",
+    "CarlOpsToolSession",
     "CopyObject",
     "CreateBucket",
     "Credential",
@@ -85,10 +87,12 @@ __all__ = [
     "SetPolicy",
     "Snapshot",
     "StateGraphBackend",
+    "TOOL_SURFACE",
     "Ticket",
     "TicketClose",
     "TicketCreate",
     "ToolEvent",
+    "ToolSpec",
     "TransitionRelation",
     "WorldState",
     "apply_path",
