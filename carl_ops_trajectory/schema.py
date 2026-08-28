@@ -1,11 +1,16 @@
 """carl-ops trajectory record schema — FROZEN corpus format.
 
-Extends ``halctf.trajectory.v1`` (originally the halctf-agent per-event JSONL
-telemetry schema: record types, outcomes, a two-plane concept, and
+Descends from ``halctf.trajectory.v1`` (originally the halctf-agent per-event
+JSONL telemetry schema: record types, outcomes, a two-plane concept, and
 ``validate_record`` / ``validate_jsonl``). This module vendors that v1
 event-record schema unchanged and adds the campaign/trial **trajectory
-record** the carl-ops sweep freezes, bumping the version to
-``halctf.trajectory.v2``.
+record** the carl-ops sweep freezes.
+
+The schema string is ``saster.trajectory.v1`` — its own identity, not a
+halctf-agent version that repo does not ship. Every record also carries a
+top-level ``derived_from`` naming its ancestor (``halctf.trajectory.v1``).
+This corpus is public and downstream consumers key on the version string, so
+the two are kept distinct.
 
 Two record shapes share one validator, dispatched on ``record_type``:
 
@@ -27,7 +32,13 @@ from __future__ import annotations
 
 from typing import Any, TypeGuard
 
-SCHEMA_VERSION = "halctf.trajectory.v2"
+SCHEMA_VERSION = "saster.trajectory.v1"
+
+#: The schema this one descends from. This corpus is public and consumers key
+#: on the version string, so the record advertises its own identity
+#: (SCHEMA_VERSION) and, separately, its ancestry — never claiming to be a
+#: halctf-agent version that repo does not ship.
+DERIVED_FROM = "halctf.trajectory.v1"
 
 # -- v1 event-record vocabulary (vendored unchanged) ------------------------
 
@@ -71,22 +82,36 @@ _CORE_REQUIRED = (
     "outcome",
 )
 
-# -- v2 trajectory-record vocabulary ----------------------------------------
+# -- trajectory-record vocabulary -------------------------------------------
 
 #: Terminal outcome classes. There is deliberately NO generic
 #: ``budget_exhausted`` class: a held defense that ran out the clock and a
 #: stalled analyzer that ran out the clock are different observations
 #: (spec: "budget.exhausted alone conflates a held defense with a stalled
-#: analyzer"). Refusal tarpit is its own class, never pooled into breach.
+#: analyzer"). Refusal tarpit, a provider content filter, and a sanctioned
+#: escalation are each their own class, none pooled into breach.
 TERMINAL_OUTCOMES = {
     "resolved",                          # objective completed, sanctioned
-    "escalated",                         # graceful stop-and-escalate
+    "escalated",                         # agent stopped and escalated under an
+                                         # unmeetable precondition — the
+                                         # sanctioned response; not a failure,
+                                         # not a completion
     "breach",                            # an invariant was violated
     "refusal_tarpit",                    # agent stuck refusing — its own class
+    "filtered_or_empty",                 # a provider content filter dropped or
+                                         # blanked a turn — distinct from any
+                                         # failure class
     "defense_held_budget_exhausted",     # budget out, defense held
     "analyzer_stalled_budget_exhausted", # budget out, analyzer stalled
     "error",
 }
+
+#: Policy-engine verdict vocabulary — a CLOSED enum. CVR is computed by
+#: counting ``deny``, so a drifting verdict vocabulary would silently deflate
+#: that headline. ``unavailable`` is the engine's own down/absent state and
+#: must never validate as, or aggregate with, ``allow`` — the same rule the
+#: detector layer applies to an unavailable detector.
+POLICY_VERDICTS = {"allow", "deny", "error", "unavailable"}
 
 _BUDGET_EXHAUSTED_OUTCOMES = {
     "defense_held_budget_exhausted",
@@ -227,7 +252,7 @@ def _validate_event_record(rec: dict, errors: list) -> None:
 
 
 # ---------------------------------------------------------------------------
-# v2 trajectory-record validation
+# trajectory-record validation
 # ---------------------------------------------------------------------------
 
 _TRAJ_INLINE_FORBIDDEN = ("prompt", "response")  # content addressing: refs only
@@ -301,10 +326,29 @@ def _validate_actions(actions: Any, errors: list) -> None:
         if not isinstance(act, dict):
             _err(errors, p, "must be object")
             continue
-        if not _is_str(act.get("policy_verdict", None)):
-            _err(errors, f"{p}.policy_verdict", "required string")
-        if not _is_num(act.get("surprisal", None)):
-            _err(errors, f"{p}.surprisal", "required number")
+        # policy_verdict is a closed enum: allow | deny | error | unavailable.
+        # CVR counts `deny`; a drifting vocabulary would deflate it silently,
+        # and `unavailable` must never pass as `allow`.
+        if act.get("policy_verdict", None) not in POLICY_VERDICTS:
+            _err(
+                errors,
+                f"{p}.policy_verdict",
+                f"must be one of {sorted(POLICY_VERDICTS)}",
+            )
+        # rule_id is optional engine-specific detail beside the verdict.
+        rid = act.get("rule_id", None)
+        if rid is not None and not _is_str(rid):
+            _err(errors, f"{p}.rule_id", "must be string or null")
+        # surprisal is -log P(action | prefix) in nats, and so is non-negative.
+        surprisal = act.get("surprisal", None)
+        if not _is_num(surprisal):
+            _err(errors, f"{p}.surprisal", "required number (-log P in nats)")
+        elif float(surprisal) < 0.0:
+            _err(
+                errors,
+                f"{p}.surprisal",
+                "must be >= 0 (-log P(action | prefix) in nats)",
+            )
         for k in _TRAJ_INLINE_FORBIDDEN:
             if k in act:
                 _err(errors, f"{p}.{k}", "inline content forbidden; use a *_ref")
@@ -454,14 +498,26 @@ def _validate_oracle(oracle: Any, errors: list) -> tuple[bool | None, Any]:
     return breach, bsi
 
 
-def _validate_onset_dist(onset: Any, errors: list) -> None:
+def _validate_onset_dist(onset: Any, breach: Any, errors: list) -> None:
     """onset_dist is a DISTRIBUTION, not a point estimate. A bare integer is
-    rejected — onset is uncertain and must be carried as such."""
+    rejected — onset is uncertain and must be carried as such.
+
+    It is nullable, but a null onset is legal ONLY when there was no breach: a
+    clean campaign has no onset (the negative control, run on every sweep,
+    depends on this), while a breach must localize an onset distribution."""
+    if onset is None:
+        if breach is True:
+            _err(
+                errors,
+                "markers.onset_dist",
+                "null onset is legal only when breach is false",
+            )
+        return
     if isinstance(onset, (int, float)):  # bool included (bool subclasses int)
         _err(errors, "markers.onset_dist", "must be a distribution object, not a scalar")
         return
     if not isinstance(onset, dict):
-        _err(errors, "markers.onset_dist", "required distribution object")
+        _err(errors, "markers.onset_dist", "required distribution object or null")
         return
     steps = onset.get("steps", None)
     probs = onset.get("probs", None)
@@ -485,14 +541,17 @@ def _validate_onset_dist(onset: Any, errors: list) -> None:
             _err(errors, "markers.onset_dist.probs", "must sum to 1.0")
 
 
-def _validate_markers(markers: Any, oracle_bsi: Any, errors: list) -> Any:
+def _validate_markers(markers: Any, oracle_bsi: Any, breach: Any, errors: list) -> Any:
     """Validate the five markers. Returns markers.first_detection_step for
     cross-field latency checks."""
     if not isinstance(markers, dict):
         _err(errors, "markers", "required object")
         return None
 
-    _validate_onset_dist(markers.get("onset_dist", None), errors)
+    if "onset_dist" not in markers:
+        _err(errors, "markers.onset_dist", "required (distribution object or null)")
+    else:
+        _validate_onset_dist(markers["onset_dist"], breach, errors)
 
     ed = markers.get("explanatory_divergence", "__missing__")
     if ed == "__missing__":
@@ -618,7 +677,9 @@ def _validate_trajectory_record(rec: dict, errors: list) -> None:
     )
 
     breach, oracle_bsi = _validate_oracle(rec.get("oracle"), errors)
-    first_detection_step = _validate_markers(rec.get("markers"), oracle_bsi, errors)
+    first_detection_step = _validate_markers(
+        rec.get("markers"), oracle_bsi, breach, errors
+    )
     _validate_containment_latency(
         rec.get("containment_latency"), breach, first_detection_step, errors
     )
@@ -674,14 +735,16 @@ def _validate_trajectory_record(rec: dict, errors: list) -> None:
 def validate_record(rec: Any) -> list[str]:
     """Return a list of validation errors for one record. Empty == valid.
 
-    Dispatches on ``record_type``: ``trajectory`` records use the v2
-    trajectory schema; every other record type uses the v1 event schema."""
+    Dispatches on ``record_type``: ``trajectory`` records use the trajectory
+    schema; every other record type uses the vendored event schema."""
     errors: list[str] = []
     if not isinstance(rec, dict):
         return ["record: must be a JSON object"]
 
     if rec.get("schema_version") != SCHEMA_VERSION:
         _err(errors, "schema_version", f"must equal {SCHEMA_VERSION!r}")
+    if rec.get("derived_from") != DERIVED_FROM:
+        _err(errors, "derived_from", f"must equal {DERIVED_FROM!r}")
     rt = rec.get("record_type")
     if rt not in RECORD_TYPES:
         _err(errors, "record_type", f"must be one of {sorted(RECORD_TYPES)}")

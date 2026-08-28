@@ -21,6 +21,7 @@ from carl_ops_trajectory import SCHEMA_VERSION, validate_jsonl, validate_record
 def valid_event_record() -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
+        "derived_from": "halctf.trajectory.v1",
         "record_type": "step",
         "run_id": "run-1",
         "challenge_id": "carl-ops",
@@ -40,6 +41,7 @@ def valid_event_record() -> dict:
 def valid_trajectory_record() -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
+        "derived_from": "halctf.trajectory.v1",
         "record_type": "trajectory",
         "run_id": "run-1",
         "campaign_id": "carl-ops-induced",
@@ -102,7 +104,7 @@ def valid_clean_trajectory() -> dict:
         "invariants_fired": [],
     }
     rec["markers"] = {
-        "onset_dist": {"steps": [0], "probs": [1.0]},
+        "onset_dist": None,  # a clean campaign has no onset (negative control)
         "explanatory_divergence": None,
         "point_of_no_return": None,
         "breach_step_index": None,
@@ -159,14 +161,30 @@ def test_every_carried_field_present_is_required() -> None:
         reject(broken, field)
 
 
-# -- version bump -----------------------------------------------------------
+# -- schema string and provenance -------------------------------------------
 
 
-def test_version_bumped_and_enforced() -> None:
-    assert SCHEMA_VERSION == "halctf.trajectory.v2"
+def test_schema_string_is_saster_v1() -> None:
+    assert SCHEMA_VERSION == "saster.trajectory.v1"
     rec = valid_trajectory_record()
-    rec["schema_version"] = "halctf.trajectory.v1"
+    # the vendored copy must not claim to be a halctf-agent version
+    rec["schema_version"] = "halctf.trajectory.v2"
     reject(rec, "schema_version")
+    rec2 = valid_trajectory_record()
+    rec2["schema_version"] = "halctf.trajectory.v1"
+    reject(rec2, "schema_version")
+
+
+def test_derived_from_required_and_pinned() -> None:
+    rec = valid_trajectory_record()
+    del rec["derived_from"]
+    reject(rec, "derived_from")
+    rec2 = valid_trajectory_record()
+    rec2["derived_from"] = "saster.trajectory.v1"  # must name the ancestor
+    reject(rec2, "derived_from")
+    rec3 = valid_event_record()
+    del rec3["derived_from"]
+    reject(rec3, "derived_from")
 
 
 # -- semantic rule: breach_step_index null is NOT 0 -------------------------
@@ -366,6 +384,97 @@ def test_onset_dist_length_mismatch_rejected() -> None:
     rec = valid_trajectory_record()
     rec["markers"]["onset_dist"] = {"steps": [3, 4, 5], "probs": [1.0]}
     reject(rec, "onset_dist")
+
+
+# -- semantic rule: onset_dist nullable only when breach is false -----------
+
+
+def test_null_onset_with_breach_is_rejected() -> None:
+    rec = valid_trajectory_record()  # oracle.breach is True
+    rec["markers"]["onset_dist"] = None
+    reject(rec, "onset_dist")
+
+
+def test_null_onset_clean_is_accepted() -> None:
+    # The negative control: a clean campaign carries a null onset and must
+    # validate — the pre-amendment encoding failed exactly this.
+    rec = valid_clean_trajectory()
+    assert rec["markers"]["onset_dist"] is None
+    assert validate_record(rec) == []
+
+
+def test_onset_dist_key_required_present() -> None:
+    rec = valid_clean_trajectory()
+    del rec["markers"]["onset_dist"]
+    reject(rec, "onset_dist")
+
+
+# -- semantic rule: policy_verdict is a closed enum (CVR integrity) ----------
+
+
+def test_policy_verdict_out_of_vocabulary_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    rec["actions"][0]["policy_verdict"] = "hitl"  # not allow/deny/error/unavailable
+    reject(rec, "policy_verdict")
+
+
+def test_policy_verdict_full_vocabulary_accepted() -> None:
+    for verdict in ("allow", "deny", "error", "unavailable"):
+        rec = valid_trajectory_record()
+        rec["actions"][0]["policy_verdict"] = verdict
+        assert validate_record(rec) == [], verdict
+
+
+def test_optional_rule_id_accepted_and_typechecked() -> None:
+    rec = valid_trajectory_record()
+    rec["actions"][0]["rule_id"] = "R-042"
+    assert validate_record(rec) == []
+    rec2 = valid_trajectory_record()
+    rec2["actions"][0]["rule_id"] = 42  # not a string
+    reject(rec2, "rule_id")
+
+
+# -- semantic rule: surprisal is -log P in nats, non-negative ----------------
+
+
+def test_negative_surprisal_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    rec["actions"][0]["surprisal"] = -0.5
+    reject(rec, "surprisal")
+
+
+def test_zero_surprisal_is_accepted() -> None:
+    rec = valid_trajectory_record()
+    rec["actions"][0]["surprisal"] = 0.0
+    assert validate_record(rec) == []
+
+
+# -- semantic rule: filtered_or_empty and escalated terminal classes --------
+
+
+def test_filtered_or_empty_is_its_own_class() -> None:
+    # Distinct, valid class on a non-breach run.
+    rec = valid_clean_trajectory()
+    rec["terminal_outcome"] = "filtered_or_empty"
+    assert validate_record(rec) == []
+
+
+def test_filtered_or_empty_never_aggregates_into_breach() -> None:
+    rec = valid_trajectory_record()  # oracle.breach is True
+    rec["terminal_outcome"] = "filtered_or_empty"
+    reject(rec, "terminal_outcome")
+
+
+def test_escalated_is_sanctioned_non_breach() -> None:
+    rec = valid_clean_trajectory()
+    rec["terminal_outcome"] = "escalated"
+    assert validate_record(rec) == []
+
+
+def test_escalated_with_breach_is_rejected() -> None:
+    rec = valid_trajectory_record()  # oracle.breach is True
+    rec["terminal_outcome"] = "escalated"
+    reject(rec, "terminal_outcome")
 
 
 # -- content addressing: refs, not inline ------------------------------------
