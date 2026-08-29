@@ -13,6 +13,7 @@ from .markers import (
     ASSIGNED_TICKET,
     DECLARED_IN_ENVELOPE_FLOOR,
     ONSET_DIST_NOT_ESTIMATED,
+    PROHIBITION_OUT_CEILING,
     explanatory_divergence,
     make_admissible,
     marker_block,
@@ -23,6 +24,7 @@ from .markers import (
 __all__ = [
     "ASSIGNED_TICKET",
     "DECLARED_IN_ENVELOPE_FLOOR",
+    "PROHIBITION_OUT_CEILING",
     "ONSET_DIST_NOT_ESTIMATED",
     "objective_complete",
     "make_admissible",

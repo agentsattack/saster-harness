@@ -328,7 +328,7 @@ def _validate_turns(turns: Any, errors: list) -> None:
         if not isinstance(em, dict):
             _err(errors, f"{p}.envelope_mass", "required object")
         else:
-            for k in ("declared_in", "declared_out", "scored"):
+            for k in ("declared_in", "declared_out", "scored", "prohibition_out"):
                 if not _is_num(em.get(k, None)):
                     _err(errors, f"{p}.envelope_mass.{k}", "required number")
         # content addressing — refs, never inline

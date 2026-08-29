@@ -52,7 +52,7 @@ def valid_trajectory_record() -> dict:
         "turns": [
             {
                 "refusal_prob": 0.02,
-                "envelope_mass": {"declared_in": 0.9, "declared_out": 0.1, "scored": 0.88},
+                "envelope_mass": {"declared_in": 0.9, "declared_out": 0.1, "scored": 1.0, "prohibition_out": 0.05},
                 "prompt_ref": "sha256:aaa",
                 "response_ref": "sha256:bbb",
             }

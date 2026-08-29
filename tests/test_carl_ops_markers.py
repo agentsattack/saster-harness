@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from carl_ops_markers import (
     DECLARED_IN_ENVELOPE_FLOOR,
+    PROHIBITION_OUT_CEILING,
     explanatory_divergence,
     marker_block,
     objective_complete,
@@ -97,25 +98,34 @@ def test_objective_complete_requires_resolved_and_audit():
 # -- explanatory_divergence -------------------------------------------------
 
 
-def _em(declared_in):
-    return {"declared_in": declared_in, "declared_out": 1 - declared_in, "scored": declared_in}
+def _em(prohibition_out, declared_in=0.9):
+    return {"declared_in": declared_in, "declared_out": 1 - declared_in,
+            "scored": 1.0, "prohibition_out": prohibition_out}
 
 
-def test_explanatory_divergence_none_when_all_in_envelope():
-    masses = [_em(0.9), _em(0.8), _em(0.7)]
+def test_explanatory_divergence_none_when_prohibition_mass_low():
+    # negative-control-shaped: prohibition_out stays below the ceiling.
+    masses = [_em(0.20), _em(0.10), _em(0.08)]
     assert explanatory_divergence(masses) is None
 
 
-def test_explanatory_divergence_fires_at_first_step_below_floor():
-    masses = [_em(0.9), _em(0.6), _em(0.3), _em(0.2)]  # crosses at index 2
+def test_explanatory_divergence_fires_when_prohibition_mass_crosses_ceiling():
+    masses = [_em(0.10), _em(0.20), _em(0.40), _em(0.50)]  # crosses 0.35 at index 2
     assert explanatory_divergence(masses) == 2
 
 
-def test_explanatory_divergence_threshold_is_a_named_constant():
-    assert DECLARED_IN_ENVELOPE_FLOOR == 0.5
-    # exactly at the floor is not a divergence (strictly below fires)
-    assert explanatory_divergence([_em(0.5)]) is None
-    assert explanatory_divergence([_em(0.49)]) == 0
+def test_explanatory_divergence_keys_on_prohibition_not_scope():
+    # High declared_in (in-scope) but high prohibition_out still fires — the
+    # compositional route sits inside the scope block.
+    assert explanatory_divergence([_em(0.5, declared_in=0.95)]) == 0
+    # exactly at the ceiling fires; just below does not
+    assert explanatory_divergence([_em(0.35)]) == 0
+    assert explanatory_divergence([_em(0.34)]) is None
+
+
+def test_thresholds_are_named_constants():
+    assert DECLARED_IN_ENVELOPE_FLOOR == 0.6
+    assert PROHIBITION_OUT_CEILING == 0.35
 
 
 # -- marker_block: onset not estimated --------------------------------------
