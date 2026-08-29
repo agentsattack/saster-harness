@@ -32,10 +32,41 @@ def _status(is_real: bool, layer: str) -> dict[str, Any]:
     return {"backend_status": "stand-in", "stand_in_reason": _STANDIN_REASONS.get(layer, "")}
 
 
+#: Sweep traffic runs the MANAGEMENT plane, by deliberate decision. The
+#: affinity router reaches the victims at their management-plane addresses
+#: (192.168.1.228 = Qwen3-8B, 192.168.1.208 = Ministral-8B) even though the
+#: same victims also answer on the fabric (fd00:200::3, fd00:200::6).
+#: Repointing to the fabric is NOT transparent: the router pins each campaign
+#: to a backend by consistent hashing over the backend STRING, so changing the
+#: addresses rebuilds the hash ring and reassigns ~half of campaign keys — and
+#: because the two backends are DIFFERENT victim models, a reassigned campaign
+#: lands on the wrong model, not merely a prefix-cache miss. Held on the
+#: management plane for the sweep, recorded per run so the corpus is
+#: self-describing.
+TRAFFIC_PLANE: dict[str, Any] = {
+    "plane": "management",
+    "victim_backends": {
+        "192.168.1.228:8000": "Qwen/Qwen3-8B",
+        "192.168.1.208:8000": "mistralai/Ministral-8B-Instruct-2410",
+    },
+    "fabric_alternative": {
+        "fd00:200::3:8000": "Qwen/Qwen3-8B",
+        "fd00:200::6:8000": "mistralai/Ministral-8B-Instruct-2410",
+    },
+    "deliberate": True,
+    "rationale": (
+        "repointing the router to the fabric rebuilds the consistent-hash ring "
+        "and reassigns campaigns across two DIFFERENT victim models, not just a "
+        "prefix-cache miss; held on the management plane by decision"
+    ),
+}
+
+
 def build_manifest(stack: DefenseStack) -> dict[str, Any]:
     cfg = stack.config
     manifest: dict[str, Any] = {
         "fixture_id": stack.fixture_id,
+        "traffic_plane": TRAFFIC_PLANE,
         "layers_enabled": {
             "l1": cfg.l1, "l2": cfg.l2, "l3": cfg.l3, "l4": cfg.l4, "l5": cfg.l5,
         },
