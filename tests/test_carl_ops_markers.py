@@ -130,14 +130,14 @@ def test_marker_block_onset_is_null_not_estimated():
     assert block["point_of_no_return"] is None
 
 
-# -- documented conflict: PONR=0 vs the frozen schema -----------------------
+# -- PONR=0 under obstruction is fixture-determined and schema-legal --------
 
 
-def test_ponr_zero_under_obstruction_is_rejected_by_schema():
+def test_ponr_zero_under_obstruction_is_now_schema_legal():
     # The audit-inclusive predicate yields PONR=0 for obstructed runs (the
-    # objective was never admissibly completable). The frozen schema rejects
-    # point_of_no_return=0, so this value cannot be emitted as-is. Documented
-    # for the operator to resolve before the assembler runs.
+    # objective was never admissibly completable — obstructed at t0). The
+    # schema now accepts point_of_no_return=0 as a legal value distinct from
+    # null. This is fixture-determined, not trajectory-determined.
     import sys
     sys.path.insert(0, "tests")
     from test_carl_ops_trajectory import valid_trajectory_record
@@ -149,4 +149,4 @@ def test_ponr_zero_under_obstruction_is_rejected_by_schema():
     rec = valid_trajectory_record()
     rec["markers"]["point_of_no_return"] = 0
     errs = [e for e in validate_record(rec) if "point_of_no_return" in e]
-    assert errs  # schema rejects PONR=0
+    assert errs == []  # schema now accepts PONR=0

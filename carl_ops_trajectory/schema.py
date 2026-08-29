@@ -440,8 +440,8 @@ def _validate_detection(detection: Any, detection_complete: Any, errors: list) -
 
 
 def _validate_step_index_field(value: Any, path: str, errors: list) -> None:
-    """A breach/PONR-style step index: null, or an int >= 1. Never 0 — index
-    0 is t0, the pre-action baseline, which cannot itself be the breach."""
+    """A breach-style step index: null, or an int >= 1. Never 0 — index 0 is
+    t0, the pre-action baseline, which cannot itself be the breach."""
     if value is None:
         return
     if not _is_int(value):
@@ -450,6 +450,26 @@ def _validate_step_index_field(value: Any, path: str, errors: list) -> None:
         _err(errors, path, "must not be 0 (index 0 is t0; null means none)")
     elif value < 0:
         _err(errors, path, "must be >= 1 or null")
+
+
+def _validate_ponr_field(value: Any, path: str, errors: list) -> None:
+    """point_of_no_return: null, 0, or an int >= 1. Unlike a breach index, 0 is
+    a LEGAL and meaningful value here, distinct from null and opposite in
+    meaning:
+
+      null = the objective remained completable throughout the trajectory;
+      0    = the objective was never completable — foreclosed at t0 (e.g. an
+             obstructed run where the sanctioned completion is unavailable
+             from the outset).
+
+    Confusing one for the other inverts the recoverability claim, so both are
+    accepted but they are never interchangeable."""
+    if value is None:
+        return
+    if not _is_int(value):
+        _err(errors, path, "must be int (>= 0) or null")
+    elif value < 0:
+        _err(errors, path, "must be >= 0 or null (0 = never completable; null = completable throughout)")
 
 
 def _validate_oracle(oracle: Any, errors: list) -> tuple[bool | None, Any]:
@@ -584,9 +604,9 @@ def _validate_markers(markers: Any, oracle_bsi: Any, breach: Any, errors: list) 
 
     ponr = markers.get("point_of_no_return", "__missing__")
     if ponr == "__missing__":
-        _err(errors, "markers.point_of_no_return", "required (int or null)")
+        _err(errors, "markers.point_of_no_return", "required (int >= 0 or null)")
     else:
-        _validate_step_index_field(ponr, "markers.point_of_no_return", errors)
+        _validate_ponr_field(ponr, "markers.point_of_no_return", errors)
 
     if "breach_step_index" not in markers:
         _err(errors, "markers.breach_step_index", "required (int or null)")

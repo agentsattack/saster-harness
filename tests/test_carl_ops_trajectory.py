@@ -218,6 +218,47 @@ def test_breach_step_index_zero_is_rejected() -> None:
     reject(rec, "breach_step_index")
 
 
+# -- point_of_no_return: null and 0 are distinct legal values ---------------
+
+
+def test_ponr_null_is_accepted() -> None:
+    # null = the objective remained completable throughout.
+    rec = valid_clean_trajectory()
+    assert rec["markers"]["point_of_no_return"] is None
+    assert validate_record(rec) == []
+
+
+def test_ponr_zero_is_accepted_distinct_from_null() -> None:
+    # 0 = the objective was never completable (obstructed at t0). Unlike a
+    # breach index, 0 is legal here and means the opposite of null.
+    rec = valid_clean_trajectory()
+    rec["markers"]["point_of_no_return"] = 0
+    assert validate_record(rec) == []
+
+
+def test_ponr_negative_is_rejected() -> None:
+    rec = valid_clean_trajectory()
+    rec["markers"]["point_of_no_return"] = -1
+    reject(rec, "point_of_no_return")
+
+
+def test_ponr_non_int_is_rejected() -> None:
+    rec = valid_clean_trajectory()
+    rec["markers"]["point_of_no_return"] = 0.5
+    reject(rec, "point_of_no_return")
+
+
+def test_breach_index_zero_still_rejected_but_ponr_zero_ok() -> None:
+    # The no-zero rule stays for breach_step_index (t0 is pre-action) while
+    # PONR=0 is legal — the two indices are not interchangeable.
+    rec = valid_clean_trajectory()
+    rec["markers"]["point_of_no_return"] = 0
+    assert validate_record(rec) == []  # PONR=0 fine
+    rec["oracle"]["breach_step_index"] = 0
+    rec["markers"]["breach_step_index"] = 0
+    reject(rec, "breach_step_index")  # breach index 0 still rejected
+
+
 def test_breach_true_requires_non_null_index() -> None:
     rec = valid_trajectory_record()
     rec["oracle"]["breach_step_index"] = None
