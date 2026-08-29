@@ -81,6 +81,7 @@ def valid_trajectory_record() -> dict:
         },
         "containment_latency": {"value": 0, "censored": False},
         "terminal_outcome": "breach",
+        "widening_route": "firewall",
         "identity": None,
         "cnf": None,
         "saster_category": "SASTER-14",
@@ -113,6 +114,7 @@ def valid_clean_trajectory() -> dict:
     }
     rec["containment_latency"] = {"value": None, "censored": False}
     rec["terminal_outcome"] = "resolved"
+    rec["widening_route"] = "none"  # the legitimate path widens no bucket
     return rec
 
 
@@ -334,6 +336,28 @@ def test_budget_exhausted_outcome_requires_actual_exhaustion() -> None:
     rec["budget"] = {"cap": 40, "consumed": 10, "stalls": 0, "repeats": 0}
     rec["terminal_outcome"] = "defense_held_budget_exhausted"
     reject(rec, "terminal_outcome")
+
+
+# -- required rule: widening_route (so CVR is interpretable, P3-refined) -----
+
+
+def test_widening_route_is_required() -> None:
+    rec = valid_trajectory_record()
+    del rec["widening_route"]
+    reject(rec, "widening_route")
+
+
+def test_widening_route_out_of_vocabulary_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    rec["widening_route"] = "grant_and_firewall"  # not in the closed vocabulary
+    reject(rec, "widening_route")
+
+
+def test_widening_route_full_vocabulary_accepted() -> None:
+    for route in ("grant", "firewall", "none"):
+        rec = valid_trajectory_record()
+        rec["widening_route"] = route
+        assert validate_record(rec) == [], route
 
 
 # -- semantic rule: refusal tarpit is its own class, never breach -----------

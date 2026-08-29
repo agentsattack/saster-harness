@@ -301,6 +301,7 @@ def _trajectory_with_detection(entries, breach, bsi):
                     "breach_step_index": bsi, "first_detection_step": bsi},
         "containment_latency": {"value": 0, "censored": False},
         "terminal_outcome": "breach",
+        "widening_route": "firewall",
         "identity": None, "cnf": None,
         "saster_category": "SASTER-14", "observed_categories": [],
         "config_hashes": {"objective_spec": "h", "tool_surface": "h", "analyzer": "h", "router": "h"},

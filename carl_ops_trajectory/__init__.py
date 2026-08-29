@@ -17,6 +17,7 @@ from .schema import (
     REFUSAL_TYPES,
     SCHEMA_VERSION,
     TERMINAL_OUTCOMES,
+    WIDENING_ROUTES,
     validate_jsonl,
     validate_record,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "REFUSAL_TYPES",
     "TERMINAL_OUTCOMES",
     "POLICY_VERDICTS",
+    "WIDENING_ROUTES",
     "DETECTION_ACTIONS",
     "DETECTION_STATUSES",
     "validate_record",
