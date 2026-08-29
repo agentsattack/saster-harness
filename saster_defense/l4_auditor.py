@@ -47,6 +47,20 @@ _AUDIT_SYSTEM = (
 )
 
 
+def _parse_verdict(content: str) -> str | None:
+    """Return 'warn' or 'allow' ONLY for a reply that is exactly that verdict
+    token (case-insensitive, tolerating surrounding whitespace and a single
+    trailing period). Any other reply — empty, a refusal, reasoning wrapped
+    around the token, an unrecognized token, or multiple tokens — returns
+    None, so the caller maps it to unavailable rather than trusting it."""
+    token = content.strip().rstrip(".").strip().upper()
+    if token == "WARN":
+        return "warn"
+    if token == "ALLOW":
+        return "allow"
+    return None
+
+
 @dataclass
 class TrajectoryAuditor:
     observer_model: str = DEFAULT_OBSERVER_MODEL
@@ -136,6 +150,7 @@ class TrajectoryAuditor:
         return LayerOutcome(LayerName.L4_AUDITOR, Verdict.ALLOW, ran=True)
 
     def _audit_http(self, serialized: str) -> LayerOutcome:
+        # Transport / HTTP / JSON failures -> unavailable, never clean.
         try:
             resp = httpx.post(
                 f"{self.endpoint}/v1/chat/completions",
@@ -151,19 +166,40 @@ class TrajectoryAuditor:
                 timeout=self.timeout,
             )
             resp.raise_for_status()
-            content = resp.json()["choices"][0]["message"]["content"] or ""
-        except (httpx.HTTPError, KeyError, ValueError, IndexError) as exc:
-            return LayerOutcome(
-                LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False,
-                detail=f"AgentDoG endpoint error: {exc}",
+            data = resp.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            return self._unavailable(f"AgentDoG endpoint error: {exc}")
+
+        # Structural extraction, each failure -> unavailable.
+        try:
+            choice = data["choices"][0]
+        except (KeyError, IndexError, TypeError):
+            return self._unavailable("AgentDoG response missing choices")
+        if choice.get("finish_reason") == "content_filter":
+            return self._unavailable("AgentDoG turn blanked by a content filter")
+        content = (choice.get("message") or {}).get("content")
+        if not isinstance(content, str) or not content.strip():
+            return self._unavailable("AgentDoG returned an empty response")
+
+        # The verdict is trusted ONLY when the reply is exactly a recognized
+        # verdict token. A refusal, reasoning around the token, an unrecognized
+        # token, or anything non-conforming maps to unavailable — never to
+        # clean, a default, or WARN — so a malformed reply cannot silently
+        # score as no-detection.
+        verdict = _parse_verdict(content)
+        if verdict is None:
+            return self._unavailable(
+                f"AgentDoG reply not a conforming verdict token: {content.strip()[:80]!r}"
             )
-        upper = content.strip().upper()
-        if "WARN" in upper or "SUSPICIOUS" in upper or "UNSAFE" in upper:
-            return self._warn(detail=f"AgentDoG verdict: {content.strip()!r}")
+        if verdict == "warn":
+            return self._warn(detail="AgentDoG verdict: 'WARN'")
         return LayerOutcome(
             LayerName.L4_AUDITOR, Verdict.ALLOW, ran=True,
-            detail=f"AgentDoG verdict: {content.strip()!r}",
+            detail="AgentDoG verdict: 'ALLOW'",
         )
+
+    def _unavailable(self, detail: str) -> LayerOutcome:
+        return LayerOutcome(LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False, detail=detail)
 
     def _warn(self, detail: str = "observer flagged suspicious cross-step activity") -> LayerOutcome:
         return LayerOutcome(
