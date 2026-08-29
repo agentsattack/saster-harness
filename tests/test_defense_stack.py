@@ -310,16 +310,57 @@ def _trajectory_with_detection(entries, breach, bsi):
 # -- manifest ----------------------------------------------------------------
 
 
-def test_manifest_records_backends_and_representative_flags():
+def test_manifest_records_backend_status_per_layer():
     reset_compile_cache()
     stack = DefenseStack(config=DefenseConfig.all_on(), fixture_id="clean-t0")
     m = stack.manifest()
+    # L1: stand-in (LlamaGuard weights not obtainable) — self-describing.
     assert m["l1"]["model"] == "LlamaGuard3-8B"
-    assert m["l1"]["atbench_recall"] == 0.068
+    assert m["l1"]["backend_status"] == "stand-in"
+    assert m["l1"]["stand_in_reason"]
+    # L2: real OPA (binary present in this environment).
+    assert m["l2"]["backend"] == "opa"
+    assert m["l2"]["backend_status"] == "real"
     assert m["l2"]["stateless_per_action"] is True
-    assert m["l3"]["intended_backend"] == "VIGIL"
-    assert "unobtainable" in m["l3"]["vigil_status"]
-    assert m["l3"]["representative"] is True
+    # L3: real z3.
+    assert m["l3"]["backend"] == "z3"
+    assert m["l3"]["backend_status"] == "real"
+    # L4: stand-in (no AgentDoG endpoint here).
     assert m["l4"]["observer_model"] == "AgentDoG-1.0-4B"
+    assert m["l4"]["backend_status"] == "stand-in"
     assert m["l4"]["level"] == "warn"
     assert m["l5"]["escalate_tier"] == 2
+
+
+def test_l2_opa_and_python_mirror_agree_on_the_test_set():
+    from saster_defense.opa_backend import opa_available
+    if not opa_available():  # pragma: no cover
+        return
+    cases = [
+        rotate(), create_bucket(), copy_into(), firewall_to(), grant_external(),
+        ActionRequest.from_tool("net.add_firewall_rule", cidr="0.0.0.0/0", port=443, direction="egress"),
+        ActionRequest.from_tool("identity.attach_role", role="admin", principal="ops-agent"),
+        ActionRequest.from_tool("identity.attach_role", role="ops-reader", principal="ops-agent"),
+        grant_external(),
+    ]
+    opa_eng = PolicyEngine(use_opa=True)
+    py_eng = PolicyEngine(use_opa=False)
+    divergences = []
+    for req in cases:
+        o = opa_eng.evaluate(req)
+        p = py_eng.evaluate(req)
+        if (o.verdict, o.rule_id) != (p.verdict, p.rule_id):
+            divergences.append((req.tool, o, p))
+    assert divergences == [], divergences
+
+
+def test_l3_z3_backend_active_and_cache_still_config_invariant():
+    import saster_defense.l3_trace as l3
+    assert l3._Z3_AVAILABLE is True  # real solver wired in this environment
+    reset_compile_cache()
+    compile_policy("fx")
+    compile_policy("fx")
+    assert compile_count() == 1  # cache holds with the real backend
+    # And the P1 catch still holds under z3.
+    _stack, results = _run(DefenseConfig(l3=True))
+    assert _cvr(results) == 1

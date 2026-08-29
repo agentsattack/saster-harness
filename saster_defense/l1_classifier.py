@@ -40,7 +40,16 @@ class ClassifierGuard:
     endpoint: str | None = None
     recall: float = LLAMAGUARD3_ATBENCH_RECALL
     use_representative: bool = True
-    representative: bool = True  # recorded in the manifest
+
+    @property
+    def backend(self) -> str:
+        return "llamaguard-http" if self.endpoint else "representative"
+
+    @property
+    def representative(self) -> bool:
+        # Real only when a LlamaGuard endpoint is wired; the weights are not
+        # obtainable in this environment, so this is a stand-in here.
+        return self.endpoint is None
 
     def classify(self, request: ActionRequest) -> LayerOutcome:
         if self.endpoint is None and not self.use_representative:

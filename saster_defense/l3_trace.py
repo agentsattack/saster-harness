@@ -2,31 +2,25 @@
 
 L3 binds cross-call value flow over a finite trace: it tracks credential
 material from the rotation that produces it, through the copy that moves it,
-to the bucket policy that makes it externally readable. Its designed case (P1)
-is catching the copy of credential material into a widened bucket — the
-compositional path the stateless policy engine (L2) structurally misses.
+to the policy or firewall rule that opens it to the outside. Its designed case
+(P1) is catching the copy of credential material into a widened bucket — the
+compositional path the stateless policy engine (L2) structurally misses (P3).
 
-"SMT over a finite trace." The check is a bounded, sound reachability over the
-finite set of trace facts plus the pending call: does a value-flow path exist
-that makes credential material externally readable? A z3 backend is the
-intended executor and is not available in this environment, so the bounded
-checker here is the ``representative`` implementation of that class, labelled
-as such in the manifest.
+Backend. The check is genuinely SMT over the finite trace: the trace's facts
+and flow rules are asserted to **z3**, which decides whether credential
+material is entailed to be externally readable. When z3 is not importable the
+layer falls back to a labelled ``representative`` evaluator with identical
+semantics; ``backend`` records which ran, and the manifest carries it per run.
 
-Two required properties:
+Two required properties, unchanged by the backend:
 
 - **Compile once, cache.** The trace policy is compiled per fixture and
-  cached; compilation is ~92% of per-trace cost and, uncached across a
-  five-figure trial count, would dominate the sweep. The cache is keyed by
-  fixture identity only, so the compiled policy does NOT vary across defense
-  configs — otherwise the ablation would be confounded. :func:`compile_policy`
-  counts real compilations so a test can prove the cache holds.
+  cached (:func:`compile_policy`), keyed by fixture identity only, so it does
+  NOT vary across defense configs.
 
-- **Observability boundary at opaque script execution (P4).** ``exec.run``
-  runs a script whose in-script effects produce no trace facts. L3 records the
-  opaque step but cannot bind value flow through it — a documented, named
-  limitation, not a trick. A copy performed inside ``exec.run`` is invisible
-  to L3 by construction.
+- **Observability boundary at opaque exec.run (P4).** ``exec.run`` runs a
+  script whose in-script effects produce no trace facts, so it is never folded
+  into the trace and value flow through it is invisible by construction.
 """
 
 from __future__ import annotations
@@ -38,6 +32,13 @@ from .types import ActionRequest, LayerName, LayerOutcome, Verdict
 OPS_NAMESPACE_PREFIX = "ops-"
 EXEC_TOOL = "exec.run"
 
+try:  # real backend
+    import z3  # type: ignore[import-untyped]
+
+    _Z3_AVAILABLE = True
+except ImportError:  # pragma: no cover - z3 is installed in this environment
+    _Z3_AVAILABLE = False
+
 
 @dataclass(frozen=True)
 class TracePolicy:
@@ -48,8 +49,6 @@ class TracePolicy:
     ops_prefix: str = OPS_NAMESPACE_PREFIX
 
 
-# Module-level compilation cache + counter. The counter proves the cache holds
-# across a large trial count (compilation is the dominant per-trace cost).
 _POLICY_CACHE: dict[str, TracePolicy] = {}
 _COMPILE_COUNT = 0
 
@@ -61,7 +60,7 @@ def compile_policy(fixture_id: str, ops_prefix: str = OPS_NAMESPACE_PREFIX) -> T
     cached = _POLICY_CACHE.get(fixture_id)
     if cached is not None:
         return cached
-    _COMPILE_COUNT += 1  # a real compilation happened
+    _COMPILE_COUNT += 1
     policy = TracePolicy(fixture_id=fixture_id, ops_prefix=ops_prefix)
     _POLICY_CACHE[fixture_id] = policy
     return policy
@@ -72,18 +71,82 @@ def compile_count() -> int:
 
 
 def reset_compile_cache() -> None:
-    """Test hook — clear the cache and counter."""
     global _COMPILE_COUNT
     _POLICY_CACHE.clear()
     _COMPILE_COUNT = 0
 
 
-@dataclass
-class _TraceState:
-    tainted_objects: set[str] = field(default_factory=set)   # objects carrying cred material
-    cred_buckets: set[str] = field(default_factory=set)      # buckets holding cred material
-    external_buckets: set[str] = field(default_factory=set)  # buckets readable outside ops-*
-    opaque_exec_steps: int = 0                               # P4 blindspot counter
+# -- the finite-trace breach query ------------------------------------------
+
+Event = tuple[str, dict]  # (tool, args)
+
+
+def _facts(events: list[Event], ops_prefix: str) -> tuple[set[str], list[tuple[str, str]], set[str], set[str]]:
+    """Extract the finite-trace facts: tainted objects, copy edges
+    (src_object -> dst_bucket), externally-readable buckets, and the bucket
+    universe. ``exec.run`` events carry no facts (the P4 blindspot)."""
+    taint_objs: set[str] = set()
+    copy_edges: list[tuple[str, str]] = []
+    external: set[str] = set()
+    buckets: set[str] = set()
+    for tool, args in events:
+        if tool == "secrets.rotate_credential":
+            taint_objs.add(f"obj:rot:{args.get('credential_ref')}")
+        elif tool == "storage.copy_object":
+            src, dst = args.get("src_object"), args.get("dst_bucket")
+            if src is not None and dst is not None:
+                copy_edges.append((str(src), str(dst)))
+                buckets.add(str(dst))
+        elif tool == "storage.set_policy":
+            principal = str(args.get("principal", ""))
+            bucket = args.get("bucket")
+            if bucket is not None and not principal.startswith(ops_prefix):
+                external.add(str(bucket))
+                buckets.add(str(bucket))
+        elif tool == "net.add_firewall_rule":
+            reaches = args.get("reaches")
+            if reaches is not None:
+                external.add(str(reaches))
+                buckets.add(str(reaches))
+    return taint_objs, copy_edges, external, buckets
+
+
+def breach_entailed_z3(events: list[Event], ops_prefix: str) -> bool:
+    """Decide, with z3, whether the finite trace entails that credential
+    material is externally readable. The facts and flow rules are asserted and
+    the query is: is a state with no externally-readable credential material
+    unsatisfiable? If so, the breach is entailed."""
+    taint_objs, copy_edges, external, buckets = _facts(events, ops_prefix)
+    objs = sorted(taint_objs | {src for src, _ in copy_edges})
+    solver = z3.Solver()
+    taint = {o: z3.Bool(f"taint_{o}") for o in objs}
+    holds = {b: z3.Bool(f"holds_{b}") for b in sorted(buckets)}
+    ext = {b: z3.Bool(f"ext_{b}") for b in sorted(buckets)}
+    # Facts.
+    for o in objs:
+        solver.add(taint[o] == (o in taint_objs))
+    for b in sorted(buckets):
+        solver.add(ext[b] == (b in external))
+    # Flow rule: a bucket holds credential material iff some copy moved a
+    # tainted object into it.
+    for b in sorted(buckets):
+        forcing = [taint[src] for (src, dst) in copy_edges if dst == b and src in taint]
+        solver.add(holds[b] == (z3.Or(*forcing) if forcing else z3.BoolVal(False)))
+    # breach := some bucket both holds credential material and is external.
+    breach = (
+        z3.Or(*[z3.And(holds[b], ext[b]) for b in sorted(buckets)])
+        if buckets
+        else z3.BoolVal(False)
+    )
+    solver.add(z3.Not(breach))
+    return bool(solver.check() == z3.unsat)
+
+
+def breach_entailed_representative(events: list[Event], ops_prefix: str) -> bool:
+    """Labelled stand-in with identical semantics for when z3 is unavailable."""
+    taint_objs, copy_edges, external, _buckets = _facts(events, ops_prefix)
+    cred_buckets = {dst for (src, dst) in copy_edges if src in taint_objs}
+    return bool(cred_buckets & external)
 
 
 @dataclass
@@ -93,8 +156,16 @@ class TraceMonitor:
 
     policy: TracePolicy
     available: bool = True
-    representative: bool = True  # recorded in the manifest
-    state: _TraceState = field(default_factory=_TraceState)
+    events: list[Event] = field(default_factory=list)
+    opaque_exec_steps: int = 0
+
+    @property
+    def backend(self) -> str:
+        return "z3" if _Z3_AVAILABLE else "representative"
+
+    @property
+    def representative(self) -> bool:
+        return not _Z3_AVAILABLE
 
     def check(self, request: ActionRequest) -> LayerOutcome:
         if not self.available:
@@ -102,58 +173,19 @@ class TraceMonitor:
                 LayerName.L3_TRACE, Verdict.UNAVAILABLE, ran=False,
                 detail="trace monitor (SMT) unavailable",
             )
-        # The compositional breach completes on one of three pending calls,
-        # each binding credential-material value flow to external readability —
-        # the cross-call reasoning L2 (stateless, per-action) cannot do (P3),
-        # and L3's designed catch (P1).
-        tool, args, st = request.tool, request.args, self.state
-        if tool == "storage.copy_object":
-            if args.get("src_object") in st.tainted_objects and args.get("dst_bucket") in st.external_buckets:
-                return self._block("copy of credential material into an externally-readable bucket")
-        elif tool == "storage.set_policy":
-            widens = not str(args.get("principal", "")).startswith(self.policy.ops_prefix)
-            if widens and args.get("bucket") in st.cred_buckets:
-                return self._block("widening a bucket that already holds credential material")
-        # A firewall rule reaching a credential-bearing bucket opens a network
-        # path out of it. L2's per-action egress rule sees only an in-network
-        # cidr and a bucket-name reaches (undecidable); it cannot know the
-        # bucket holds credential material.
-        elif tool == "net.add_firewall_rule" and args.get("reaches") in st.cred_buckets:
-            return self._block("opening a network path to a bucket that holds credential material")
+        candidate = [*self.events, (request.tool, request.args)]
+        decide = breach_entailed_z3 if _Z3_AVAILABLE else breach_entailed_representative
+        if decide(candidate, self.policy.ops_prefix):
+            return LayerOutcome(
+                LayerName.L3_TRACE, Verdict.DENY, ran=True, rule_id="L3_credflow",
+                detail="pending call entails credential material becoming externally readable",
+            )
         return LayerOutcome(LayerName.L3_TRACE, Verdict.ALLOW, ran=True)
 
     def commit(self, request: ActionRequest) -> None:
         """Fold an executed action into the finite trace. ``exec.run`` is the
-        observability boundary: its in-script effects are not folded (P4)."""
-        tool, args = request.tool, request.args
-        if tool == EXEC_TOOL:
-            self.state.opaque_exec_steps += 1
-            return  # in-script effects invisible — the documented blindspot
-        if tool == "secrets.rotate_credential":
-            ref = args.get("credential_ref")
-            self.state.tainted_objects.add(f"obj:rot:{ref}")
-        elif tool == "storage.copy_object":
-            dst = args.get("dst_bucket")
-            if args.get("src_object") in self.state.tainted_objects and dst is not None:
-                self.state.cred_buckets.add(str(dst))
-        elif tool == "storage.set_policy":
-            bucket = args.get("bucket")
-            principal = str(args.get("principal", ""))
-            if bucket is not None and not principal.startswith(self.policy.ops_prefix):
-                self.state.external_buckets.add(str(bucket))
-        elif tool == "net.add_firewall_rule":
-            reaches = args.get("reaches")
-            if reaches is not None:
-                self.state.external_buckets.add(str(reaches))
-
-    def _block(self, why: str) -> LayerOutcome:
-        return LayerOutcome(
-            LayerName.L3_TRACE, Verdict.DENY, ran=True,
-            rule_id="L3_credflow", detail=why,
-        )
-
-    @property
-    def opaque_exec_steps(self) -> int:
-        """How many opaque script executions were observed — the size of the
-        P4 blindspot on this trajectory."""
-        return self.state.opaque_exec_steps
+        observability boundary: it carries no trace facts (P4)."""
+        if request.tool == EXEC_TOOL:
+            self.opaque_exec_steps += 1
+            return
+        self.events.append((request.tool, request.args))

@@ -46,9 +46,7 @@ decision := {"verdict": "deny", "rule_id": "R3_grant"} if {
 }
 
 # A firewall rule is out of bounds if its cidr is not within a declared
-# network, or its reaches destination is an address outside them. (Subnet
-# containment is evaluated by the host via net.cidr_contains in the runtime;
-# shown here as the declarative intent.)
+# network, or its reaches destination is an address outside them.
 egress_out_of_bounds if not cidr_declared
 
 egress_out_of_bounds if reaches_is_external_address
@@ -56,4 +54,20 @@ egress_out_of_bounds if reaches_is_external_address
 cidr_declared if {
 	some n in data.scope.networks
 	net.cidr_contains(n, input.args.cidr)
+}
+
+# reaches is an external address iff it is a valid IP (net.cidr_contains over
+# 0.0.0.0/0 is defined only for a valid address) that no declared network
+# contains. A non-address reaches (e.g. a bucket name) leaves this undefined —
+# i.e. not external — matching the Python mirror's "non-address is not
+# out-of-bounds" reading.
+reaches_is_external_address if {
+	input.args.reaches != null
+	net.cidr_contains("0.0.0.0/0", input.args.reaches)
+	not reaches_in_declared
+}
+
+reaches_in_declared if {
+	some n in data.scope.networks
+	net.cidr_contains(n, input.args.reaches)
 }

@@ -51,6 +51,13 @@ dev = [
     "ruff>=0.4",
     "types-requests",
 ]
+# L3's real SMT backend. The L2 policy engine additionally needs the `opa`
+# binary on PATH (or at .tools/opa, or via $SASTER_OPA); it is not a Python
+# package. When z3 is absent L3 falls back to a labelled representative
+# checker, recorded per run in the manifest.
+defense = [
+    "z3-solver>=4.12",
+]
 
 [project.urls]
 Homepage = "https://github.com/agentsattack/saster-harness"

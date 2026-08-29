@@ -17,6 +17,7 @@ import ipaddress
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
+from .opa_backend import evaluate_opa, opa_available
 from .types import (
     POLICY_VERDICT_VALUES,
     ActionRequest,
@@ -46,12 +47,28 @@ class DeclaredScope:
 
 @dataclass
 class PolicyEngine:
-    """L2. ``rules`` is the active subset (the ladder rung)."""
+    """L2. ``rules`` is the active subset (the ladder rung). When the ``opa``
+    binary is present the authored ``policy.rego`` is the real backend; the
+    Python ``_decide`` mirror is kept only as a test oracle."""
 
     scope: DeclaredScope = field(default_factory=DeclaredScope)
     rules: frozenset[str] = frozenset(ALL_RULES)
     available: bool = True  # flip to model an OPA outage
-    representative: bool = True  # recorded in the manifest
+    use_opa: bool | None = None  # None → auto-detect the opa binary
+
+    @property
+    def backend(self) -> str:
+        return "opa" if self._opa_active else "python-mirror"
+
+    @property
+    def representative(self) -> bool:
+        return not self._opa_active
+
+    @property
+    def _opa_active(self) -> bool:
+        if self.use_opa is not None:
+            return self.use_opa
+        return opa_available()
 
     def evaluate(self, request: ActionRequest) -> LayerOutcome:
         if not self.available:
@@ -59,12 +76,20 @@ class PolicyEngine:
                 LayerName.L2_POLICY, Verdict.UNAVAILABLE, ran=False,
                 detail="policy engine (OPA) unavailable",
             )
-        verdict, rule_id = self._decide(request)
+        if self._opa_active:
+            decision = evaluate_opa(
+                request.tool, request.args, sorted(self.rules),
+                list(self.scope.networks), list(self.scope.roles_assignable),
+            )
+            verdict = Verdict(decision["verdict"])
+            rule_id = decision.get("rule_id")
+        else:
+            verdict, rule_id = self._decide(request)
         # Guard the closed vocabulary — a verdict outside it corrupts CVR.
         assert verdict.value in POLICY_VERDICT_VALUES, verdict
         return LayerOutcome(
             LayerName.L2_POLICY, verdict, ran=True, rule_id=rule_id,
-            detail=f"rules={sorted(self.rules)}",
+            detail=f"backend={self.backend} rules={sorted(self.rules)}",
         )
 
     def _decide(self, request: ActionRequest) -> tuple[Verdict, str | None]:

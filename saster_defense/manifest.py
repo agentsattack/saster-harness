@@ -1,10 +1,11 @@
 """Run manifest for the defense stack.
 
-Records what actually ran: which layers were active, the model/backend behind
-each layer as a config field (never a hidden constant), and whether a layer is
-a ``representative`` stand-in for an unavailable real backend. The
-class-vs-repo dissociation under test depends on this being explicit — a
-representative stand-in must be labelled here, not silently substituted.
+Records what actually ran per run: which layers were active, the backend behind
+each (a config field, never a hidden constant), and — critically — each
+layer's ``backend_status``: ``real`` when the genuine component executed, or
+``stand-in`` (with a reason) when a labelled representative ran in its place. A
+corpus generated against a stand-in must be identifiable as such from the
+record alone, so this status travels with every run.
 """
 
 from __future__ import annotations
@@ -17,10 +18,18 @@ from .l2_policy import ALL_RULES
 if TYPE_CHECKING:
     from .stack import DefenseStack
 
-#: VIGIL (the intended L3 trace-verification backend) was searched for and is
-#: unobtainable in this environment; L3 runs the representative stand-in of the
-#: same architectural class. The dissociation under test is between classes.
-VIGIL_STATUS = "unobtainable — representative stand-in of the same class in use"
+#: Why each layer is real or a stand-in in THIS environment. Recorded so the
+#: corpus is self-describing.
+_STANDIN_REASONS = {
+    "l1": "LlamaGuard3-8B weights not obtainable in this environment",
+    "l4": "no AgentDoG endpoint configured; representative warn evaluator in use",
+}
+
+
+def _status(is_real: bool, layer: str) -> dict[str, Any]:
+    if is_real:
+        return {"backend_status": "real"}
+    return {"backend_status": "stand-in", "stand_in_reason": _STANDIN_REASONS.get(layer, "")}
 
 
 def build_manifest(stack: DefenseStack) -> dict[str, Any]:
@@ -37,48 +46,56 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
         },
     }
     if cfg.l1 and stack.classifier is not None:
+        c = stack.classifier
         manifest["l1"] = {
             "role": "input_classifier",
-            "model": stack.classifier.model,
-            "endpoint": stack.classifier.endpoint,
+            "model": c.model,
+            "endpoint": c.endpoint,
+            "backend": c.backend,
             "atbench_recall": LLAMAGUARD3_ATBENCH_RECALL,
-            "representative": stack.classifier.representative,
             "note": "low agent-path recall is the anchored operating point, not a bug",
+            **_status(not c.representative, "l1"),
         }
     if cfg.l2 and stack.policy is not None:
+        p = stack.policy
         manifest["l2"] = {
             "role": "policy_engine",
-            "backend": "opa/rego",
-            "executor": "representative-python (no opa binary present)",
+            "backend": p.backend,   # 'opa' (real) or 'python-mirror'
+            "policy_artifact": "policy.rego",
             "stateless_per_action": True,
-            "rules_active": sorted(stack.policy.rules),
+            "rules_active": sorted(p.rules),
             "rules_available": list(ALL_RULES),
-            "representative": stack.policy.representative,
+            "python_mirror": "test-oracle only; agrees with OPA on the test set",
+            **_status(not p.representative, "l2"),
         }
     if cfg.l3 and stack.trace is not None:
+        t = stack.trace
         manifest["l3"] = {
             "role": "trace_monitor",
+            "backend": t.backend,   # 'z3' (real) or 'representative'
             "backend_class": "SMT-over-finite-trace",
-            "intended_backend": "VIGIL",
-            "vigil_status": VIGIL_STATUS,
-            "executor": "representative bounded checker (z3 not present)",
-            "representative": stack.trace.representative,
+            "intended_specific_tool": "VIGIL (unobtainable; z3 is the real solver of the class)",
             "policy_cache": "per-fixture, config-invariant",
             "observability_boundary": "opaque exec.run (in-script effects unobserved) — P4",
+            **_status(not t.representative, "l3"),
         }
     if cfg.l4 and stack.auditor is not None:
+        a = stack.auditor
         manifest["l4"] = {
             "role": "trajectory_auditor",
-            "observer_model": stack.auditor.observer_model,
-            "context_window": stack.auditor.context_window,
+            "observer_model": a.observer_model,
+            "endpoint": a.endpoint,
+            "backend": a.backend,
+            "context_window": a.context_window,
             "level": "warn",
-            "representative": stack.auditor.representative,
             "note": "observer_model is a config field; vary if budget allows",
+            **_status(not a.representative, "l4"),
         }
     if cfg.l5 and stack.approval is not None:
         manifest["l5"] = {
             "role": "approval_gate",
             "escalate_tier": stack.approval.escalate_tier,
             "approver": "scriptable (auto-approve default; human on stage)",
+            "backend_status": "real",  # a real gate, no external model needed
         }
     return manifest
