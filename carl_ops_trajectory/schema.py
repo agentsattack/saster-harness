@@ -126,6 +126,17 @@ TERMINAL_OUTCOMES = {
 #: different claims and the corpus must keep them apart.
 ONSET_STATUSES = {"estimated", "not_estimated"}
 
+#: Whether ``envelope_mass.scored`` holds a measurement — a CLOSED enum
+#: (AMENDMENT 3; see ``docs/schema-amendments.md``). ``scored`` was specified
+#: as a number and every producer emitted a hardcoded 1.0, because the softmax
+#: denominator is the closed candidate set and sums to 1 whatever the model
+#: does. The status separates "we measured the accounted-for mass" from "this
+#: method cannot measure it", so a constant can no longer validate as data.
+#: The field is OPTIONAL: when it is absent the pre-amendment rule applies and
+#: ``scored`` must be a number, so records written before the amendment stay
+#: valid and absence cannot be used to smuggle a null through.
+SCORED_STATUSES = {"computed", "not_computed"}
+
 #: Policy-engine verdict vocabulary — a CLOSED enum. CVR is computed by
 #: counting ``deny``, so a drifting verdict vocabulary would silently deflate
 #: that headline. ``unavailable`` is the engine's own down/absent state and
@@ -324,6 +335,39 @@ def _validate_budget(budget: Any, errors: list) -> None:
             _err(errors, f"budget.{k}", "required int >= 0")
 
 
+def _validate_scored(em: dict, path: str, errors: list) -> None:
+    """AMENDMENT 3 — ``scored_status`` governs ``scored`` nullability.
+
+    Mirrors the ``onset_status`` / ``onset_dist`` rule. ``scored_status`` is
+    optional; when it is missing or outside the vocabulary the pre-amendment
+    rule applies unchanged (``scored`` must be a number), so pre-amendment
+    records keep validating and a missing status is not a back door for
+    carrying a null.
+    """
+    status = em.get("scored_status")
+    if status is None and "scored_status" not in em:
+        if not _is_num(em.get("scored")):
+            _err(errors, f"{path}.scored", "required number")
+        return
+    if status not in SCORED_STATUSES:
+        _err(errors, f"{path}.scored_status", f"must be one of {sorted(SCORED_STATUSES)}")
+        # Fall back to the pre-amendment rule rather than letting an
+        # unrecognized status excuse the field.
+        if not _is_num(em.get("scored")):
+            _err(errors, f"{path}.scored", "required number")
+        return
+    scored = em.get("scored")
+    if status == "computed":
+        if not _is_num(scored):
+            _err(errors, f"{path}.scored",
+                 "required number when scored_status is 'computed'")
+        elif not (0.0 <= float(scored) <= 1.0):
+            _err(errors, f"{path}.scored", "must be in [0,1]")
+    elif scored is not None:
+        _err(errors, f"{path}.scored",
+             "must be null when scored_status is 'not_computed'")
+
+
 def _validate_turns(turns: Any, errors: list) -> None:
     if not isinstance(turns, list):
         _err(errors, "turns", "required array")
@@ -340,9 +384,10 @@ def _validate_turns(turns: Any, errors: list) -> None:
         if not isinstance(em, dict):
             _err(errors, f"{p}.envelope_mass", "required object")
         else:
-            for k in ("declared_in", "declared_out", "scored", "prohibition_out"):
+            for k in ("declared_in", "declared_out", "prohibition_out"):
                 if not _is_num(em.get(k, None)):
                     _err(errors, f"{p}.envelope_mass.{k}", "required number")
+            _validate_scored(em, f"{p}.envelope_mass", errors)
         # content addressing — refs, never inline
         for k in _TRAJ_INLINE_FORBIDDEN:
             if k in turn:

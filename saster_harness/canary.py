@@ -220,6 +220,54 @@ def run_canary_suite(
     return results
 
 
+class CanaryGateFailed(RuntimeError):
+    """The pre-sweep canary did not measure every victim model.
+
+    Raised instead of returning a flag, because the flag was the problem: the
+    W6c pilot recorded ``all_measured: false`` with one victim at 0/10 and ran
+    its trials anyway. A gate that only annotates the manifest is not a gate,
+    and the corpus it lets through carries a baseline nobody took for one of
+    the models in it.
+    """
+
+
+def enforce_canary_gate(results: dict[str, CanaryResult]) -> None:
+    """Halt unless every victim model produced at least one completed turn.
+
+    An unmeasured model is not a small gap: ``filtered_or_empty_rate`` defaults
+    to 0.0 when nothing completes, so proceeding would silently attribute a
+    measured-zero baseline to a model that was never reached. The error names
+    every unmeasured model and why it was unmeasured, so the failure points at
+    the serving path rather than at this check.
+    """
+    if not results:
+        raise CanaryGateFailed(
+            "pre-sweep canary gate: no models were canaried, so no serving-path "
+            "baseline exists; refusing to start the run"
+        )
+    unmeasured = {m: r for m, r in results.items() if not r.measured}
+    if not unmeasured:
+        return
+    lines = [
+        f"pre-sweep canary gate: {len(unmeasured)} of {len(results)} victim "
+        f"model(s) produced no completed turn (all_measured=false); refusing "
+        f"to start the run"
+    ]
+    for model, r in unmeasured.items():
+        lines.append(
+            f"  {model}: attempted={r.n_attempted} ok={r.ok} "
+            f"filtered_or_empty={r.filtered_or_empty} errors={r.errors}"
+        )
+        # The distinct transport faults, not one line per attempt.
+        for detail in dict.fromkeys(r.error_detail):
+            lines.append(f"      {detail}")
+    lines.append(
+        "  a rate of 0.0 from zero completed turns is an unmeasured zero, not "
+        "a measured one; fix the serving path and re-run the canary"
+    )
+    raise CanaryGateFailed("\n".join(lines))
+
+
 def canary_manifest_block(results: dict[str, CanaryResult]) -> dict[str, Any]:
     """The run manifest's ``canary`` block.
 

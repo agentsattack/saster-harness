@@ -8,10 +8,12 @@ import pytest
 
 from saster_harness.canary import (
     BENIGN_PROMPTS,
+    CanaryGateFailed,
     CanaryResult,
     TurnClass,
     canary_manifest_block,
     classify_turn,
+    enforce_canary_gate,
     run_canary,
     run_canary_suite,
 )
@@ -289,3 +291,92 @@ def test_manifest_block_is_json_serializable():
 
     results = run_canary_suite(["a"], 1, router_factory=factory)
     json.dumps(canary_manifest_block(results))
+
+
+# --------------------------------------------------------------------------
+# the gate blocks
+#
+# The W6c pilot recorded all_measured=false — Qwen3-8B at 0/10, every attempt
+# a routed 404 — and ran its five trials anyway, because nothing consumed the
+# flag. These tests are the difference between a flag and a gate.
+# --------------------------------------------------------------------------
+
+
+def test_gate_passes_when_every_model_was_measured():
+    def factory(model, campaign_id):
+        return FakeRouter(ok(1))
+
+    results = run_canary_suite(["a", "b"], 1, router_factory=factory)
+    enforce_canary_gate(results)  # must not raise
+
+
+def test_gate_blocks_when_a_model_produced_no_completed_turn():
+    """The exact W6c shape: one victim fine, the other unreachable."""
+    def factory(model, campaign_id):
+        if model == "down":
+            return FakeRouter([FakeRouted(response=False, error="HTTP 404")])
+        return FakeRouter(ok(1))
+
+    results = run_canary_suite(["up", "down"], 1, router_factory=factory)
+    assert canary_manifest_block(results)["all_measured"] is False
+    with pytest.raises(CanaryGateFailed):
+        enforce_canary_gate(results)
+
+
+def test_gate_error_names_the_unmeasured_model_and_the_transport_fault():
+    """The error has to point at the serving path, not just say 'gate failed'
+    — the cause of the W6c failure was a routing defect and the message is
+    where an operator finds that."""
+    def factory(model, campaign_id):
+        if model == "down":
+            return FakeRouter([FakeRouted(response=False, error="HTTP 404 from router")])
+        return FakeRouter(ok(1))
+
+    results = run_canary_suite(["up", "down"], 1, router_factory=factory)
+    with pytest.raises(CanaryGateFailed) as exc:
+        enforce_canary_gate(results)
+    message = str(exc.value)
+    assert "down" in message
+    assert "HTTP 404 from router" in message
+    assert "up" not in message.split("\n")[0]
+
+
+def test_gate_blocks_when_no_model_was_canaried_at_all():
+    """No canary is not a passing canary."""
+    with pytest.raises(CanaryGateFailed):
+        enforce_canary_gate({})
+
+
+def test_gate_blocks_even_though_the_unmeasured_rate_reads_zero():
+    """The trap the gate exists for: filtered_or_empty_rate defaults to 0.0
+    when nothing completed, so an unmeasured model looks clean on the number
+    a reader would check."""
+    def factory(model, campaign_id):
+        return FakeRouter([FakeRouted(response=False, error="boom")])
+
+    results = run_canary_suite(["down"], 1, router_factory=factory)
+    assert results["down"].filtered_or_empty_rate == 0.0
+    assert results["down"].measured is False
+    with pytest.raises(CanaryGateFailed):
+        enforce_canary_gate(results)
+
+
+def test_gate_ignores_filtered_turns_which_are_measurements_not_failures():
+    """A model that filters every benign turn HAS been measured — that is the
+    baseline the canary exists to take, and it must not halt the run."""
+    def factory(model, campaign_id):
+        return FakeRouter(blank(2))
+
+    results = run_canary_suite(["filtery"], 2, router_factory=factory)
+    assert results["filtery"].filtered_or_empty_rate == 1.0
+    enforce_canary_gate(results)  # must not raise
+
+
+def test_gate_lists_every_unmeasured_model():
+    def factory(model, campaign_id):
+        return FakeRouter([FakeRouted(response=False, error="x")])
+
+    results = run_canary_suite(["a", "b"], 1, router_factory=factory)
+    with pytest.raises(CanaryGateFailed) as exc:
+        enforce_canary_gate(results)
+    assert "a" in str(exc.value) and "b" in str(exc.value)

@@ -726,3 +726,100 @@ def test_config_hashes_all_four_required() -> None:
         rec = valid_trajectory_record()
         del rec["config_hashes"][key]
         reject(rec, f"config_hashes.{key}")
+
+
+# -- AMENDMENT 3: scored_status governs envelope_mass.scored nullability -----
+#
+# The pre-amendment rule was "scored is a required number". Every producer
+# emitted a hardcoded 1.0, because the softmax denominator is the closed
+# 13-candidate set and sums to 1 whatever the model does — so the field
+# validated as data while measuring nothing, in a corpus meant to be public.
+# The amendment adds envelope_mass.scored_status rather than deleting the
+# field, so "we measured the accounted-for mass" and "this method cannot
+# measure it" stay distinguishable. scored_status is OPTIONAL: absent, the
+# pre-amendment rule applies unchanged, so records written before the
+# amendment keep validating. See docs/schema-amendments.md.
+
+
+def _em(rec: dict) -> dict:
+    return rec["turns"][0]["envelope_mass"]
+
+
+def test_scored_may_be_null_under_not_computed() -> None:
+    rec = valid_trajectory_record()
+    _em(rec).update({"scored": None, "scored_status": "not_computed"})
+    assert validate_record(rec) == []
+
+
+def test_not_computed_with_a_number_is_rejected() -> None:
+    """A sweep that did not compute the mass cannot carry one — this is the
+    exact shape the amendment exists to reject: scored_status says the method
+    cannot measure it, and 1.0 sits in the field anyway."""
+    rec = valid_trajectory_record()
+    _em(rec).update({"scored": 1.0, "scored_status": "not_computed"})
+    reject(rec, "scored")
+
+
+def test_computed_with_a_null_is_rejected() -> None:
+    """A method that claims to have computed the mass owes a number."""
+    rec = valid_trajectory_record()
+    _em(rec).update({"scored": None, "scored_status": "computed"})
+    reject(rec, "scored")
+
+
+def test_computed_accepts_a_real_fraction() -> None:
+    rec = valid_trajectory_record()
+    _em(rec).update({"scored": 0.83, "scored_status": "computed"})
+    assert validate_record(rec) == []
+
+
+def test_computed_rejects_a_value_outside_zero_one() -> None:
+    """It is a mass fraction, so it cannot exceed 1."""
+    rec = valid_trajectory_record()
+    _em(rec).update({"scored": 1.4, "scored_status": "computed"})
+    reject(rec, "scored")
+
+
+def test_scored_status_vocabulary_is_closed() -> None:
+    rec = valid_trajectory_record()
+    _em(rec).update({"scored": None, "scored_status": "partially_computed"})
+    reject(rec, "scored_status")
+
+
+def test_out_of_vocabulary_status_still_demands_a_number() -> None:
+    """An unrecognized status must not excuse the field: the pre-amendment
+    rule applies underneath, so a bogus status plus a null is two errors, not
+    a way through."""
+    rec = valid_trajectory_record()
+    _em(rec).update({"scored": None, "scored_status": "nonsense"})
+    errs = reject(rec, "scored_status")
+    assert any("scored:" in e or "scored " in e for e in errs)
+
+
+def test_omitting_the_status_keeps_the_pre_amendment_rule() -> None:
+    """Backward compatibility in both directions. A record with no status and
+    a number is still valid — the W6c pilot records are exactly this shape and
+    must not be invalidated retroactively."""
+    rec = valid_trajectory_record()
+    _em(rec).pop("scored_status", None)
+    _em(rec)["scored"] = 1.0
+    assert validate_record(rec) == []
+
+
+def test_omitting_the_status_is_not_a_back_door_for_a_null() -> None:
+    """The guard AMENDMENT 2 established: absence of the status cannot be used
+    to carry a null through."""
+    rec = valid_trajectory_record()
+    _em(rec).pop("scored_status", None)
+    _em(rec)["scored"] = None
+    reject(rec, "scored")
+
+
+def test_the_other_three_envelopes_are_still_required_numbers() -> None:
+    """The amendment loosens exactly one field. declared_in, declared_out and
+    prohibition_out are real measurements and stay mandatory."""
+    for key in ("declared_in", "declared_out", "prohibition_out"):
+        rec = valid_trajectory_record()
+        _em(rec).update({"scored": None, "scored_status": "not_computed"})
+        del _em(rec)[key]
+        reject(rec, key)
