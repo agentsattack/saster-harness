@@ -27,6 +27,30 @@ if TYPE_CHECKING:
 #: not one; this is the mechanism that makes that checkable.
 GRRCON_MATRIX_PATH = Path(__file__).resolve().parents[1] / "docs" / "grrcon-test-matrix.md"
 
+#: The envelope-mass pre-registration. Its SHA-256 is a REQUIRED manifest
+#: field, on the same footing as the prediction matrix and for the same
+#: reason. This document fixes the scoring method (MEAN per-token logprob, not
+#: SUM), the 13-candidate set, and both calibrated thresholds —
+#: ``DECLARED_IN_ENVELOPE_FLOOR`` and the ``PROHIBITION_OUT_CEILING`` that
+#: ``explanatory_divergence`` keys on. Those are the semantics the marker is
+#: computed under, so a corpus that does not record which version of them it
+#: ran against cannot be interpreted: a threshold edited after the fact would
+#: silently redefine the marker for every record already published.
+ENVELOPE_PREREG_PATH = (
+    Path(__file__).resolve().parents[1] / "docs" / "envelope-preregistration.md"
+)
+
+#: Required hash fields, each mapping to the function that recomputes it from
+#: the committed bytes. Kept as a table so a third pre-registered document
+#: cannot be added to the manifest without also being validated.
+_REQUIRED_HASH_FIELDS = {
+    "grrcon_matrix_sha256": "the pre-registered prediction-matrix hash",
+    "envelope_preregistration_sha256": (
+        "the envelope-mass pre-registration hash (scoring method, candidate "
+        "set, thresholds)"
+    ),
+}
+
 
 class ManifestError(ValueError):
     """A manifest is missing a required field."""
@@ -37,16 +61,24 @@ def grrcon_matrix_sha256() -> str:
     return hashlib.sha256(GRRCON_MATRIX_PATH.read_bytes()).hexdigest()
 
 
+def envelope_preregistration_sha256() -> str:
+    """SHA-256 of the envelope-mass pre-registration, as committed."""
+    return hashlib.sha256(ENVELOPE_PREREG_PATH.read_bytes()).hexdigest()
+
+
 def validate_manifest(manifest: dict[str, Any]) -> None:
-    """Reject a manifest that lacks the pre-registration hash. A corpus whose
-    manifest carries no ``grrcon_matrix_sha256`` cannot be tied to the
-    predictions it was meant to test, so it is not admissible."""
-    value = manifest.get("grrcon_matrix_sha256")
-    if not isinstance(value, str) or len(value) != 64:
-        raise ManifestError(
-            "manifest missing required grrcon_matrix_sha256 "
-            "(the pre-registered prediction-matrix hash)"
-        )
+    """Reject a manifest that lacks either pre-registration hash.
+
+    A corpus whose manifest carries no ``grrcon_matrix_sha256`` cannot be tied
+    to the predictions it was meant to test; one carrying no
+    ``envelope_preregistration_sha256`` cannot be tied to the scoring method
+    and thresholds its ``explanatory_divergence`` was computed under. Neither
+    is admissible.
+    """
+    for field, description in _REQUIRED_HASH_FIELDS.items():
+        value = manifest.get(field)
+        if not isinstance(value, str) or len(value) != 64:
+            raise ManifestError(f"manifest missing required {field} ({description})")
 
 #: Why each layer is real or a stand-in in THIS environment. Recorded so the
 #: corpus is self-describing.
@@ -97,6 +129,7 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
     manifest: dict[str, Any] = {
         "fixture_id": stack.fixture_id,
         "grrcon_matrix_sha256": grrcon_matrix_sha256(),
+        "envelope_preregistration_sha256": envelope_preregistration_sha256(),
         "traffic_plane": TRAFFIC_PLANE,
         "layers_enabled": {
             "l1": cfg.l1, "l2": cfg.l2, "l3": cfg.l3, "l4": cfg.l4, "l5": cfg.l5,

@@ -133,15 +133,28 @@ a lower bound on divergence, not an estimate of its onset.
 
 ## Hashing note
 
-Neither of these amendments changes `docs/grrcon-test-matrix.md`, which is the
-only doc whose SHA-256 is wired into the run manifest
-(`saster_defense.manifest.grrcon_matrix_sha256`, pinned in
-`tests/test_manifest_prereg.py`). `grrcon_matrix_sha256` is therefore
+Two documents are hashed into the run manifest, both required by
+`saster_defense.manifest.validate_manifest` and both pinned in
+`tests/test_manifest_prereg.py`:
+
+| document | manifest field |
+|---|---|
+| `docs/grrcon-test-matrix.md` | `grrcon_matrix_sha256` |
+| `docs/envelope-preregistration.md` | `envelope_preregistration_sha256` |
+
+Neither amendment above changed either document, so `grrcon_matrix_sha256` is
 unchanged by this work.
 
-`docs/envelope-preregistration.md` describes itself as "committed and hashed
-with the rest of the pre-registration", but no code currently computes a hash
-over it and no test pins one. It is committed, so git history pins it, but it
-is not hashed into any manifest and a change to it would not surface anywhere
-a corpus consumer can see. Worth closing if pre-registration documents are
-meant to be tamper-evident from the record alone.
+The envelope pre-registration was wired in W6b. It had described itself as
+hashed while nothing computed a hash over it — it was pinned only by git
+history, so an edit to the scoring method or either threshold would not have
+surfaced anywhere a corpus consumer could see. It fixes the semantics
+`explanatory_divergence` is computed under, which makes it exactly as
+load-bearing as the prediction matrix.
+
+**This file is deliberately not hashed.** It is an append-only change log, so
+a pinned hash would break on every legitimate amendment and would train
+whoever hits it to update the pin reflexively — which is the habit that makes
+the other two pins worthless. Git history carries this file. The distinction
+is that the hashed documents are *fixed commitments* whose change should be an
+event, while this one is a *record of changes* and is expected to grow.

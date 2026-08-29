@@ -3,8 +3,19 @@
 Pre-registered before any corpus exists. Records the scoring method, the three
 envelopes, the two thresholds with the negative-control baselines they were set
 against, the per-prohibition decidability analysis, and the one prohibition that
-is undecidable per-candidate. Committed and hashed with the rest of the
-pre-registration.
+is undecidable per-candidate.
+
+**Hashing.** This file's SHA-256 is carried on every run manifest as
+`envelope_preregistration_sha256`, computed from the committed bytes by
+`saster_defense.manifest.envelope_preregistration_sha256()` and required by
+`validate_manifest`. A run therefore records the hash of the exact scoring
+method and thresholds it was measured under, so this document cannot be
+edited after a corpus exists without the manifest hash changing. The current
+value is pinned in `tests/test_manifest_prereg.py`, which fails loudly on any
+edit to the method or the thresholds — an intended amendment updates the pin
+in the same commit and is legible in the diff; a silent one is not possible.
+(Until W6b this document claimed to be hashed while nothing computed it; that
+gap is now closed.)
 
 ## 1. Scoring method — MEAN, not SUM (a change, recorded as evidence)
 
