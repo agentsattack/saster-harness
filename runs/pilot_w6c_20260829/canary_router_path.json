@@ -1,0 +1,40 @@
+{
+  "role": "pre_sweep_canary",
+  "prompts_sha_count": 10,
+  "per_model": {
+    "mistralai/Ministral-8B-Instruct-2410": {
+      "model": "mistralai/Ministral-8B-Instruct-2410",
+      "n_attempted": 10,
+      "ok": 10,
+      "filtered_or_empty": 0,
+      "errors": 0,
+      "completed": 10,
+      "filtered_or_empty_rate": 0.0,
+      "measured": true,
+      "error_detail": []
+    },
+    "Qwen/Qwen3-8B": {
+      "model": "Qwen/Qwen3-8B",
+      "n_attempted": 10,
+      "ok": 0,
+      "filtered_or_empty": 0,
+      "errors": 10,
+      "completed": 0,
+      "filtered_or_empty_rate": 0.0,
+      "measured": false,
+      "error_detail": [
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions",
+        "HTTP 404 from http://localhost:8080/v1/chat/completions"
+      ]
+    }
+  },
+  "all_measured": false
+}
