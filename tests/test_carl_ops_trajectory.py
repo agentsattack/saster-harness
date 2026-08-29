@@ -73,6 +73,7 @@ def valid_trajectory_record() -> dict:
             "invariants_fired": ["I4", "I1"],
         },
         "markers": {
+            "onset_status": "estimated",
             "onset_dist": {"steps": [3, 4, 5], "probs": [0.2, 0.3, 0.5]},
             "explanatory_divergence": 0.71,
             "point_of_no_return": 5,
@@ -106,6 +107,7 @@ def valid_clean_trajectory() -> dict:
         "invariants_fired": [],
     }
     rec["markers"] = {
+        "onset_status": "not_estimated",
         "onset_dist": None,  # a clean campaign has no onset (negative control)
         "explanatory_divergence": None,
         "point_of_no_return": None,
@@ -470,13 +472,115 @@ def test_onset_dist_length_mismatch_rejected() -> None:
     reject(rec, "onset_dist")
 
 
-# -- semantic rule: onset_dist nullable only when breach is false -----------
+# -- AMENDMENT 2: onset_status governs onset_dist nullability ---------------
+#
+# The pre-amendment rule was "a null onset is legal only when breach is
+# false", which assumed a breach can always localize an onset. It cannot:
+# onset is inferred, not observed, and a sweep may decline to infer it. The
+# amendment adds markers.onset_status rather than relaxing the null rule, so
+# "not estimated" and "estimated as absent" stay distinguishable. See
+# docs/schema-amendments.md.
 
 
-def test_null_onset_with_breach_is_rejected() -> None:
-    rec = valid_trajectory_record()  # oracle.breach is True
+def test_onset_status_is_required() -> None:
+    rec = valid_trajectory_record()
+    del rec["markers"]["onset_status"]
+    reject(rec, "onset_status")
+
+
+def test_onset_status_vocabulary_is_closed() -> None:
+    rec = valid_trajectory_record()
+    rec["markers"]["onset_status"] = "partially_estimated"
+    reject(rec, "onset_status")
+
+
+def test_onset_status_null_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    rec["markers"]["onset_status"] = None
+    reject(rec, "onset_status")
+
+
+def test_estimated_with_null_onset_is_rejected() -> None:
+    """An estimator that ran owes a distribution."""
+    rec = valid_trajectory_record()
+    rec["markers"]["onset_status"] = "estimated"
     rec["markers"]["onset_dist"] = None
     reject(rec, "onset_dist")
+
+
+def test_not_estimated_with_a_distribution_is_rejected() -> None:
+    """A sweep that did not estimate onset cannot carry one."""
+    rec = valid_trajectory_record()
+    rec["markers"]["onset_status"] = "not_estimated"
+    rec["markers"]["onset_dist"] = {"steps": [3], "probs": [1.0]}
+    reject(rec, "onset_dist")
+
+
+def test_not_estimated_with_a_distribution_is_rejected_on_a_clean_record() -> None:
+    rec = valid_clean_trajectory()
+    rec["markers"]["onset_dist"] = {"steps": [1], "probs": [1.0]}
+    reject(rec, "onset_dist")
+
+
+def test_null_onset_on_a_breach_is_accepted_when_not_estimated() -> None:
+    """The amendment's purpose: a breach can decline to localize onset."""
+    rec = valid_trajectory_record()  # oracle.breach is True
+    rec["markers"]["onset_status"] = "not_estimated"
+    rec["markers"]["onset_dist"] = None
+    assert validate_record(rec) == []
+
+
+def test_null_onset_with_breach_is_still_rejected_when_estimated() -> None:
+    rec = valid_trajectory_record()  # oracle.breach is True
+    rec["markers"]["onset_status"] = "estimated"
+    rec["markers"]["onset_dist"] = None
+    reject(rec, "onset_dist")
+
+
+def test_null_onset_on_a_breach_cannot_slip_through_a_missing_status() -> None:
+    """Omitting onset_status must not become a way to carry a null onset on a
+    breach: the pre-amendment rule still applies when the status is absent."""
+    rec = valid_trajectory_record()  # oracle.breach is True
+    del rec["markers"]["onset_status"]
+    rec["markers"]["onset_dist"] = None
+    errs = reject(rec, "onset_status")
+    assert any("onset_dist" in e for e in errs)
+
+
+def test_estimated_still_enforces_distribution_shape() -> None:
+    """The amendment must not have loosened validation for the estimated
+    case."""
+    rec = valid_trajectory_record()
+    rec["markers"]["onset_status"] = "estimated"
+    rec["markers"]["onset_dist"] = {"steps": [3, 4], "probs": [0.2, 0.2]}
+    reject(rec, "onset_dist.probs")
+
+
+def test_estimated_still_rejects_a_scalar_onset() -> None:
+    rec = valid_trajectory_record()
+    rec["markers"]["onset_status"] = "estimated"
+    rec["markers"]["onset_dist"] = 5
+    reject(rec, "onset_dist")
+
+
+def test_estimated_still_rejects_a_length_mismatch() -> None:
+    rec = valid_trajectory_record()
+    rec["markers"]["onset_status"] = "estimated"
+    rec["markers"]["onset_dist"] = {"steps": [3, 4, 5], "probs": [1.0]}
+    reject(rec, "onset_dist")
+
+
+def test_not_estimated_and_estimated_are_not_interchangeable() -> None:
+    """The distinction the amendment exists to preserve: the same null onset
+    is legal under one status and rejected under the other."""
+    not_est = valid_trajectory_record()
+    not_est["markers"]["onset_status"] = "not_estimated"
+    not_est["markers"]["onset_dist"] = None
+    est = valid_trajectory_record()
+    est["markers"]["onset_status"] = "estimated"
+    est["markers"]["onset_dist"] = None
+    assert validate_record(not_est) == []
+    assert validate_record(est) != []
 
 
 def test_null_onset_clean_is_accepted() -> None:

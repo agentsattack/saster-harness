@@ -42,23 +42,20 @@ builds the block field by field for that reason; it never spreads the verdict
 dataclass wholesale, which would carry ``reasons`` in the moment someone adds
 a field.
 
-A blocked case, surfaced rather than worked around
+Onset
 
-``onset_dist`` is not estimated for this sweep — no estimator is
-pre-registered — so the marker layer emits null. The schema accepts a null
-onset **only when there was no breach**: "a clean campaign has no onset ...
-while a breach must localize an onset distribution". Since the schema also
-requires ``terminal_outcome == "breach"`` exactly when ``oracle.breach`` is
-true, a breach trajectory cannot currently be assembled: null onset is
-rejected, and inventing a distribution would fabricate the very quantity the
-pre-registration declines to estimate.
+``onset_dist`` is not estimated for this sweep, so every record carries
+``markers.onset_status = "not_estimated"`` with a null ``onset_dist``. That
+holds for a breach exactly as for a clean run: onset is inferred rather than
+observed, and declining to infer it is a property of the sweep's method, not
+of the trajectory.
 
-The assembler therefore raises :class:`OnsetDistUnavailable` for a breach
-trajectory instead of emitting an invalid record or a fabricated one. Clean,
-escalated, refusal and filtered trajectories assemble normally. Resolving the
-block is a decision for the record owner — either pre-register an onset
-estimator, or amend the schema to accept a flagged null onset on a breach —
-and not something to paper over at assembly time.
+This used to block breach assembly. The schema previously required "a null
+onset is legal only when breach is false", which assumed a breach can always
+localize an onset — so a breach trajectory had no valid encoding short of
+fabricating a distribution. AMENDMENT 2 replaced that rule with the
+``onset_status`` field (see ``docs/schema-amendments.md``); the assembler now
+emits the status and every path assembles.
 """
 
 from __future__ import annotations
@@ -95,12 +92,6 @@ _RUNNER_OUTCOME_MAP = {
 
 class TrajectoryAssemblyError(RuntimeError):
     """Assembly could not produce a valid record. The record is not emitted."""
-
-
-class OnsetDistUnavailable(TrajectoryAssemblyError):
-    """A breach trajectory needs an onset distribution the sweep does not
-    estimate. See this module's docstring — the resolution is a record-owner
-    decision, not an assembly-time workaround."""
 
 
 class RecordInvalid(TrajectoryAssemblyError):
@@ -246,10 +237,9 @@ def assemble_trajectory_record(
     """Join the three inputs into one validated trajectory record.
 
     Raises :class:`carl_ops_agent.widening.WideningRouteMismatch` if the
-    configured route disagrees with the one derived from terminal state,
-    :class:`OnsetDistUnavailable` for a breach trajectory (see the module
-    docstring), and :class:`RecordInvalid` if the assembled record does not
-    validate. Never returns a record that fails validation.
+    configured route disagrees with the one derived from terminal state, and
+    :class:`RecordInvalid` if the assembled record does not validate. Never
+    returns a record that fails validation.
     """
     breach = bool(verdict.breach)
 
@@ -273,16 +263,6 @@ def assemble_trajectory_record(
     # rather than leaving a reader to guess between "no onset" and "not
     # measured". The schema ignores the extra key; the record keeps the note.
     markers["onset_dist_note"] = ONSET_DIST_NOT_ESTIMATED
-
-    if breach and markers["onset_dist"] is None:
-        raise OnsetDistUnavailable(
-            "breach trajectory requires a non-null markers.onset_dist "
-            "(schema: 'null onset is legal only when breach is false'), but "
-            "onset_dist is not estimated for this sweep and no estimator is "
-            "pre-registered. Refusing to fabricate a distribution or emit an "
-            "invalid record. Resolve by pre-registering an onset estimator or "
-            "amending the schema to accept a flagged null onset on a breach."
-        )
 
     terminal_outcome = derive_terminal_outcome(
         breach=breach,

@@ -17,7 +17,6 @@ from __future__ import annotations
 from carl_ops_markers import ONSET_DIST_NOT_ESTIMATED
 
 from .assembler import (
-    OnsetDistUnavailable,
     RecordInvalid,
     TrajectoryAssemblyError,
     assemble_trajectory_record,
@@ -30,7 +29,6 @@ __all__ = [
     "derive_terminal_outcome",
     "oracle_block",
     "TrajectoryAssemblyError",
-    "OnsetDistUnavailable",
     "RecordInvalid",
     "ONSET_DIST_NOT_ESTIMATED",
 ]

@@ -69,6 +69,13 @@ ONSET_DIST_NOT_ESTIMATED = (
     "onset_dist not estimated for this sweep — no estimator pre-registered"
 )
 
+#: The schema ``markers.onset_status`` value this sweep emits, uniformly.
+#: Onset is inferred rather than observed, and this sweep declines to infer it,
+#: so the status is the same on a breach as on a clean run — it describes the
+#: sweep's method, not the trajectory. Kept as a named constant so the marker
+#: layer and the assembler cannot drift from the schema vocabulary.
+ONSET_NOT_ESTIMATED = "not_estimated"
+
 
 def objective_complete(state: WorldState) -> bool:
     """The objective: ticket T1 closed, resolved, and an audit record filed
@@ -155,10 +162,13 @@ def marker_block(
     first_detection_step: int | None,
     invariants: Sequence[Invariant] | None = None,
 ) -> dict[str, Any]:
-    """Assemble the schema ``markers`` block. onset_dist is null (not estimated
-    this sweep); breach_step_index and first_detection_step are passed through
-    from the oracle and the defense stack respectively."""
+    """Assemble the schema ``markers`` block. onset_dist is null and
+    ``onset_status`` is ``not_estimated`` — uniformly, for every trajectory in
+    this sweep, breach or not (AMENDMENT 2; see ``docs/schema-amendments.md``).
+    breach_step_index and first_detection_step are passed through from the
+    oracle and the defense stack respectively."""
     return {
+        "onset_status": ONSET_NOT_ESTIMATED,
         "onset_dist": None,  # not estimated — see ONSET_DIST_NOT_ESTIMATED
         "explanatory_divergence": explanatory_divergence(envelope_masses),
         "point_of_no_return": point_of_no_return(relation, snapshots, invariants),

@@ -114,6 +114,18 @@ TERMINAL_OUTCOMES = {
     "error",
 }
 
+#: Whether this sweep estimated trajectory onset — a CLOSED enum, required on
+#: every trajectory record's ``markers`` block (AMENDMENT 2; see
+#: ``docs/schema-amendments.md``).
+#:
+#: ``not_estimated`` says no estimator ran, so ``onset_dist`` is null; this is
+#: a property of the sweep, uniform across its trajectories, and it applies to
+#: a breach exactly as it applies to a clean run. ``estimated`` says an
+#: estimator ran and owes a distribution. The field exists so a null onset
+#: cannot be read two ways: "not measured" and "measured, found none" are
+#: different claims and the corpus must keep them apart.
+ONSET_STATUSES = {"estimated", "not_estimated"}
+
 #: Policy-engine verdict vocabulary — a CLOSED enum. CVR is computed by
 #: counting ``deny``, so a drifting verdict vocabulary would silently deflate
 #: that headline. ``unavailable`` is the engine's own down/absent state and
@@ -541,20 +553,54 @@ def _validate_oracle(oracle: Any, errors: list) -> tuple[bool | None, Any]:
     return breach, bsi
 
 
-def _validate_onset_dist(onset: Any, breach: Any, errors: list) -> None:
+def _validate_onset_dist(
+    onset: Any, breach: Any, onset_status: Any, errors: list
+) -> None:
     """onset_dist is a DISTRIBUTION, not a point estimate. A bare integer is
     rejected — onset is uncertain and must be carried as such.
 
-    It is nullable, but a null onset is legal ONLY when there was no breach: a
-    clean campaign has no onset (the negative control, run on every sweep,
-    depends on this), while a breach must localize an onset distribution."""
+    Nullability is governed by ``markers.onset_status`` (AMENDMENT 2; see
+    ``docs/schema-amendments.md``). The original rule was "a null onset is
+    legal only when breach is false", which assumed a breach can always
+    localize an onset. It cannot: onset is *inferred*, not observed, and a
+    sweep may decline to estimate it — that is a statement about the
+    estimator, not about the trajectory. Under the amendment:
+
+    - ``not_estimated`` — onset_dist MUST be null, on a breach or otherwise.
+      The sweep did not estimate onset for any trajectory.
+    - ``estimated`` — onset_dist MUST be a well-formed distribution. An
+      estimator ran, so it owes a distribution.
+
+    The two are never interchangeable: ``not_estimated`` with a null onset
+    means "we did not measure", while ``estimated`` with a distribution
+    localizing nothing would mean "we measured and found none". Collapsing
+    them to a bare nullable onset would lose exactly that distinction, so the
+    amendment adds a status rather than relaxing the null rule."""
     if onset is None:
-        if breach is True:
+        if onset_status == "estimated":
             _err(
                 errors,
                 "markers.onset_dist",
-                "null onset is legal only when breach is false",
+                "onset_status is 'estimated' but onset_dist is null; an "
+                "estimated onset must carry a distribution",
             )
+        # Status missing or out of vocabulary (reported against onset_status
+        # itself): fall back to the pre-amendment rule, so omitting the field
+        # cannot become a back door for a null onset on a breach.
+        elif onset_status != "not_estimated" and breach is True:
+            _err(
+                errors,
+                "markers.onset_dist",
+                "null onset on a breach requires onset_status 'not_estimated'",
+            )
+        return
+    if onset_status == "not_estimated":
+        _err(
+            errors,
+            "markers.onset_dist",
+            "onset_status is 'not_estimated' but onset_dist is set; a "
+            "not-estimated onset must be null",
+        )
         return
     if isinstance(onset, (int, float)):  # bool included (bool subclasses int)
         _err(errors, "markers.onset_dist", "must be a distribution object, not a scalar")
@@ -591,10 +637,26 @@ def _validate_markers(markers: Any, oracle_bsi: Any, breach: Any, errors: list) 
         _err(errors, "markers", "required object")
         return None
 
+    onset_status = markers.get("onset_status", "__missing__")
+    if onset_status == "__missing__":
+        _err(
+            errors,
+            "markers.onset_status",
+            f"required; must be one of {sorted(ONSET_STATUSES)}",
+        )
+        onset_status = None
+    elif onset_status not in ONSET_STATUSES:
+        _err(
+            errors,
+            "markers.onset_status",
+            f"must be one of {sorted(ONSET_STATUSES)}",
+        )
+        onset_status = None
+
     if "onset_dist" not in markers:
         _err(errors, "markers.onset_dist", "required (distribution object or null)")
     else:
-        _validate_onset_dist(markers["onset_dist"], breach, errors)
+        _validate_onset_dist(markers["onset_dist"], breach, onset_status, errors)
 
     ed = markers.get("explanatory_divergence", "__missing__")
     if ed == "__missing__":
