@@ -676,3 +676,28 @@ def test_retries_multiply_the_timeout_budget():
     cfg = ServingConfig(campaign_id="c", model="m")
     assert cfg.max_retries == 2
     assert cfg.timeout * (1 + cfg.max_retries) == 900.0
+
+
+def test_serving_manifest_block_records_the_timeout():
+    """The timeout changes what the corpus says, not just how long a run
+    takes: a turn that outlives it becomes a transport error, errors are
+    excluded from the filtered_or_empty denominator, and the victim then
+    records as unmeasured rather than as itself. Two runs of the same config
+    under different timeouts can therefore disagree about whether a model was
+    measured, and a reader cannot recover that from the records."""
+    block = ServingConfig(campaign_id="c", model="m").as_manifest_block()
+    assert block["timeout_s"] == 300.0
+
+
+def test_serving_manifest_block_records_the_timeout_actually_in_use():
+    """Not the default — whatever this campaign was pinned to."""
+    cfg = ServingConfig(campaign_id="c", model="m", timeout=45.0)
+    assert cfg.as_manifest_block()["timeout_s"] == 45.0
+
+
+def test_serving_manifest_block_keeps_timeout_beside_retries():
+    """The two numbers are only interpretable together: a blown turn costs
+    (1 + max_retries) full timeouts before it is recorded."""
+    block = ServingConfig(campaign_id="c", model="m").as_manifest_block()
+    assert {"timeout_s", "max_retries"} <= set(block)
+    assert block["timeout_s"] * (1 + block["max_retries"]) == 900.0

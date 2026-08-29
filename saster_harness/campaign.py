@@ -204,6 +204,16 @@ class ServingConfig:
             "backend_pinned": True,
             "refusal_policy": "terminal",
             "max_retries": self.max_retries,
+            # Recorded because it changes what the corpus SAYS, not just how
+            # long a run takes. A turn that outlives the timeout is a
+            # transport error, errors are excluded from the
+            # filtered_or_empty denominator, and the victim then records as
+            # unmeasured rather than as itself — so two runs of the same
+            # config under different timeouts can disagree about whether a
+            # model was measured at all. A reader cannot reconstruct that
+            # from the records, so the number belongs beside max_retries,
+            # which multiplies it.
+            "timeout_s": self.timeout,
         }
 
 

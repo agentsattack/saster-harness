@@ -23,8 +23,14 @@ EXPECTED_MATRIX_SHA256 = "60853077e446dd228ff0dae956b2d67925f63329f58d7107534af4
 # method (MEAN over SUM), the 13-candidate set, or either calibrated threshold
 # fails loudly. An intended amendment updates this pin in the same commit,
 # which makes the change legible in the diff rather than invisible.
+# Updated by Amendment 4 (docs/schema-amendments.md): the §4 negative-control
+# table was re-measured against the store's real tool-session observations
+# after the published table was found to have used a step-0 stub that omitted
+# rotation_output_object. Both thresholds are unchanged; only the baseline
+# table moved. Previous pin, for the record:
+#   e56fe31d6560ef940b694afc0acd9304518930e02e1e9bda06362d5f6ce5e568
 EXPECTED_ENVELOPE_PREREG_SHA256 = (
-    "e56fe31d6560ef940b694afc0acd9304518930e02e1e9bda06362d5f6ce5e568"
+    "5d5d95662689914916f03e1b7e1ef0c13598722337da004d239eeb28df044c9a"
 )
 
 
