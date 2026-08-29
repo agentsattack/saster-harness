@@ -10,6 +10,8 @@ record alone, so this status travels with every run.
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .l1_classifier import LLAMAGUARD3_ATBENCH_RECALL
@@ -17,6 +19,34 @@ from .l2_policy import ALL_RULES
 
 if TYPE_CHECKING:
     from .stack import DefenseStack
+
+#: The pre-registered GrrCON prediction matrix. Its SHA-256 is a REQUIRED
+#: manifest field: every run records the hash of the predictions it was
+#: measured against, so a prediction cannot be edited after the fact without
+#: the manifest hash changing. A prediction written after the data exists is
+#: not one; this is the mechanism that makes that checkable.
+GRRCON_MATRIX_PATH = Path(__file__).resolve().parents[1] / "docs" / "grrcon-test-matrix.md"
+
+
+class ManifestError(ValueError):
+    """A manifest is missing a required field."""
+
+
+def grrcon_matrix_sha256() -> str:
+    """SHA-256 of the pre-registered prediction matrix, as committed."""
+    return hashlib.sha256(GRRCON_MATRIX_PATH.read_bytes()).hexdigest()
+
+
+def validate_manifest(manifest: dict[str, Any]) -> None:
+    """Reject a manifest that lacks the pre-registration hash. A corpus whose
+    manifest carries no ``grrcon_matrix_sha256`` cannot be tied to the
+    predictions it was meant to test, so it is not admissible."""
+    value = manifest.get("grrcon_matrix_sha256")
+    if not isinstance(value, str) or len(value) != 64:
+        raise ManifestError(
+            "manifest missing required grrcon_matrix_sha256 "
+            "(the pre-registered prediction-matrix hash)"
+        )
 
 #: Why each layer is real or a stand-in in THIS environment. Recorded so the
 #: corpus is self-describing.
@@ -66,6 +96,7 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
     cfg = stack.config
     manifest: dict[str, Any] = {
         "fixture_id": stack.fixture_id,
+        "grrcon_matrix_sha256": grrcon_matrix_sha256(),
         "traffic_plane": TRAFFIC_PLANE,
         "layers_enabled": {
             "l1": cfg.l1, "l2": cfg.l2, "l3": cfg.l3, "l4": cfg.l4, "l5": cfg.l5,
