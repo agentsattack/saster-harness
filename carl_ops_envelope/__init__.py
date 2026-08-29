@@ -17,6 +17,7 @@ from .context import (
 )
 from .scorer import (
     CANDIDATES,
+    DEFAULT_SCORER_TIMEOUT_S,
     SCORED_NOT_COMPUTED,
     SCORED_NOT_COMPUTED_NOTE,
     Candidate,
@@ -32,6 +33,7 @@ from .scorer import (
 
 __all__ = [
     "CANDIDATES",
+    "DEFAULT_SCORER_TIMEOUT_S",
     "Candidate",
     "envelope_mass",
     "envelopes",

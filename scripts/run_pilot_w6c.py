@@ -34,7 +34,12 @@ sys.path.insert(0, "/home/lbsuto/halctf-agent")
 from carl_ops_agent.agent import CarlOps
 from carl_ops_agent.widening import derive_widening_route
 from carl_ops_assembly import assemble_trajectory_record
-from carl_ops_envelope import CANDIDATES, envelopes, score_candidates
+from carl_ops_envelope import (
+    CANDIDATES,
+    DEFAULT_SCORER_TIMEOUT_S,
+    envelopes,
+    score_candidates,
+)
 from carl_ops_envelope.context import build_prefix
 from carl_ops_oracle import evaluate_snapshots
 from carl_ops_state import CarlOpsToolSession, TransitionRelation
@@ -51,8 +56,15 @@ from saster_harness.canary import (
     run_canary,
 )
 
-RUN_ID = "w6c-pilot-20260829"
-CAMPAIGN_ID = "w6c-pilot-003"      # hashes onto the Ministral replica; see report
+# Overridable alongside PILOT_OUT. A re-run writes to a new directory, and two
+# runs that sit in different directories must not answer to the same run_id —
+# these two in particular were produced under DIFFERENT envelope
+# pre-registrations, which is exactly the distinction run_id exists to carry.
+RUN_ID = os.environ.get("PILOT_RUN_ID", "w6c-pilot-20260829")
+# The affinity key. It no longer has to be hand-picked to hash onto the right
+# replica — the router selects backends that serve the requested model first —
+# so this is now just the prefix-cache pinning key.
+CAMPAIGN_ID = os.environ.get("PILOT_CAMPAIGN_ID", "w6c-pilot-003")
 VICTIM = "mistralai/Ministral-8B-Instruct-2410"
 ROUTER_URL = "http://localhost:8080"
 AGENTDOG = "http://[fd00:200::4]:8001"
@@ -312,6 +324,31 @@ def main() -> None:
     manifest["campaign_id"] = CAMPAIGN_ID
     manifest["victim_model"] = VICTIM
     manifest["k"] = K
+    # The serving layer this run actually used, timeout_s included. A blown
+    # timeout is a transport error, errors leave the filtered_or_empty
+    # denominator, and the victim then records as unmeasured rather than as
+    # itself — so the number changes what the records SAY and belongs in the
+    # manifest.
+    manifest["serving"] = ServingConfig(
+        campaign_id=CAMPAIGN_ID, model=VICTIM, base_url=ROUTER_URL
+    ).as_manifest_block()
+    # ... but the serving block does NOT govern the envelope scorer, which is
+    # where nearly all of this run's model traffic goes (13 candidates + a
+    # prefix count, per turn, per trial). It reaches the router over urllib on
+    # its own timeout, so recording only the serving number would assert one
+    # budget for two paths.
+    manifest["envelope_scorer"] = {
+        "role": "envelope_mass_scoring",
+        "base_url": ROUTER_URL,
+        "model": VICTIM,
+        "campaign_id": CAMPAIGN_ID,
+        "transport": "urllib",
+        "timeout_s": DEFAULT_SCORER_TIMEOUT_S,
+        "note": (
+            "echo teacher-forcing, max_tokens=1 — prompt-only, so this path "
+            "does not generate and is not bounded by generation length"
+        ),
+    }
     manifest["role"] = "PILOT — one config, k=5. Not the sweep, not the corpus."
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
 

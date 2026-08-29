@@ -180,6 +180,15 @@ def introduces_violation(candidate: Candidate, state: WorldState, t0: WorldState
 # -- echo teacher-forcing (length-normalized) --------------------------------
 
 
+#: Per-call timeout for echo scoring, in seconds. Named so the run manifest can
+#: record the value actually in force rather than repeat a literal. This is NOT
+#: ``ServingConfig.timeout``: that governs the canary and campaign generation
+#: path, while these calls are prompt-only echo (``max_tokens=1``) and so are
+#: bounded by prompt length, not by how long a victim talks. Two different
+#: budgets for two different paths, deliberately kept separate.
+DEFAULT_SCORER_TIMEOUT_S = 60.0
+
+
 def _post(base_url: str, path: str, body: dict, campaign_id: str, timeout: float) -> dict:
     req = urllib.request.Request(
         f"{base_url}{path}", data=json.dumps(body).encode(),
@@ -196,12 +205,12 @@ def _echo_token_logprobs(base_url: str, model: str, text: str, campaign_id: str,
     return tl
 
 
-def prefix_token_count(base_url: str, model: str, prefix: str, campaign_id: str, timeout: float = 60.0) -> int:
+def prefix_token_count(base_url: str, model: str, prefix: str, campaign_id: str, timeout: float = DEFAULT_SCORER_TIMEOUT_S) -> int:
     return len(_echo_token_logprobs(base_url, model, prefix, campaign_id, timeout))
 
 
 def candidate_mean_logprob(base_url: str, model: str, prefix: str, candidate: Candidate,
-                           campaign_id: str, n_prefix: int, timeout: float = 60.0) -> float:
+                           campaign_id: str, n_prefix: int, timeout: float = DEFAULT_SCORER_TIMEOUT_S) -> float:
     """Length-normalized log P(candidate | prefix): the MEAN of the candidate
     suffix's teacher-forced token logprobs."""
     tl = _echo_token_logprobs(base_url, model, prefix + candidate.serialize(), campaign_id, timeout)
@@ -243,7 +252,7 @@ class ScoredDistribution:
 
 
 def score_candidates(base_url: str, model: str, prefix: str, campaign_id: str,
-                     timeout: float = 60.0) -> ScoredDistribution:
+                     timeout: float = DEFAULT_SCORER_TIMEOUT_S) -> ScoredDistribution:
     """Score the 13 candidates against ``prefix`` and softmax-normalize.
 
     ``prefix`` is the context at ONE decision point and must advance with the
@@ -300,7 +309,7 @@ def envelopes(dist: ScoredDistribution, scope: Scope, state: WorldState,
 
 def envelope_mass(base_url: str, model: str, prefix: str, scope: Scope,
                   state: WorldState, t0: WorldState, relation: TransitionRelation,
-                  campaign_id: str, timeout: float = 60.0) -> dict[str, Any]:
+                  campaign_id: str, timeout: float = DEFAULT_SCORER_TIMEOUT_S) -> dict[str, Any]:
     """Score the 13 candidates (mean per-token logprob), softmax-normalize, and
     compute the three envelopes. ``state`` is the current world state, used for
     the per-candidate prohibition check."""
