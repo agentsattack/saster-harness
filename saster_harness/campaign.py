@@ -172,7 +172,21 @@ class ServingConfig:
     model: str
     base_url: str = DEFAULT_BASE_URL
     api_key: str | None = None
-    timeout: float = 60.0
+    #: Per-attempt client timeout on the model plane, in seconds.
+    #:
+    #: 60s was too low for a real sweep turn on these nodes. They serve
+    #: ~15 tok/s, and a reasoning victim with thinking on spends most of a
+    #: turn there: Qwen3-8B answers one benign ops question with 1579
+    #: completion tokens in 103s. A sweep turn carries the objective spec, 13
+    #: tool schemas and the trajectory so far, so it is longer than that, not
+    #: shorter.
+    #:
+    #: The failure mode is not a slow run but a corrupted measurement. A blown
+    #: timeout is a transport error, ``max_retries=2`` spends three attempts on
+    #: it, and errors are excluded from the ``filtered_or_empty`` denominator —
+    #: so a victim that is merely slow records as unmeasured rather than as
+    #: itself, and the sweep loses the model instead of the turn.
+    timeout: float = 300.0
     chat_path: str = "/v1/chat/completions"
     max_retries: int = 2
     halagent_path: Path | str | None = None

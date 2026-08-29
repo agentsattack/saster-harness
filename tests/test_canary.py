@@ -8,6 +8,7 @@ import pytest
 
 from saster_harness.canary import (
     BENIGN_PROMPTS,
+    CANARY_PARAMS,
     CanaryGateFailed,
     CanaryResult,
     TurnClass,
@@ -37,9 +38,11 @@ class FakeRouter:
     def __init__(self, scripted):
         self._scripted = list(scripted)
         self.calls = []
+        self.params_seen = []
 
     def generate(self, *, run_id, challenge_id, step_index, messages, params):
         self.calls.append((run_id, challenge_id, step_index, messages))
+        self.params_seen.append(params)
         return self._scripted[min(step_index, len(self._scripted) - 1)]
 
 
@@ -380,3 +383,66 @@ def test_gate_lists_every_unmeasured_model():
     with pytest.raises(CanaryGateFailed) as exc:
         enforce_canary_gate(results)
     assert "a" in str(exc.value) and "b" in str(exc.value)
+
+
+# --------------------------------------------------------------------------
+# the canary turn is bounded
+#
+# Unbounded, a reasoning victim never completes a canary turn inside the
+# client timeout: Qwen3-8B answers a benign ops question with 1579 completion
+# tokens in 103s at ~15 tok/s. Every turn timed out, retried twice, and
+# recorded as a transport error, so the gate blocked on a model that was
+# healthy. Length is not what the canary measures.
+# --------------------------------------------------------------------------
+
+
+def test_canary_turns_are_bounded_by_default():
+    router = FakeRouter(ok(2))
+    run_canary(router, "m", 2)
+    assert router.params_seen == [CANARY_PARAMS, CANARY_PARAMS]
+    assert CANARY_PARAMS["max_tokens"] == 64
+
+
+def test_the_suite_bounds_every_model():
+    seen = {}
+
+    def factory(model, campaign_id):
+        seen[model] = FakeRouter(ok(1))
+        return seen[model]
+
+    run_canary_suite(["a", "b"], 1, router_factory=factory)
+    for router in seen.values():
+        assert router.params_seen == [{"max_tokens": 64}]
+
+
+def test_explicit_params_override_the_bound():
+    router = FakeRouter(ok(1))
+    run_canary(router, "m", 1, params={"max_tokens": 8, "temperature": 0})
+    assert router.params_seen == [{"max_tokens": 8, "temperature": 0}]
+
+
+def test_explicit_empty_params_deliberately_unbounds():
+    """``{}`` is a caller saying 'no params', distinct from not asking."""
+    router = FakeRouter(ok(1))
+    run_canary(router, "m", 1, params={})
+    assert router.params_seen == [{}]
+
+
+def test_bounding_does_not_change_what_is_measured():
+    """A truncated turn is still a turn that came back. The two signals the
+    canary reads are unaffected by a token cap: only an explicit
+    content_filter finish_reason or an empty body classify as filtered, and
+    finish_reason 'length' is neither."""
+    truncated = {"choices": [{"finish_reason": "length"}]}
+    assert classify_turn("<think>\nOkay, the user wants", truncated) is TurnClass.OK
+    filtered = {"choices": [{"finish_reason": "content_filter"}]}
+    assert classify_turn("partial", filtered) is TurnClass.FILTERED_OR_EMPTY
+    assert classify_turn("", truncated) is TurnClass.FILTERED_OR_EMPTY
+
+
+def test_a_bounded_turn_still_counts_as_measured():
+    router = FakeRouter([FakeRouted(text="<think>", raw={"choices": [{"finish_reason": "length"}]})])
+    result = run_canary(router, "m", 1)
+    assert result.ok == 1
+    assert result.measured is True
+    enforce_canary_gate({"m": result})  # must not raise

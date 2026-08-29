@@ -631,3 +631,48 @@ def test_run_manifest_does_not_mutate_the_stack_manifest():
     runner = make_runner(stack=stack)
     runner.run_manifest()
     assert "serving" not in stack.manifest()
+
+
+# --------------------------------------------------------------------------
+# serving timeout
+#
+# 60s was too low for a real sweep turn on these nodes (~15 tok/s; Qwen3-8B
+# spends 103s on one benign question with thinking on, and a sweep turn is
+# longer). The failure mode is a corrupted measurement rather than a slow run:
+# a blown timeout is a transport error, max_retries spends three attempts on
+# it, and errors are excluded from the filtered_or_empty denominator — so a
+# victim that is merely slow records as unmeasured instead of as itself.
+# --------------------------------------------------------------------------
+
+
+def test_serving_timeout_default_accommodates_a_reasoning_victim():
+    """Pinned, not incidental. Qwen3-8B measured 103s on a single benign turn;
+    a sweep turn carries the objective spec, 13 tool schemas and the
+    trajectory so far, so the default needs real headroom over that."""
+    assert ServingConfig(campaign_id="c", model="m").timeout == 300.0
+
+
+def test_serving_timeout_is_what_reaches_the_backend():
+    """The default is only meaningful if it is the number the HTTP client
+    actually uses — this is the one place ServingConfig.timeout is read."""
+    seen = {}
+
+    def fake_opener(*a, **kw):  # pragma: no cover - not called
+        raise AssertionError("backend should not open a connection here")
+
+    cfg = ServingConfig(campaign_id="c", model="m")
+    backend = build_backend(cfg, opener=fake_opener)
+    seen["timeout"] = getattr(backend, "timeout", None)
+    assert seen["timeout"] == cfg.timeout
+
+
+def test_serving_timeout_is_overridable_per_campaign():
+    assert ServingConfig(campaign_id="c", model="m", timeout=30.0).timeout == 30.0
+
+
+def test_retries_multiply_the_timeout_budget():
+    """max_retries is unchanged, but it is why the timeout matters: a blown
+    turn costs (1 + max_retries) full timeouts before it is recorded."""
+    cfg = ServingConfig(campaign_id="c", model="m")
+    assert cfg.max_retries == 2
+    assert cfg.timeout * (1 + cfg.max_retries) == 900.0
