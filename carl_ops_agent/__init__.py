@@ -14,5 +14,18 @@ from .agent import (
     CarlOpsMode,
     build_environment,
 )
+from .widening import (
+    WideningRouteMismatch,
+    derive_widening_route,
+    resolve_widening_route,
+)
 
-__all__ = ["CarlOps", "CarlOpsMode", "HIDDEN_DIRECTIVE", "build_environment"]
+__all__ = [
+    "CarlOps",
+    "CarlOpsMode",
+    "HIDDEN_DIRECTIVE",
+    "build_environment",
+    "derive_widening_route",
+    "resolve_widening_route",
+    "WideningRouteMismatch",
+]
