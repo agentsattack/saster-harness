@@ -595,7 +595,80 @@ def _validate_oracle(oracle: Any, errors: list) -> tuple[bool | None, Any]:
     if _is_str(inv) and isinstance(fired, list) and inv not in fired:
         _err(errors, "oracle.invariant", "primary invariant not in invariants_fired")
 
+    _validate_first_firing(oracle.get("first_firing_step_index", None), fired, bsi, errors)
+
     return breach, bsi
+
+
+def _validate_first_firing(
+    mapping: Any, fired: Any, bsi: Any, errors: list
+) -> None:
+    """``oracle.first_firing_step_index`` — invariant id -> earliest snapshot
+    index at which that invariant fired (AMENDMENT 5; see
+    ``docs/schema-amendments.md``).
+
+    Why it exists. ``invariants_fired`` is a flat list with no snapshot
+    association, and before AMENDMENT 5 the oracle returned at the first
+    failing snapshot, so the list was that ONE snapshot's set: an invariant
+    whose first firing came later was absent from the record entirely. On the
+    W7g compromised runs the block said ``I3`` at step 2 and never mentioned
+    ``I1`` at step 3 — credential material reaching an object store, the
+    fixture's headline compositional result, missing from its own oracle
+    output on every run that produced it. It was not recoverable either:
+    snapshot hashes are one-way and state content is structurally excluded.
+
+    The block's exclusions are UNCHANGED and still enforced above. An
+    invariant id plus an integer index leaks nothing the block does not
+    already carry — the ids are already in ``invariants_fired``, the indices
+    are already in the same space as ``breach_step_index``, and no reason
+    string or state content comes with them.
+
+    OPTIONAL, on the AMENDMENT 3 pattern. Records written before the field
+    existed — the W6c pilot's — carry an oracle block without it and stay
+    valid under the contract they were written to. Absence is not a back
+    door: when the field IS present every rule below applies.
+
+    Rules:
+
+    - object mapping invariant id (string) -> step index (int >= 1);
+    - never 0, for the same reason ``breach_step_index`` is never 0: a firing
+      at t0 is a rigged fixture, not a breach;
+    - its key set is EXACTLY ``invariants_fired`` — the two are one fact in
+      two shapes, and a record where they disagree is not analyzable;
+    - ``min(values) == breach_step_index``, which is what makes the earliest
+      firing and the breach index the same claim rather than two;
+    - on a clean run (``breach_step_index`` null) it must be empty.
+    """
+    if mapping is None:
+        return  # absent: pre-amendment record, rule above applies unchanged
+    p = "oracle.first_firing_step_index"
+    if not isinstance(mapping, dict):
+        _err(errors, p, "must be an object mapping invariant id to step index")
+        return
+    for key, value in sorted(mapping.items(), key=lambda kv: str(kv[0])):
+        if not _is_str(key):
+            _err(errors, f"{p}.{key}", "key must be an invariant id string")
+            continue
+        if not _is_int(value):
+            _err(errors, f"{p}.{key}", "must be int")
+        elif value == 0:
+            _err(errors, f"{p}.{key}", "must not be 0 (index 0 is t0)")
+        elif value < 0:
+            _err(errors, f"{p}.{key}", "must be >= 1")
+
+    if (
+        isinstance(fired, list)
+        and all(_is_str(f) for f in fired)
+        and set(mapping) != set(fired)
+    ):
+        _err(errors, p, "key set must equal invariants_fired")
+
+    values = [v for v in mapping.values() if _is_int(v) and v >= 1]
+    if bsi is None:
+        if mapping:
+            _err(errors, p, "must be empty when breach_step_index is null")
+    elif values and min(values) != bsi:
+        _err(errors, p, "earliest first-firing index must equal breach_step_index")
 
 
 def _validate_onset_dist(

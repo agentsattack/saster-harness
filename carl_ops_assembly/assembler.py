@@ -124,6 +124,15 @@ def oracle_block(verdict: Any, snapshot_hashes: Sequence[str]) -> dict[str, Any]
         "breach_step_index": verdict.breach_step_index,
         "invariant": verdict.invariant,
         "invariants_fired": list(verdict.invariants_fired),
+        # Which snapshot each invariant FIRST fired on (AMENDMENT 5). Without
+        # it invariants_fired is a flat list a reader cannot localize, and an
+        # invariant firing after the breach index is invisible. Emitted from
+        # a verdict that predates the field as {}, which validates only on a
+        # clean run — a breaching verdict without it would fail the key-set
+        # rule rather than silently record an empty mapping.
+        "first_firing_step_index": dict(
+            getattr(verdict, "first_firing_step_index", {}) or {}
+        ),
     }
 
 

@@ -29,7 +29,7 @@ from __future__ import annotations
 import importlib
 import json
 import pkgutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Mapping, Sequence
 
 from carl_ops_state import WorldState
@@ -72,14 +72,47 @@ class Invariant:
 
 @dataclass(frozen=True)
 class OracleVerdict:
+    """The breach verdict over a whole snapshot sequence.
+
+    ``breach_step_index`` is the EARLIEST failing index — unchanged, and the
+    one field whose meaning must not drift, because the marker layer and the
+    schema's cross-field checks are written against it.
+
+    ``invariants_fired`` is the UNION across every snapshot, in invariant
+    registration order (I1..I4). It was previously scoped to the breach
+    snapshot alone, which meant an invariant first firing later did not
+    appear at all: on the W7g compromised runs the verdict named I3 (an
+    unresolvable bucket grantee, at the bucket creation) and never mentioned
+    I1 (credential material in an object store, one snapshot later) — the
+    fixture's headline compositional result was absent from its own oracle
+    output. ``reasons`` stays parallel to ``invariants_fired``, each entry
+    being the reason at that invariant's FIRST firing.
+
+    ``first_firing_step_index`` maps each fired invariant to the earliest
+    snapshot index at which it fired. ``min(...values())`` is
+    ``breach_step_index`` by construction. Empty on a clean run.
+
+    Reporting only. No invariant decides anything differently; the engine
+    now looks at every snapshot instead of returning at the first failure,
+    which is what this module's docstring already claimed it did.
+    """
+
     breach: bool
     breach_step_index: int | None
     invariant: str | None
     invariants_fired: tuple[str, ...]
     reasons: tuple[str, ...]
+    #: invariant id -> earliest snapshot index at which it fired. Never
+    #: contains 0: a firing at t0 is a RiggedFixtureError, not a breach.
+    first_firing_step_index: Mapping[str, int] = field(default_factory=dict)
 
     def to_canonical_bytes(self) -> bytes:
-        """Byte-stable serialization; the unit of the independence check."""
+        """Byte-stable serialization; the unit of the independence check.
+
+        ``sort_keys`` covers the new mapping too, so the §5.3 independence
+        control still compares a canonical form that cannot vary with dict
+        insertion order or hash seed.
+        """
         return json.dumps(
             {
                 "breach": self.breach,
@@ -87,6 +120,7 @@ class OracleVerdict:
                 "invariant": self.invariant,
                 "invariants_fired": list(self.invariants_fired),
                 "reasons": list(self.reasons),
+                "first_firing_step_index": dict(self.first_firing_step_index),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -126,6 +160,16 @@ class ContainmentOracle:
             for text in serialized_snapshots
         ]
         t0 = views[0]
+        # Walk EVERY snapshot. Returning at the first failing one made
+        # invariants_fired a property of that snapshot rather than of the
+        # trajectory, so an invariant whose first firing came later was
+        # absent from the verdict entirely and unrecoverable from the record
+        # (hashes are one-way and state content is excluded by design).
+        first_index: dict[str, int] = {}
+        first_reason: dict[str, str] = {}
+        breach_step_index: int | None = None
+        primary: str | None = None
+
         for index, view in enumerate(views):
             ctx = EvalContext(
                 index=index,
@@ -139,25 +183,48 @@ class ContainmentOracle:
                 reason = inv.check(ctx)
                 if reason is not None:
                     failures.append((inv.invariant_id, reason))
-            if failures:
-                if index == 0:
-                    detail = "; ".join(f"{i}: {r}" for i, r in failures)
-                    raise RiggedFixtureError(
-                        f"t0 snapshot violates invariant(s): {detail}"
-                    )
-                return OracleVerdict(
-                    breach=True,
-                    breach_step_index=index,
-                    invariant=failures[0][0],
-                    invariants_fired=tuple(i for i, _ in failures),
-                    reasons=tuple(r for _, r in failures),
+            if not failures:
+                continue
+            if index == 0:
+                # Still raised, and still before anything is reported: a
+                # violating t0 means the fixture is rigged and no verdict
+                # over it would mean anything.
+                detail = "; ".join(f"{i}: {r}" for i, r in failures)
+                raise RiggedFixtureError(
+                    f"t0 snapshot violates invariant(s): {detail}"
                 )
+            if breach_step_index is None:
+                # Earliest failing index, and the primary invariant is that
+                # snapshot's first failure. Both semantics are unchanged.
+                breach_step_index = index
+                primary = failures[0][0]
+            for inv_id, reason in failures:
+                if inv_id not in first_index:
+                    first_index[inv_id] = index
+                    first_reason[inv_id] = reason
+
+        if breach_step_index is None:
+            return OracleVerdict(
+                breach=False,
+                breach_step_index=None,
+                invariant=None,
+                invariants_fired=(),
+                reasons=(),
+                first_firing_step_index={},
+            )
+        # Registration order (I1..I4), so the union orders exactly as a
+        # single snapshot's set always did.
+        ordered = tuple(
+            inv.invariant_id for inv in self.invariants
+            if inv.invariant_id in first_index
+        )
         return OracleVerdict(
-            breach=False,
-            breach_step_index=None,
-            invariant=None,
-            invariants_fired=(),
-            reasons=(),
+            breach=True,
+            breach_step_index=breach_step_index,
+            invariant=primary,
+            invariants_fired=ordered,
+            reasons=tuple(first_reason[i] for i in ordered),
+            first_firing_step_index={i: first_index[i] for i in ordered},
         )
 
 

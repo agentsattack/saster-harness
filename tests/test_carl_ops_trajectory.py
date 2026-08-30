@@ -823,3 +823,99 @@ def test_the_other_three_envelopes_are_still_required_numbers() -> None:
         _em(rec).update({"scored": None, "scored_status": "not_computed"})
         del _em(rec)[key]
         reject(rec, key)
+
+
+# -- AMENDMENT 5: oracle.first_firing_step_index -----------------------------
+#
+# invariants_fired is a flat list with no snapshot association, and before
+# W8 the oracle returned at the first failing snapshot, so it was that ONE
+# snapshot's set. On the W7g compromised runs the block read
+# breach_step_index=2, invariant=I3, invariants_fired=["I3"] and I1 —
+# credential material reaching an object store, at snapshot 3 — appeared
+# nowhere. Snapshot hashes are one-way and state content is structurally
+# excluded, so a reader could not recover it.
+#
+# The field is OPTIONAL, on the AMENDMENT 3 pattern: the W6c pilot's records
+# carry an oracle block without it and stay valid. When present, it is bound
+# tightly to the fields it restates. See docs/schema-amendments.md.
+
+
+def test_first_firing_may_be_absent_pre_amendment_record() -> None:
+    rec = valid_trajectory_record()
+    assert "first_firing_step_index" not in rec["oracle"]
+    assert validate_record(rec) == []
+
+
+def test_first_firing_accepts_a_well_formed_mapping() -> None:
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": 5, "I1": 7}
+    assert validate_record(rec) == []
+
+
+def test_first_firing_key_set_must_equal_invariants_fired() -> None:
+    """The two are one fact in two shapes. A record where they disagree is
+    not analyzable, so it is rejected rather than silently preferred."""
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": 5}  # I1 fired, omitted
+    reject(rec, "first_firing_step_index")
+
+
+def test_first_firing_rejects_an_invariant_that_did_not_fire() -> None:
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": 5, "I1": 7, "I2": 9}
+    reject(rec, "first_firing_step_index")
+
+
+def test_first_firing_index_may_not_be_zero() -> None:
+    """Index 0 is t0. A firing there is a rigged fixture, not a breach — the
+    same rule breach_step_index carries."""
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": 0, "I1": 7}
+    reject(rec, "must not be 0")
+
+
+def test_first_firing_index_may_not_be_negative() -> None:
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": -1, "I1": 7}
+    reject(rec, "first_firing_step_index")
+
+
+def test_first_firing_index_must_be_an_int() -> None:
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": "5", "I1": 7}
+    reject(rec, "first_firing_step_index")
+
+
+def test_first_firing_must_be_an_object() -> None:
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = ["I4", 5]
+    reject(rec, "first_firing_step_index")
+
+
+def test_earliest_first_firing_must_equal_breach_step_index() -> None:
+    """What makes the earliest firing and the breach index the same claim
+    rather than two that can drift apart."""
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": 6, "I1": 7}  # bsi is 5
+    reject(rec, "breach_step_index")
+
+
+def test_a_clean_run_may_not_carry_firings() -> None:
+    rec = valid_clean_trajectory()
+    rec["oracle"]["first_firing_step_index"] = {"I1": 3}
+    reject(rec, "first_firing_step_index")
+
+
+def test_a_clean_run_may_carry_an_empty_mapping() -> None:
+    rec = valid_clean_trajectory()
+    rec["oracle"]["first_firing_step_index"] = {}
+    assert validate_record(rec) == []
+
+
+def test_the_block_exclusions_still_hold_with_the_new_field() -> None:
+    """AMENDMENT 5 adds an id and an index, nothing else. Reasons and state
+    content stay structurally excluded."""
+    rec = valid_trajectory_record()
+    rec["oracle"]["first_firing_step_index"] = {"I4": 5, "I1": 7}
+    rec["oracle"]["reasons"] = ["credential material resides in an object store"]
+    reject(rec, "forbidden")
