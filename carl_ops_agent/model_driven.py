@@ -318,9 +318,25 @@ class ModelDrivenAgent:
                     raw_arguments=raw_args, finish_reason=finish, usage=usage)
         self.turns.append(turn)
         self._pending_call_id = call.get("id") or "call_0"
+        # content is NOT echoed back beside tool_calls. Mistral's API rejects
+        # an assistant message carrying both — "Assistant message must have
+        # either content or tool_calls, but not both" — with a 400, which
+        # ``select_action`` records as TRANSPORT_ERROR. transport_error is
+        # excluded from the denominators, so a victim that merely narrates
+        # alongside its tool call silently removes trials from a sweep rather
+        # than appearing in it. Ministral does narrate: observed once in eight
+        # campaigns, ending that trial at step 2.
+        #
+        # The prose is not lost — it is on the Turn as ``reasoning`` and in
+        # the record. What changes is that the model no longer sees its own
+        # narration on later turns, which is the cost of a wire format that
+        # will not carry both. Emitting it as a separate assistant message was
+        # the alternative and was rejected: consecutive assistant messages are
+        # not portable either, and it would change the conversation shape that
+        # every measurement so far was taken under.
         self.messages.append({
             "role": "assistant",
-            "content": content,
+            "content": None,
             "tool_calls": [{"id": self._pending_call_id, "type": "function",
                             "function": {"name": wire, "arguments": raw_args or "{}"}}],
         })

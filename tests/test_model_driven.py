@@ -24,6 +24,7 @@ from carl_ops_agent.model_driven import (
     TurnStatus,
     system_prompt,
 )
+from saster_defense.types import ActionRequest
 
 
 def reply(tool_calls=None, content=None, finish_reason="stop", usage=None):
@@ -391,3 +392,63 @@ def test_the_compromised_arm_still_has_no_fallback_ladder():
     assert a.select_action(0) is None
     assert a.turns[-1].status is TurnStatus.UNKNOWN_TOOL
     assert a.turns[-1].source is None
+
+
+# --------------------------------------------------------------------------
+# W8: an assistant turn carries tool_calls OR content, never both
+# --------------------------------------------------------------------------
+#
+# Mistral's API rejects a message with both — "Assistant message must have
+# either content or tool_calls, but not both" — with a 400 on the NEXT
+# request. select_action records that as TRANSPORT_ERROR, and transport_error
+# is excluded from the denominators, so a victim that narrates alongside its
+# tool call silently removes trials from a sweep instead of appearing in it.
+
+
+def test_assistant_message_omits_content_when_a_tool_is_called():
+    a = agent(scripted(reply(call("secrets_rotate_credential",
+                                  '{"credential_ref": "cred:prod-web:db"}'),
+                             content="Rotating the expiring credential now.")))
+    a.select_action(0)
+    assistant = [m for m in a.messages if m["role"] == "assistant"]
+    assert len(assistant) == 1
+    assert assistant[0]["content"] is None
+    assert assistant[0]["tool_calls"]
+
+
+def test_no_assistant_message_carries_both():
+    """The invariant, over a multi-turn trajectory: not one replayed assistant
+    message may have prose and a tool call together."""
+    a = agent(scripted(
+        reply(call("inventory_list_hosts", '{"group": "prod-web"}'),
+              content="First I will list the hosts."),
+        reply(call("secrets_list_expiring", '{"window": 7}'),
+              content="Now the expiring credentials."),
+    ))
+    a.select_action(0)
+    # advance so the next turn has an observation to condition on
+    a.observe_executed(ActionRequest.from_tool(
+        "inventory.list_hosts", tier=0, mutating=False, group="prod-web"))
+    a.select_action(1)
+    for m in a.messages:
+        if m["role"] == "assistant":
+            assert not (m.get("content") and m.get("tool_calls")), m
+
+
+def test_the_prose_is_still_recorded_on_the_turn():
+    """Dropping it from the wire must not drop it from the record — the model
+    stops seeing its own narration, the corpus does not."""
+    a = agent(scripted(reply(call("secrets_rotate_credential",
+                                  '{"credential_ref": "cred:prod-web:db"}'),
+                             content="Rotating the expiring credential now.")))
+    a.select_action(0)
+    assert a.turns[-1].reasoning == "Rotating the expiring credential now."
+
+
+def test_a_prose_only_turn_still_keeps_its_content():
+    """The fix touches the message that accompanies a tool call. A turn with
+    no tool call is a NO_TOOL_CALL terminal and still reports what was said."""
+    a = agent(scripted(reply(content="I cannot proceed; escalating instead.")))
+    assert a.select_action(0) is None
+    assert a.turns[-1].status is TurnStatus.NO_TOOL_CALL
+    assert a.turns[-1].reasoning == "I cannot proceed; escalating instead."
