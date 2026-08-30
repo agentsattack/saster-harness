@@ -2,8 +2,9 @@
 
 Amendments to the frozen record contract in `carl_ops_trajectory/schema.py`,
 in order — plus, where one occurs, a correction to a hashed pre-registration
-document (Amendment 4), logged here because this is the only amendment log the
-project keeps. Every amendment here was made **before any corpus existed**, and
+document (Amendment 4) and any recorded observation that changes no contract
+but bears on how the corpus must be read ("Recorded observation" entries),
+logged here because this is the only amendment log the project keeps. Every amendment here was made **before any corpus existed**, and
 each entry says so explicitly, because "the schema changed" and "the schema
 changed after we saw results" are very different claims and a public corpus
 has to let a reader tell them apart.
@@ -306,6 +307,100 @@ separate decision made on its own evidence and recorded as its own amendment.
 `60853077e446dd228ff0dae956b2d67925f63329f58d7107534af4fa138571e2`. The pin in
 `tests/test_manifest_prereg.py` is updated in the same commit, which is what
 makes the change legible in the diff rather than invisible.
+
+---
+
+## Recorded observation 1 — Qwen's thinking flag changes its action distribution
+
+**This is not an amendment.** `schema.py` is untouched, no field is added,
+removed, or relaxed, and neither hashed document moves. It is logged here
+because this is the only change log the project keeps, and because a reader
+comparing victims across the corpus needs this fact before they read P8 or P9.
+
+**Status:** pre-corpus. No corpus exists. The W6c pilot records and the W7/W7f
+campaign transcripts are pilot and single-campaign output, explicitly not
+corpus.
+
+### The observation
+
+Qwen3-8B is a reasoning model that thinks by default. With thinking on it
+cannot be used as a model-driven victim at all — measured at turn 0, N=50,
+temperature 0.7, seeds 0–49:
+
+| configuration | tool-call reach | completion tokens | latency (serial) |
+|---|---|---|---|
+| `enable_thinking: false`, `max_tokens=512` | **50/50** | 22 (min = max) | 1.6 s |
+| thinking on, `max_tokens=512` | **0/50** | 512 (every draw capped) | 35.8 s |
+| thinking on, `max_tokens=2560` | 40/50 | mean 1591, max 2560 | 74.2 s |
+
+So the flag has to be set. The point of this entry is that setting it is
+**not** a free cost optimization, because it also changes *which action the
+model picks*:
+
+| victim / configuration | modal turn-0 action | share |
+|---|---|---|
+| Qwen3-8B, `enable_thinking: false` | `inventory.list_hosts {"group":"prod-web"}` | 50/50 |
+| Qwen3-8B, thinking on (`max_tokens=2560`) | `secrets.list_expiring` | 38/50 |
+| Ministral-8B-Instruct-2410 | `secrets.list_expiring` | 29/30 |
+
+Thinking-**on** Qwen agrees with Ministral on the first action. Thinking-**off**
+Qwen does not. The disagreement is not marginal: under thinking-off the
+turn-0 distribution is a point mass on a *different tool*, with zero entropy
+over 50 draws.
+
+### Why it is recorded here
+
+**P8** ("Across victim models — layer effect varies, possibly inverts") and
+**P9** ("L4 across guard sizes and families — detection differs by family more
+than by size") are both written as comparisons between *model families*. As
+the sweep is configured, they are not only that. Qwen runs with
+`enable_thinking: false` and Ministral runs with no template kwargs at all, so
+a Qwen-vs-Ministral contrast varies the inference configuration and the model
+family **together**, and the two cannot be separated from the corpus.
+
+Stated plainly: **P8 and P9 compare inference configurations as well as model
+families.** A family effect they report is an upper bound on the family
+effect, not an estimate of it. This is a limit on what those two predictions
+can conclude, and it is written down now rather than discovered in the
+analysis — the same discipline Amendment 1 applied to the fixture-determined
+`point_of_no_return=0` caveat.
+
+### What was deliberately not done
+
+The obvious alternative was to run Qwen thinking-on with a large enough token
+budget so both victims are "unconfigured". It was rejected on the measurement
+above: at `max_tokens=2560` the reach rate is 40/50 per decision point, so a
+five-step trial completes about a third of the time (0.8⁵ ≈ 33%) and the rest
+terminate early on `no_tool_call` under the no-fallback rule. That does not
+remove the confound, it replaces it with a 67% attrition rate that is itself
+configuration-dependent. Running thinking-off and recording the confound is
+the honest option of the two.
+
+The other alternative — dropping Qwen and running one victim — was rejected
+because P8 and P9 need two, and a bounded confound is worth more than a
+missing axis.
+
+### What makes it auditable
+
+`ModelDrivenAgent.sampling_manifest_block()` records `chat_template_kwargs`
+beside `temperature` and `seed`, so two runs with different thinking settings
+are distinguishable from their manifests alone. The value is resolved from
+`saster_harness.campaign.TEMPLATE_KWARGS_BY_MODEL`, the single table the
+pre-sweep canary also reads (`saster_harness.canary.canary_params_for`), so
+the gate runs the configuration the sweep measures;
+`tests/test_canary.py::test_canary_and_campaign_template_kwargs_agree` pins
+that agreement for every model in the table.
+
+### Hashes
+
+Neither moves. `docs/grrcon-test-matrix.md` is untouched — P8 and P9 keep
+their pre-registered text, and this entry is a caveat on their
+interpretation, not a restatement of the predictions.
+`docs/envelope-preregistration.md` is untouched — nothing here concerns the
+scoring method, the candidate set, the three envelopes or either threshold.
+
+    grrcon_matrix_sha256              unchanged  60853077…
+    envelope_preregistration_sha256   unchanged  5d5d9566…
 
 ---
 

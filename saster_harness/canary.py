@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from .campaign import ServingConfig, build_router
+from .campaign import ServingConfig, build_router, template_kwargs_for
 
 #: Benign, on-domain prompts. Deliberately ordinary IT-operations questions:
 #: nothing adversarial, nothing near a policy boundary, nothing that should
@@ -74,6 +74,35 @@ BENIGN_PROMPTS: tuple[str, ...] = (
 #: ``CampaignRunner.generate`` and are deliberately left unbounded — there the
 #: content of the turn is the observation.
 CANARY_PARAMS: dict[str, Any] = {"max_tokens": 64}
+
+
+def canary_params_for(model: str) -> dict[str, Any]:
+    """:data:`CANARY_PARAMS` plus the chat-template kwargs ``model`` is served
+    with — the gate's params for that model.
+
+    The canary exists to measure the path the sweep will actually run on. Chat
+    template kwargs are part of that path: they decide whether a Qwen3 turn
+    thinks or answers, which is the difference between a turn that emits a tool
+    call and one that spends its whole budget in ``<think>``. A thinking-off
+    sweep gated by a thinking-on canary gates on a configuration it does not
+    measure — the same class of mismatch as the W7b prompt-surface divergence
+    and the Amendment 4 stub-observation baseline, both of which were found
+    only after the fact.
+
+    Resolved from :func:`saster_harness.campaign.template_kwargs_for`, the one
+    table the action plane reads, so the two cannot drift apart silently;
+    ``tests/test_canary.py`` asserts the agreement.
+
+    A model needing no kwargs gets no ``chat_template_kwargs`` key at all
+    rather than an empty dict, so the request body is byte-identical to the
+    pre-W7f one for those models and this change cannot move their measured
+    baseline.
+    """
+    params = dict(CANARY_PARAMS)
+    kwargs = template_kwargs_for(model)
+    if kwargs:
+        params["chat_template_kwargs"] = kwargs
+    return params
 
 
 class TurnClass(str, Enum):
@@ -176,8 +205,11 @@ def run_canary(
     corpus repeats rather than truncating. Nothing here raises on a filtered
     turn — that is the measurement, not an error.
 
-    ``params`` defaults to :data:`CANARY_PARAMS`, which bounds the turn. Pass
-    an explicit dict to override; passing ``{}`` deliberately unbounds it.
+    ``params`` defaults to :func:`canary_params_for` for ``model`` — the
+    bounded turn plus whatever chat-template kwargs that model is served with,
+    so the gate runs the sweep's configuration. Pass an explicit dict to
+    override; passing ``{}`` deliberately unbounds it AND drops the template
+    kwargs, which is the caller's call to make explicitly.
     """
     # None means "use the bundled corpus"; an explicitly empty list is a
     # caller error, not a request for the default — silently substituting the
@@ -196,7 +228,7 @@ def run_canary(
             challenge_id=f"canary::{model}",
             step_index=i,
             messages=[{"role": "user", "content": prompt}],
-            params=CANARY_PARAMS if params is None else params,
+            params=canary_params_for(model) if params is None else params,
         )
         if routed.response is None:
             result.errors += 1

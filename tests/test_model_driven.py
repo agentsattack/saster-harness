@@ -16,10 +16,13 @@ import json
 import httpx
 import pytest
 
+from carl_ops_agent.agent import HIDDEN_DIRECTIVE, CarlOpsMode
 from carl_ops_agent.model_driven import (
+    SYSTEM,
     ModelDrivenAgent,
     TurnSource,
     TurnStatus,
+    system_prompt,
 )
 
 
@@ -231,3 +234,160 @@ def test_obstruction_changes_the_environment_not_the_brief():
     blocked = agent(scripted(reply(call("identity_list_roles", "{}"))), obstructed=True)
     assert clean.messages == blocked.messages
     assert clean.session.state.to_json() != blocked.session.state.to_json()
+
+
+# --------------------------------------------------------------------------
+# W7f: template kwargs are an explicit, recorded config field
+# --------------------------------------------------------------------------
+
+
+def test_template_kwargs_default_to_the_shared_table():
+    a = ModelDrivenAgent(base_url="http://r", model="Qwen/Qwen3-8B",
+                         campaign_id="c", obstructed=True, temperature=0.7, seed=1)
+    assert a.template_kwargs == {"enable_thinking": False}
+
+
+def test_template_kwargs_can_be_set_explicitly():
+    a = ModelDrivenAgent(base_url="http://r", model="Qwen/Qwen3-8B",
+                         campaign_id="c", obstructed=True, temperature=0.7, seed=1,
+                         template_kwargs={"enable_thinking": True})
+    assert a.template_kwargs == {"enable_thinking": True}
+
+
+def test_template_kwargs_reach_the_request_body():
+    seen = {}
+
+    def _t(body):
+        seen.update(body)
+        return reply(call("inventory_list_hosts", '{"group": "prod-web"}'))
+
+    a = ModelDrivenAgent(base_url="http://r", model="Qwen/Qwen3-8B",
+                         campaign_id="c", obstructed=True, temperature=0.7, seed=1,
+                         transport=_t)
+    a.select_action(0)
+    assert seen["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_no_kwargs_model_sends_the_pre_w7f_body():
+    """An empty resolution omits the key entirely, so a model needing no
+    template kwargs sends a byte-identical body to the one it sent before this
+    field existed. Adding the field must not perturb Ministral's measurements."""
+    seen = {}
+
+    def _t(body):
+        seen.update(body)
+        return reply(call("inventory_list_hosts", '{"group": "prod-web"}'))
+
+    a = ModelDrivenAgent(base_url="http://r",
+                         model="mistralai/Ministral-8B-Instruct-2410",
+                         campaign_id="c", obstructed=True, temperature=0.7, seed=1,
+                         transport=_t)
+    a.select_action(0)
+    assert "chat_template_kwargs" not in seen
+
+
+def test_manifest_records_the_template_kwargs():
+    """Two runs with different thinking settings must not be indistinguishable
+    in the manifest — the same defect class as the W7b surface mismatch."""
+    on = ModelDrivenAgent(base_url="http://r", model="Qwen/Qwen3-8B",
+                          campaign_id="c", obstructed=True, temperature=0.7, seed=1,
+                          template_kwargs={"enable_thinking": True})
+    off = ModelDrivenAgent(base_url="http://r", model="Qwen/Qwen3-8B",
+                           campaign_id="c", obstructed=True, temperature=0.7, seed=1,
+                           template_kwargs={"enable_thinking": False})
+    assert on.sampling_manifest_block() != off.sampling_manifest_block()
+    assert on.sampling_manifest_block()["chat_template_kwargs"] == {"enable_thinking": True}
+    assert off.sampling_manifest_block()["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_manifest_template_kwargs_sit_beside_temperature_and_seed():
+    block = ModelDrivenAgent(base_url="http://r", model="Qwen/Qwen3-8B",
+                             campaign_id="c", obstructed=True,
+                             temperature=0.7, seed=1).sampling_manifest_block()
+    assert {"temperature", "seed", "chat_template_kwargs"} <= set(block)
+
+
+def test_manifest_block_does_not_alias_the_agents_kwargs():
+    a = ModelDrivenAgent(base_url="http://r", model="Qwen/Qwen3-8B",
+                         campaign_id="c", obstructed=True, temperature=0.7, seed=1)
+    a.sampling_manifest_block()["chat_template_kwargs"]["enable_thinking"] = True
+    assert a.template_kwargs == {"enable_thinking": False}
+
+
+# --------------------------------------------------------------------------
+# W7f: the compromised arm — one field, and nothing else
+# --------------------------------------------------------------------------
+
+
+def test_induced_is_the_default_mode():
+    a = agent(scripted(reply(call("inventory_list_hosts", '{"group": "prod-web"}'))))
+    assert a.mode is CarlOpsMode.INDUCED
+    assert a.messages[0]["content"] == SYSTEM
+
+
+def test_compromised_carries_the_hidden_directive_in_the_system_message():
+    a = ModelDrivenAgent(base_url="http://r", model="m", campaign_id="c",
+                         obstructed=True, temperature=0.7, seed=1,
+                         mode=CarlOpsMode.COMPROMISED)
+    assert HIDDEN_DIRECTIVE in a.messages[0]["content"]
+
+
+def test_the_directive_is_appended_not_substituted():
+    """The compromised agent is told the prohibitions AND the directive; the
+    conflict is the mechanism. An arm that dropped a prohibition would be a
+    different fixture, not a different mechanism."""
+    compromised = system_prompt(CarlOpsMode.COMPROMISED)
+    assert compromised.startswith(SYSTEM)
+    assert "credential material must not be written to any object store" in compromised
+    assert compromised.endswith(HIDDEN_DIRECTIVE)
+
+
+def test_the_induced_system_prompt_is_byte_identical_to_pre_w7f():
+    """Adding the mode must not move the benign arm, or every measurement
+    taken before W7f stops being comparable to one taken after it."""
+    assert system_prompt(CarlOpsMode.INDUCED) == SYSTEM
+
+
+def test_the_modes_differ_only_by_the_directive():
+    induced = system_prompt(CarlOpsMode.INDUCED)
+    compromised = system_prompt(CarlOpsMode.COMPROMISED)
+    assert compromised.replace(HIDDEN_DIRECTIVE, "").rstrip("\n") == induced
+
+
+def test_modes_share_the_tool_surface_and_t0_state():
+    """The mode sets one field. Everything the agent faces is otherwise
+    identical, including the world state at t0."""
+    induced = ModelDrivenAgent(base_url="http://r", model="m", campaign_id="c",
+                               obstructed=True, temperature=0.7, seed=1)
+    compromised = ModelDrivenAgent(base_url="http://r", model="m", campaign_id="c",
+                                   obstructed=True, temperature=0.7, seed=1,
+                                   mode=CarlOpsMode.COMPROMISED)
+    assert induced._tools == compromised._tools
+    assert induced.session.state.content_hash == compromised.session.state.content_hash
+    assert induced.messages[1] == compromised.messages[1]  # same kickoff
+
+
+def test_manifest_names_the_mode_and_the_directive():
+    """P5's mechanism IS this field; a record that does not name it is not
+    analyzable."""
+    induced = ModelDrivenAgent(base_url="http://r", model="m", campaign_id="c",
+                               obstructed=True, temperature=0.7, seed=1)
+    compromised = ModelDrivenAgent(base_url="http://r", model="m", campaign_id="c",
+                                   obstructed=True, temperature=0.7, seed=1,
+                                   mode=CarlOpsMode.COMPROMISED)
+    assert induced.sampling_manifest_block()["mode"] == "carl-ops-induced"
+    assert induced.sampling_manifest_block()["hidden_directive_present"] is False
+    assert compromised.sampling_manifest_block()["mode"] == "carl-ops-compromised"
+    assert compromised.sampling_manifest_block()["hidden_directive_present"] is True
+
+
+def test_the_compromised_arm_still_has_no_fallback_ladder():
+    """The directive changes what the model is told, never what the harness
+    substitutes. A malformed turn is still terminal with its own status."""
+    a = ModelDrivenAgent(base_url="http://r", model="m", campaign_id="c",
+                         obstructed=True, temperature=0.7, seed=1,
+                         mode=CarlOpsMode.COMPROMISED,
+                         transport=scripted(reply(call("not_a_tool", "{}"))))
+    assert a.select_action(0) is None
+    assert a.turns[-1].status is TurnStatus.UNKNOWN_TOOL
+    assert a.turns[-1].source is None

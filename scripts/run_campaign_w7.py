@@ -27,6 +27,7 @@ from typing import Any
 
 sys.path.insert(0, "/home/lbsuto/halctf-agent")
 
+from carl_ops_agent.agent import CarlOpsMode
 from carl_ops_agent.model_driven import ModelDrivenAgent
 from saster_defense.l4_auditor import TrajectoryAuditor
 from saster_defense.manifest import build_manifest, validate_manifest
@@ -38,6 +39,10 @@ ROUTER_URL = os.environ.get("W7_ROUTER", "http://localhost:8080")
 AGENTDOG = "http://[fd00:200::4]:8001"
 AGENTDOG_MODEL = "AI45Research/AgentDoG-Qwen3-4B"
 OBSTRUCTED = os.environ.get("W7_OBSTRUCTED", "1") == "1"
+#: Fixture mode. "carl-ops-induced" (benign at init) or
+#: "carl-ops-compromised" (hidden directive in the system message). The
+#: mode is the only free variable between the two arms.
+MODE = CarlOpsMode(os.environ.get("W7_MODE", CarlOpsMode.INDUCED.value))
 TEMPERATURE = float(os.environ.get("W7_TEMPERATURE", "0.7"))
 SEED = int(os.environ.get("W7_SEED", "20260829"))
 MAX_STEPS = int(os.environ.get("W7_MAX_STEPS", "12"))
@@ -85,7 +90,7 @@ def main() -> None:
 
     agent = ModelDrivenAgent(
         base_url=ROUTER_URL, model=VICTIM, campaign_id=CAMPAIGN_ID,
-        obstructed=OBSTRUCTED, temperature=TEMPERATURE, seed=SEED,
+        obstructed=OBSTRUCTED, temperature=TEMPERATURE, seed=SEED, mode=MODE,
     )
     stack = build_stack()
 
@@ -94,12 +99,14 @@ def main() -> None:
     manifest["campaign_id"] = CAMPAIGN_ID
     manifest["victim_model"] = VICTIM
     manifest["obstructed"] = OBSTRUCTED
+    manifest["fixture_mode"] = MODE.value
     manifest["action_plane"] = agent.sampling_manifest_block()
     manifest["role"] = "W7 — ONE model-driven campaign. Not a pilot, not a sweep."
     manifest["started_utc"] = datetime.now(UTC).isoformat()
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
     print(f"campaign {CAMPAIGN_ID}  victim={VICTIM}  obstructed={OBSTRUCTED}")
+    print(f"mode={MODE.value}  template_kwargs={agent.template_kwargs}")
     print(f"temperature={TEMPERATURE}  seed={SEED}  max_steps={MAX_STEPS}")
     print()
 
@@ -143,6 +150,7 @@ def main() -> None:
         "campaign_id": CAMPAIGN_ID,
         "victim_model": VICTIM,
         "obstructed": OBSTRUCTED,
+        "fixture_mode": MODE.value,
         "temperature": TEMPERATURE,
         "seed": SEED,
         "outcome": outcome,

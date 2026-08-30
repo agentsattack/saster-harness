@@ -6,6 +6,8 @@ import json
 
 import pytest
 
+from carl_ops_agent.model_driven import ModelDrivenAgent
+from saster_harness.campaign import TEMPLATE_KWARGS_BY_MODEL, template_kwargs_for
 from saster_harness.canary import (
     BENIGN_PROMPTS,
     CANARY_PARAMS,
@@ -13,6 +15,7 @@ from saster_harness.canary import (
     CanaryResult,
     TurnClass,
     canary_manifest_block,
+    canary_params_for,
     classify_turn,
     enforce_canary_gate,
     run_canary,
@@ -446,3 +449,71 @@ def test_a_bounded_turn_still_counts_as_measured():
     assert result.ok == 1
     assert result.measured is True
     enforce_canary_gate({"m": result})  # must not raise
+
+
+# --------------------------------------------------------------------------
+# W7f: the canary gates on the configuration the sweep measures
+# --------------------------------------------------------------------------
+#
+# A thinking-off sweep gated by a thinking-on canary gates on a different
+# configuration than it measures. Qwen3-8B is the case that makes this
+# concrete: with thinking on it emits no tool call inside any practical
+# budget, so a canary that ran thinking-on would pass a model the action
+# plane cannot use. These pin the agreement rather than trusting it.
+
+
+def test_canary_params_carry_the_models_template_kwargs():
+    params = canary_params_for("Qwen/Qwen3-8B")
+    assert params["chat_template_kwargs"] == {"enable_thinking": False}
+    # and the bound is still there — this adds to CANARY_PARAMS, never replaces
+    assert params["max_tokens"] == CANARY_PARAMS["max_tokens"]
+
+
+def test_canary_params_omit_the_key_for_a_model_needing_none():
+    """Not an empty dict: the body must be byte-identical to the pre-W7f one
+    for these models, so this change cannot move their measured baseline."""
+    params = canary_params_for("mistralai/Ministral-8B-Instruct-2410")
+    assert "chat_template_kwargs" not in params
+    assert params == CANARY_PARAMS
+
+
+def test_canary_params_do_not_mutate_the_shared_default():
+    canary_params_for("Qwen/Qwen3-8B")["max_tokens"] = 999
+    assert CANARY_PARAMS == {"max_tokens": 64}
+
+
+@pytest.mark.parametrize("model", sorted(TEMPLATE_KWARGS_BY_MODEL))
+def test_canary_and_campaign_template_kwargs_agree(model):
+    """THE gate-alignment invariant. The canary's kwargs and the action
+    plane's kwargs are resolved from one table, and this asserts they land
+    identically on the wire for every model the sweep runs."""
+    agent = ModelDrivenAgent(
+        base_url="http://unused", model=model, campaign_id="agreement",
+        obstructed=True, temperature=0.7, seed=0,
+    )
+    canary = canary_params_for(model).get("chat_template_kwargs", {})
+    assert canary == agent.template_kwargs
+    assert canary == template_kwargs_for(model)
+
+
+def test_run_canary_sends_the_resolved_template_kwargs():
+    """End to end through run_canary: the kwargs reach the router's params."""
+    router = FakeRouter(ok(1))
+    run_canary(router, "Qwen/Qwen3-8B", 1)
+    assert router.params_seen == [
+        {"max_tokens": 64, "chat_template_kwargs": {"enable_thinking": False}}
+    ]
+
+
+def test_run_canary_for_a_no_kwargs_model_is_unchanged():
+    router = FakeRouter(ok(1))
+    run_canary(router, "mistralai/Ministral-8B-Instruct-2410", 1)
+    assert router.params_seen == [{"max_tokens": 64}]
+
+
+def test_explicit_params_still_win_over_the_resolved_default():
+    """Overriding is the caller's call to make explicitly, including dropping
+    the template kwargs — that is what an explicit dict means."""
+    router = FakeRouter(ok(1))
+    run_canary(router, "Qwen/Qwen3-8B", 1, params={"max_tokens": 8})
+    assert router.params_seen == [{"max_tokens": 8}]

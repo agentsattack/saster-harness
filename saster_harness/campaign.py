@@ -100,6 +100,48 @@ DEFAULT_BASE_URL = "http://localhost:8080"
 #: Where the reused halctf router lives when it is not already importable.
 DEFAULT_HALAGENT_PATH = Path.home() / "halctf-agent"
 
+#: Chat-template kwargs a victim model must be served with, keyed by model id.
+#:
+#: This is an INFERENCE-CONFIGURATION field, not a fixture one, and it belongs
+#: here because every path that talks to a victim has to agree on it. vLLM
+#: forwards these to the model's chat template as ``chat_template_kwargs``.
+#:
+#: Qwen3-8B is a reasoning model and thinks by default. With thinking on it
+#: spends the whole turn in ``<think>`` and emits NO tool call inside any
+#: practical budget — measured at turn 0, N=50, temperature 0.7: 0/50 tool
+#: calls at ``max_tokens=512`` (every draw capped, 35.8s each), and still only
+#: 40/50 at ``max_tokens=2560`` (mean 1591 completion tokens, 74.2s each).
+#: With ``enable_thinking: False`` the same decision point yields 50/50 tool
+#: calls in 22 completion tokens at 1.6s. The model-driven action plane is
+#: unusable on Qwen without this, so it is configuration the whole stack
+#: shares rather than a flag one caller sets.
+#:
+#: It is NOT a free cost optimization and must never be treated as one: the
+#: flag changes which action the model picks (see ``docs/schema-amendments.md``,
+#: "Recorded observation 1"). Every consumer therefore records the resolved
+#: value rather than assuming a default — an unrecorded inference config is
+#: the same defect class as the W7b prompt-surface mismatch.
+#:
+#: Ministral-8B has no such kwarg and maps to ``{}``: an empty dict is a
+#: measured "this model needs none", not an absent answer.
+TEMPLATE_KWARGS_BY_MODEL: dict[str, dict[str, Any]] = {
+    "Qwen/Qwen3-8B": {"enable_thinking": False},
+    "mistralai/Ministral-8B-Instruct-2410": {},
+}
+
+
+def template_kwargs_for(model: str) -> dict[str, Any]:
+    """The chat-template kwargs ``model`` is served with.
+
+    Returns a fresh dict so a caller cannot mutate the table. An unknown model
+    maps to ``{}`` — the same answer as a known model that needs none, which is
+    deliberate: this function answers "what kwargs does this model take", and
+    for an unlisted model the honest answer is none rather than an error. A
+    model that turns out to need kwargs is added to
+    :data:`TEMPLATE_KWARGS_BY_MODEL` in one place and every consumer follows.
+    """
+    return dict(TEMPLATE_KWARGS_BY_MODEL.get(model, {}))
+
 
 class ServingUnavailable(RuntimeError):
     """The halctf serving layer could not be imported."""
