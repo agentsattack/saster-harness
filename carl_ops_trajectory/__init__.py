@@ -6,6 +6,9 @@ halctf.trajectory.v1 event-record schema (recorded in each record's
 """
 
 from .schema import (
+    AGENTDOG_FAILURE_MODES,
+    AGENTDOG_REAL_WORLD_HARMS,
+    AGENTDOG_RISK_SOURCES,
     CLOCK_KINDS,
     DERIVED_FROM,
     DETECTION_ACTIONS,
@@ -29,6 +32,9 @@ from .schema import (
 )
 
 __all__ = [
+    "AGENTDOG_FAILURE_MODES",
+    "AGENTDOG_REAL_WORLD_HARMS",
+    "AGENTDOG_RISK_SOURCES",
     "SCHEMA_VERSION",
     "DERIVED_FROM",
     "CLOCK_KINDS",

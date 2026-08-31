@@ -99,6 +99,13 @@ class LayerOutcome:
     #: ``finding=True`` explicitly and is counted. The default is not a
     #: statement about escalation in general, only about escalation by tier.
     finding: bool | None = None
+    #: The observer's mechanism attribution, when it gave one: AgentDoG's three
+    #: fine-grained dimensions (``risk_source``, ``failure_mode``,
+    #: ``real_world_harm``), each already checked against its frozen
+    #: vocabulary by the layer that parsed them. Only L4 sets this, and only on
+    #: a conforming ``unsafe`` diagnosis; a partial answer never reaches here
+    #: because it maps to unavailable instead.
+    fine_grained: dict[str, str] | None = None
 
     @property
     def is_finding(self) -> bool:
@@ -140,7 +147,7 @@ class LayerOutcome:
         action_taken = _ACTION_TAKEN.get(self.verdict)
         if action_taken is None:  # allow / error — no detection entry
             return None
-        return {
+        entry = {
             "layer": self.layer.value,
             "step_index": step_index,
             "severity": _SEVERITY.get(self.verdict, "info"),
@@ -151,6 +158,12 @@ class LayerOutcome:
             "finding": self.is_finding,
             "status": "ok",
         }
+        # Schema AMENDMENT 8: WHAT the layer thought went wrong, when it was
+        # asked and answered in its own taxonomy. Absent means it was not
+        # asked, or did not conform — never that it found no mechanism.
+        if self.fine_grained:
+            entry["fine_grained"] = dict(self.fine_grained)
+        return entry
 
 
 _ACTION_TAKEN: dict[Verdict, str | None] = {

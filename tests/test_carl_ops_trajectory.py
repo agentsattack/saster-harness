@@ -1163,3 +1163,117 @@ def test_finding_must_be_a_bool() -> None:
     rec = valid_trajectory_record()
     rec["detection"][0]["finding"] = "yes"
     reject(rec, "finding")
+
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 8 — the observer's mechanism attribution
+# ---------------------------------------------------------------------------
+
+GOOD_FG = {
+    "risk_source": "Inherent Agent/LLM Failures",
+    "failure_mode": "Unconfirmed or Over-privileged Action",
+    "real_world_harm": "Privacy & Confidentiality Harm",
+}
+
+
+def _with_l4_finding(fine_grained=None) -> dict:
+    rec = valid_trajectory_record()
+    entry = {
+        "layer": "l4_auditor", "step_index": 3, "severity": "medium",
+        "action_taken": "warn", "finding": True, "status": "ok",
+    }
+    if fine_grained is not None:
+        entry["fine_grained"] = fine_grained
+    rec["detection"] = [entry]
+    return rec
+
+
+def test_a_conforming_fine_grained_block_is_accepted() -> None:
+    assert validate_record(_with_l4_finding(GOOD_FG)) == []
+
+
+def test_fine_grained_is_optional() -> None:
+    """Pre-amendment records carry no attribution. Its absence means the
+    observer was not asked, never that it found no mechanism."""
+    assert validate_record(_with_l4_finding()) == []
+
+
+def test_a_label_outside_agentdogs_taxonomy_is_rejected() -> None:
+    """P10 is an accuracy against AgentDoG's own label set. An out-of-taxonomy
+    string would enter that denominator as if it were a category."""
+    rec = _with_l4_finding({**GOOD_FG, "failure_mode": "Credential Exfiltration"})
+    reject(rec, "fine_grained.failure_mode")
+
+
+def test_a_paraphrased_label_is_rejected() -> None:
+    rec = _with_l4_finding({**GOOD_FG, "failure_mode": "over-privileged action"})
+    reject(rec, "fine_grained.failure_mode")
+
+
+def test_a_risk_source_used_as_a_failure_mode_is_rejected() -> None:
+    """The three vocabularies are distinct; a value from the wrong dimension
+    would score as a valid label."""
+    rec = _with_l4_finding({**GOOD_FG, "failure_mode": "Direct Prompt Injection"})
+    reject(rec, "fine_grained.failure_mode")
+
+
+def test_a_partial_block_is_rejected() -> None:
+    """AgentDoG emits the three dimensions as one answer. A partial block would
+    record an attribution it was never asked to give piecemeal."""
+    for missing in ("risk_source", "failure_mode", "real_world_harm"):
+        rec = _with_l4_finding({k: v for k, v in GOOD_FG.items() if k != missing})
+        reject(rec, f"fine_grained.{missing}")
+
+
+def test_an_unknown_dimension_is_rejected() -> None:
+    rec = _with_l4_finding({**GOOD_FG, "severity_guess": "high"})
+    reject(rec, "fine_grained")
+
+
+def test_an_unavailable_layer_may_not_attribute_a_mechanism() -> None:
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "l4_auditor", "step_index": 3, "severity": "unavailable",
+         "action_taken": None, "status": "unavailable", "fine_grained": GOOD_FG},
+    ]
+    rec["detection_complete"] = False
+    rec["markers"]["first_detection_step"] = None
+    rec["containment_latency"] = {"value": None, "censored": True}
+    reject(rec, "fine_grained")
+
+
+def test_a_routine_escalation_may_not_attribute_a_mechanism() -> None:
+    """Only a finding may carry one — an attribution for something no layer
+    flagged is not an observation."""
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "l5_approval", "step_index": 0, "severity": "high",
+         "action_taken": "escalate", "finding": False, "status": "ok",
+         "fine_grained": GOOD_FG},
+    ]
+    rec["markers"]["first_detection_step"] = None
+    rec["containment_latency"] = {"value": None, "censored": True}
+    reject(rec, "fine_grained")
+
+
+def test_fine_grained_must_be_an_object() -> None:
+    rec = _with_l4_finding("Unconfirmed or Over-privileged Action")
+    reject(rec, "fine_grained")
+
+
+def test_every_frozen_label_validates() -> None:
+    """The contract accepts its whole vocabulary, not just the values a test
+    happened to name."""
+    from carl_ops_trajectory.schema import (
+        AGENTDOG_FAILURE_MODES,
+        AGENTDOG_REAL_WORLD_HARMS,
+        AGENTDOG_RISK_SOURCES,
+    )
+
+    for key, vocabulary in (
+        ("risk_source", AGENTDOG_RISK_SOURCES),
+        ("failure_mode", AGENTDOG_FAILURE_MODES),
+        ("real_world_harm", AGENTDOG_REAL_WORLD_HARMS),
+    ):
+        for label in vocabulary:
+            assert validate_record(_with_l4_finding({**GOOD_FG, key: label})) == [], label

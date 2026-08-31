@@ -14,6 +14,7 @@ import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from . import agentdog
 from .l1_classifier import LLAMAGUARD3_ATBENCH_RECALL
 from .l2_policy import ALL_RULES
 
@@ -184,6 +185,36 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             "context_window": a.context_window,
             "level": "warn",
             "note": "observer_model is a config field; vary if budget allows",
+            # What the observer was ASKED, hashed. The prompt and taxonomy are
+            # AgentDoG's own, vendored verbatim; a record that does not say
+            # which version it ran cannot be read against AgentDoG's published
+            # fine-grained accuracy, which is P10's entire baseline.
+            "fine_grained": a.fine_grained,
+            "prompt_template": (
+                "agentdog/trajectory_finegrained.txt" if a.fine_grained
+                else "agentdog/trajectory_binary.txt"
+            ),
+            "prompt_sha256": agentdog.sha256(
+                agentdog.TRAJECTORY_FINEGRAINED_PATH if a.fine_grained
+                else agentdog.TRAJECTORY_BINARY_PATH
+            ),
+            "taxonomy_sha256": (
+                agentdog.sha256(agentdog.TAXONOMY_FINEGRAINED_PATH)
+                if a.fine_grained else None
+            ),
+            "agentdog_repo": agentdog.AGENTDOG_REPO,
+            "agentdog_revision": agentdog.AGENTDOG_REVISION,
+            "agentdog_prompt_version": agentdog.AGENTDOG_PROMPT_VERSION,
+            # AgentDoG 1.0 ships the binary and fine-grained heads as SEPARATE
+            # checkpoints, and the published fine-grained accuracies are the FG
+            # head's. Asking a binary head for a label may still parse, and the
+            # answer is not the quantity those numbers describe. Recorded so a
+            # corpus never has to be taken on trust about which head answered.
+            "observer_is_fine_grained_checkpoint": (
+                a.observer_is_fine_grained_checkpoint
+            ),
+            "max_tokens": a.max_tokens,
+            "temperature": a.temperature,
             **_status(not a.representative, "l4"),
         }
     if cfg.l5 and stack.approval is not None:
