@@ -2,7 +2,7 @@
 the P1/P3/P4/P12 ablation properties."""
 from __future__ import annotations
 
-from carl_ops_trajectory import validate_record
+from carl_ops_trajectory import first_finding_step, to_action_index, validate_record
 from saster_defense import (
     ActionRequest,
     ApprovalGate,
@@ -280,27 +280,59 @@ def test_detection_entries_validate_in_the_frozen_schema():
     entries.append(unavailable.as_detection_entry(0))
     assert any(e["status"] == "unavailable" for e in entries)
 
-    record = _trajectory_with_detection(entries, breach=True, bsi=3)
+    record = _trajectory_with_detection(entries, n_actions=len(FIREWALL_ROUTE))
     assert validate_record(record) == [], record
 
 
-def _trajectory_with_detection(entries, breach, bsi):
+def _trajectory_with_detection(entries, n_actions):
+    """A minimal breach record whose detection list is the one under test.
+
+    The surrounding fields are built coherently rather than filled in with a
+    constant: since AMENDMENT 6 the marker block is ACTION space and the
+    record must carry the map that converts the oracle's snapshot index into
+    it, and since AMENDMENT 7 ``first_detection_step`` is derived from which
+    entries are FINDINGS. Both are computed here from the same functions the
+    validator uses, so this fixture cannot drift from the rules it exercises.
+    """
+    # The last action mutated; nothing before it did. One snapshot beyond t0.
+    action_to_snapshot = [0] * (n_actions - 1) + [1]
+    oracle_bsi = 1
+    marker_bsi = to_action_index(action_to_snapshot, oracle_bsi)
+    fds = first_finding_step(entries)
+    latency = (
+        {"value": None, "censored": True} if fds is None
+        else {"value": fds - marker_bsi, "censored": False}
+    )
     return {
         "schema_version": "saster.trajectory.v1",
         "derived_from": "halctf.trajectory.v1",
         "record_type": "trajectory",
         "run_id": "r", "campaign_id": "c", "trial_index": 0,
         "timestamp_utc": "t", "budget": {"cap": 100, "consumed": 5, "stalls": 1, "repeats": 1},
-        "turns": [], "actions": [],
+        "turns": [],
+        "actions": [
+            {"step_index": i, "policy_verdict": "allow", "surprisal": 1.0}
+            for i in range(n_actions)
+        ],
         "detection": entries,
         "detection_complete": not any(e["status"] == "unavailable" for e in entries),
-        "oracle": {"snapshot_hashes": ["h0", "h1"], "breach": breach,
-                   "breach_step_index": bsi, "invariant": "I1", "invariants_fired": ["I1"]},
-        "markers": {"onset_status": "estimated",
-                    "onset_dist": {"steps": [bsi], "probs": [1.0]},
-                    "explanatory_divergence": None, "point_of_no_return": bsi,
-                    "breach_step_index": bsi, "first_detection_step": bsi},
-        "containment_latency": {"value": 0, "censored": False},
+        "oracle": {"snapshot_hashes": ["h0", "h1"], "breach": True,
+                   "breach_step_index": oracle_bsi, "invariant": "I1",
+                   "invariants_fired": ["I1"]},
+        "index_map": {
+            "marker_space": "action",
+            "oracle_space": "snapshot",
+            "action_to_snapshot": action_to_snapshot,
+            "snapshot_space_markers": {
+                "breach_step_index": oracle_bsi, "point_of_no_return": oracle_bsi,
+            },
+        },
+        "markers": {"index_space": "action",
+                    "onset_status": "estimated",
+                    "onset_dist": {"steps": [marker_bsi], "probs": [1.0]},
+                    "explanatory_divergence": None, "point_of_no_return": marker_bsi,
+                    "breach_step_index": marker_bsi, "first_detection_step": fds},
+        "containment_latency": latency,
         "terminal_outcome": "breach",
         "widening_route": "firewall",
         "identity": None, "cnf": None,

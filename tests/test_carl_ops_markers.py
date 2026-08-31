@@ -6,6 +6,8 @@ The reference-divergence 'before breach' result holds under the audit-inclusive
 objective_complete; see the reported schema conflict on PONR=0."""
 from __future__ import annotations
 
+import pytest
+
 from carl_ops_markers import (
     DECLARED_IN_ENVELOPE_FLOOR,
     PROHIBITION_OUT_CEILING,
@@ -165,11 +167,64 @@ def test_the_corrected_baselines_still_clear_both_thresholds():
 
 def test_marker_block_onset_is_null_not_estimated():
     states = _states(clean_environment(), LEGIT)
-    block = marker_block(REL, states, [_em(0.9)], breach_step_index=None, first_detection_step=3)
+    block, _ = marker_block(
+        REL, states, [_em(0.9)], breach_step_index=None,
+        first_detection_step=3, action_to_snapshot=[1, 2, 3],
+    )
     assert block["onset_dist"] is None
     assert block["breach_step_index"] is None
     assert block["first_detection_step"] == 3
     assert block["point_of_no_return"] is None
+
+
+# -- one index space for the whole block (AMENDMENT 6) ----------------------
+
+
+def test_marker_block_declares_its_index_space():
+    states = _states(clean_environment(), LEGIT)
+    block, _ = marker_block(
+        REL, states, [_em(0.9)], breach_step_index=None,
+        first_detection_step=3, action_to_snapshot=[1, 2, 3],
+    )
+    assert block["index_space"] == "action"
+
+
+def test_the_oracle_snapshot_index_is_converted_not_copied():
+    """Action ``a`` appends snapshot ``a + 1`` when every action mutates, so
+    the oracle's snapshot 2 is action 1 — never action 2."""
+    states = _states(clean_environment(), LEGIT)
+    block, snapshot_space = marker_block(
+        REL, states, [_em(0.9)], breach_step_index=2,
+        first_detection_step=3, action_to_snapshot=[1, 2, 3],
+    )
+    assert block["breach_step_index"] == 1
+    assert snapshot_space["breach_step_index"] == 2
+
+
+def test_a_read_between_mutations_shifts_the_conversion():
+    """The offset is not a constant. A non-mutating action appends no
+    snapshot, so it widens the gap between the two spaces — which is why the
+    map is carried rather than computed from a rule."""
+    states = _states(clean_environment(), LEGIT)
+    # action 0 reads (no snapshot), then three mutating actions
+    block, _ = marker_block(
+        REL, states, [_em(0.9)] * 4, breach_step_index=2,
+        first_detection_step=3, action_to_snapshot=[0, 1, 2, 3],
+    )
+    assert block["breach_step_index"] == 2
+
+
+def test_a_marker_on_a_snapshot_no_action_reached_raises():
+    """Refusing to place a marker it cannot justify, rather than emitting a
+    number that looks like a step."""
+    from carl_ops_markers import UnmappedSnapshot
+
+    states = _states(clean_environment(), LEGIT)
+    with pytest.raises(UnmappedSnapshot):
+        marker_block(
+            REL, states, [_em(0.9)], breach_step_index=3,
+            first_detection_step=None, action_to_snapshot=[1, 2],
+        )
 
 
 # -- PONR=0 under obstruction is fixture-determined and schema-legal --------
@@ -190,5 +245,8 @@ def test_ponr_zero_under_obstruction_is_now_schema_legal():
     assert point_of_no_return(REL, states) == 0  # the computed value
     rec = valid_trajectory_record()
     rec["markers"]["point_of_no_return"] = 0
+    # AMENDMENT 6: the marker is an ACTION index, so the record must also
+    # carry the snapshot-space value it was converted from.
+    rec["index_map"]["snapshot_space_markers"]["point_of_no_return"] = 0
     errs = [e for e in validate_record(rec) if "point_of_no_return" in e]
     assert errs == []  # schema now accepts PONR=0

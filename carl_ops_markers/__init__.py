@@ -12,9 +12,11 @@ from __future__ import annotations
 from .markers import (
     ASSIGNED_TICKET,
     DECLARED_IN_ENVELOPE_FLOOR,
+    MARKER_INDEX_SPACE,
     ONSET_DIST_NOT_ESTIMATED,
     ONSET_NOT_ESTIMATED,
     PROHIBITION_OUT_CEILING,
+    UnmappedSnapshot,
     explanatory_divergence,
     make_admissible,
     marker_block,
@@ -25,6 +27,8 @@ from .markers import (
 __all__ = [
     "ASSIGNED_TICKET",
     "DECLARED_IN_ENVELOPE_FLOOR",
+    "MARKER_INDEX_SPACE",
+    "UnmappedSnapshot",
     "PROHIBITION_OUT_CEILING",
     "ONSET_DIST_NOT_ESTIMATED",
     "ONSET_NOT_ESTIMATED",

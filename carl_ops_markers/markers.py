@@ -42,6 +42,22 @@ from typing import Any
 from carl_ops_oracle.graph_view import SnapshotGraphView
 from carl_ops_oracle.oracle import EvalContext, Invariant, load_invariants
 from carl_ops_state import TransitionRelation, WorldState
+from carl_ops_trajectory import to_action_index
+
+#: The index space this block is emitted in (schema AMENDMENT 6).
+#:
+#: point_of_no_return and breach_step_index are computed over SNAPSHOTS —
+#: the store appends one only for a mutating action, so their indices skip
+#: every read and every attempt that never applied. first_detection_step and
+#: explanatory_divergence are ACTION indices. Before the amendment the block
+#: carried both and said neither.
+#:
+#: Action space wins because it is the only one every marker can be expressed
+#: in. A read that shifts the envelope has an action index and no snapshot;
+#: converting the other way would have to invent one. It is also the space the
+#: agent and the defense stack both act in, so a timeline drawn from this
+#: block lines up with the transcript a reader is looking at.
+MARKER_INDEX_SPACE = "action"
 
 ASSIGNED_TICKET = "T1"
 
@@ -160,18 +176,58 @@ def marker_block(
     envelope_masses: Sequence[dict],
     breach_step_index: int | None,
     first_detection_step: int | None,
+    action_to_snapshot: Sequence[int],
     invariants: Sequence[Invariant] | None = None,
-) -> dict[str, Any]:
-    """Assemble the schema ``markers`` block. onset_dist is null and
-    ``onset_status`` is ``not_estimated`` — uniformly, for every trajectory in
-    this sweep, breach or not (AMENDMENT 2; see ``docs/schema-amendments.md``).
-    breach_step_index and first_detection_step are passed through from the
-    oracle and the defense stack respectively."""
-    return {
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Assemble the schema ``markers`` block, in ACTION space.
+
+    Returns ``(markers, snapshot_space_markers)``. The second is the
+    pre-conversion value of each marker that was computed over snapshots, and
+    it goes into the record's ``index_map`` — the conversion has to be
+    auditable, and one case is otherwise ambiguous: ``point_of_no_return`` 0
+    means "foreclosed before action 0 ran" or "action 0 foreclosed it"
+    depending on whether the snapshot-space value was 0 or 1.
+
+    ``breach_step_index`` is the ORACLE's index and is therefore a snapshot
+    index; ``first_detection_step`` comes from the defense stack and is
+    already an action index. ``action_to_snapshot`` is the driver's record of
+    which snapshot each action reached, and is the only thing that can relate
+    them — the oracle's own surface is serialized state, which carries no
+    action information by design.
+
+    onset_dist is null and ``onset_status`` is ``not_estimated`` — uniformly,
+    for every trajectory in this sweep, breach or not (AMENDMENT 2)."""
+    ponr_snapshot = point_of_no_return(relation, snapshots, invariants)
+    a2s = list(action_to_snapshot)
+    markers = {
+        "index_space": MARKER_INDEX_SPACE,
         "onset_status": ONSET_NOT_ESTIMATED,
         "onset_dist": None,  # not estimated — see ONSET_DIST_NOT_ESTIMATED
         "explanatory_divergence": explanatory_divergence(envelope_masses),
-        "point_of_no_return": point_of_no_return(relation, snapshots, invariants),
-        "breach_step_index": breach_step_index,
+        "point_of_no_return": _to_action(a2s, ponr_snapshot),
+        "breach_step_index": _to_action(a2s, breach_step_index),
         "first_detection_step": first_detection_step,
     }
+    return markers, {
+        "breach_step_index": breach_step_index,
+        "point_of_no_return": ponr_snapshot,
+    }
+
+
+class UnmappedSnapshot(ValueError):
+    """A snapshot index no action in the trajectory reached.
+
+    The marker layer refuses to emit a converted index it cannot justify:
+    a marker localized to a snapshot the action list does not explain is not
+    a point on the timeline the record claims to draw."""
+
+
+def _to_action(action_to_snapshot: Sequence[int], snapshot_index: int | None) -> int | None:
+    converted = to_action_index(list(action_to_snapshot), snapshot_index)
+    if converted == "unmapped":
+        raise UnmappedSnapshot(
+            f"snapshot index {snapshot_index} was reached by no action in "
+            f"action_to_snapshot={list(action_to_snapshot)}; refusing to emit "
+            f"a marker that cannot be placed on the action timeline"
+        )
+    return converted

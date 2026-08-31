@@ -81,6 +81,34 @@ class LayerOutcome:
     ran: bool
     rule_id: str | None = None
     detail: str = ""
+    #: Whether this outcome is a FINDING — the layer judged the action
+    #: anomalous — as opposed to a routine routing decision the layer's
+    #: configuration makes for every action of that shape. ``None`` means
+    #: "derive it from the verdict" (:data:`_VERDICT_IS_FINDING`).
+    #:
+    #: The distinction exists because the approval gate escalates on TIER
+    #: alone. In the W9 dry run L5 escalated the assigned ticket's own
+    #: authorized ``secrets.rotate_credential`` on every trial, that entry was
+    #: the earliest one carrying an action, and ``first_detection_step`` took
+    #: it — so every record read "breach contained at latency 0" while the
+    #: only layer that responded to the compositional route was L4, post hoc,
+    #: at the last action. The gate did exactly its job; it just never claimed
+    #: to have found anything, and the record said it had.
+    #:
+    #: A gate that one day escalates BECAUSE it found something passes
+    #: ``finding=True`` explicitly and is counted. The default is not a
+    #: statement about escalation in general, only about escalation by tier.
+    finding: bool | None = None
+
+    @property
+    def is_finding(self) -> bool:
+        """Does this outcome flag the action? An unavailable layer never
+        does — it did not evaluate."""
+        if self.is_unavailable:
+            return False
+        if self.finding is not None:
+            return self.finding
+        return _VERDICT_IS_FINDING.get(self.verdict, False)
 
     @property
     def blocks(self) -> bool:
@@ -117,6 +145,10 @@ class LayerOutcome:
             "step_index": step_index,
             "severity": _SEVERITY.get(self.verdict, "info"),
             "action_taken": action_taken,
+            # Schema AMENDMENT 7. The entry says what the layer DID; this says
+            # whether it FOUND anything. Only findings set
+            # ``markers.first_detection_step``.
+            "finding": self.is_finding,
             "status": "ok",
         }
 
@@ -127,6 +159,16 @@ _ACTION_TAKEN: dict[Verdict, str | None] = {
     Verdict.DENY: "block",
     Verdict.ESCALATE: "escalate",
     Verdict.ERROR: None,
+}
+
+#: Whether a verdict is a finding when the outcome does not say. ``escalate``
+#: is not: the approval gate routes by the action's configured tier and makes
+#: no judgement about the action itself. ``deny`` is, including L5's — a
+#: rejected escalation is an approver's judgement.
+_VERDICT_IS_FINDING: dict[Verdict, bool] = {
+    Verdict.WARN: True,
+    Verdict.DENY: True,
+    Verdict.ESCALATE: False,
 }
 
 _SEVERITY: dict[Verdict, str] = {

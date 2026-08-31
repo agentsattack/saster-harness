@@ -244,6 +244,12 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> dict:
         envelope_masses=masses,
         relation=REL,
         snapshots=states,
+        # Every planned action mutates, so action ``a`` appends snapshot
+        # ``a + 1``. The offset is one here and is NOT zero: snapshot 0 is t0
+        # and no action produced it. Before AMENDMENT 6 this driver's records
+        # asserted the marker and the oracle index were the same number, which
+        # was wrong by exactly this offset.
+        action_to_snapshot=list(range(1, len(PLAN_CANDIDATES) + 1)),
         terminal_state_json=terminal_json,
         # DERIVED from terminal state, never hand-set; the assembler
         # cross-checks with resolve_widening_route and raises on mismatch.

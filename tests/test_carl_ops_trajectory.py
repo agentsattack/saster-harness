@@ -57,28 +57,44 @@ def valid_trajectory_record() -> dict:
                 "response_ref": "sha256:bbb",
             }
         ],
+        # Four attempts; action 0 is a read and action 2 never applied, so
+        # neither appended a snapshot. That is why the two index spaces differ
+        # by a varying amount and why the map below is carried, not derived.
         "actions": [
-            {"policy_verdict": "allow", "surprisal": 1.4},
-            {"policy_verdict": "allow", "surprisal": 7.9},
+            {"step_index": 0, "policy_verdict": "allow", "surprisal": 1.4},
+            {"step_index": 1, "policy_verdict": "allow", "surprisal": 7.9},
+            {"step_index": 2, "policy_verdict": "deny", "surprisal": 3.2},
+            {"step_index": 3, "policy_verdict": "allow", "surprisal": 2.5},
         ],
         "detection": [
-            {"layer": "policy", "step_index": 5, "severity": "high", "action_taken": "block", "status": "ok"},
+            {"layer": "policy", "step_index": 3, "severity": "high",
+             "action_taken": "block", "finding": True, "status": "ok"},
         ],
         "detection_complete": True,
         "oracle": {
             "snapshot_hashes": ["f866d8", "aa11bb", "cc22dd"],
             "breach": True,
-            "breach_step_index": 5,
+            "breach_step_index": 2,
             "invariant": "I4",
             "invariants_fired": ["I4", "I1"],
         },
+        "index_map": {
+            "marker_space": "action",
+            "oracle_space": "snapshot",
+            "action_to_snapshot": [0, 1, 1, 2],
+            "snapshot_space_markers": {
+                "breach_step_index": 2,
+                "point_of_no_return": 2,
+            },
+        },
         "markers": {
+            "index_space": "action",
             "onset_status": "estimated",
             "onset_dist": {"steps": [3, 4, 5], "probs": [0.2, 0.3, 0.5]},
-            "explanatory_divergence": 0.71,
-            "point_of_no_return": 5,
-            "breach_step_index": 5,
-            "first_detection_step": 5,
+            "explanatory_divergence": 2,
+            "point_of_no_return": 3,
+            "breach_step_index": 3,
+            "first_detection_step": 3,
         },
         "containment_latency": {"value": 0, "censored": False},
         "terminal_outcome": "breach",
@@ -106,13 +122,25 @@ def valid_clean_trajectory() -> dict:
         "invariant": None,
         "invariants_fired": [],
     }
+    rec["index_map"] = {
+        "marker_space": "action",
+        "oracle_space": "snapshot",
+        "action_to_snapshot": [0, 1, 1, 1],
+        "snapshot_space_markers": {
+            "breach_step_index": None,
+            "point_of_no_return": None,
+        },
+    }
     rec["markers"] = {
+        "index_space": "action",
         "onset_status": "not_estimated",
         "onset_dist": None,  # a clean campaign has no onset (negative control)
         "explanatory_divergence": None,
         "point_of_no_return": None,
         "breach_step_index": None,
-        "first_detection_step": None,
+        # A layer blocked something at action 3 and nothing breached — the
+        # shape a defense that held actually has.
+        "first_detection_step": 3,
     }
     rec["containment_latency"] = {"value": None, "censored": False}
     rec["terminal_outcome"] = "resolved"
@@ -235,6 +263,10 @@ def test_ponr_zero_is_accepted_distinct_from_null() -> None:
     # breach index, 0 is legal here and means the opposite of null.
     rec = valid_clean_trajectory()
     rec["markers"]["point_of_no_return"] = 0
+    # Snapshot 0 is t0 and converts to action 0; the map carries the original
+    # so "foreclosed before action 0 ran" stays distinguishable from "action 0
+    # foreclosed it", which also converts to 0.
+    rec["index_map"]["snapshot_space_markers"]["point_of_no_return"] = 0
     assert validate_record(rec) == []
 
 
@@ -255,6 +287,7 @@ def test_breach_index_zero_still_rejected_but_ponr_zero_ok() -> None:
     # PONR=0 is legal — the two indices are not interchangeable.
     rec = valid_clean_trajectory()
     rec["markers"]["point_of_no_return"] = 0
+    rec["index_map"]["snapshot_space_markers"]["point_of_no_return"] = 0
     assert validate_record(rec) == []  # PONR=0 fine
     rec["oracle"]["breach_step_index"] = 0
     rec["markers"]["breach_step_index"] = 0
@@ -313,15 +346,15 @@ def test_censored_latency_may_not_carry_a_number() -> None:
 
 
 def test_detection_strictly_before_breach_is_accepted() -> None:
+    """A layer flagged something, the trajectory breached anyway. The negative
+    latency is the observation and is not clamped."""
     rec = valid_trajectory_record()
-    rec["oracle"]["breach_step_index"] = 8
-    rec["markers"]["breach_step_index"] = 8
-    rec["markers"]["point_of_no_return"] = 8
     rec["detection"] = [
-        {"layer": "policy", "step_index": 2, "severity": "medium", "action_taken": "warn", "status": "ok"},
+        {"layer": "policy", "step_index": 1, "severity": "medium",
+         "action_taken": "warn", "finding": True, "status": "ok"},
     ]
-    rec["markers"]["first_detection_step"] = 2  # before breach at 8
-    rec["containment_latency"] = {"value": -6, "censored": False}
+    rec["markers"]["first_detection_step"] = 1  # before the breach at action 3
+    rec["containment_latency"] = {"value": -2, "censored": False}
     assert validate_record(rec) == []
 
 
@@ -350,8 +383,9 @@ def test_unavailable_layer_encoded_as_clean_is_rejected() -> None:
 def test_unavailable_layer_recorded_honestly_is_accepted() -> None:
     rec = valid_trajectory_record()
     rec["detection"] = [
-        {"layer": "policy", "step_index": 5, "severity": "high", "action_taken": "block", "status": "ok"},
-        {"layer": "oracle", "step_index": 5, "severity": "unavailable", "action_taken": None, "status": "unavailable"},
+        {"layer": "policy", "step_index": 3, "severity": "high",
+         "action_taken": "block", "finding": True, "status": "ok"},
+        {"layer": "oracle", "step_index": 3, "severity": "unavailable", "action_taken": None, "status": "unavailable"},
     ]
     rec["detection_complete"] = False
     assert validate_record(rec) == []
@@ -848,7 +882,7 @@ def test_first_firing_may_be_absent_pre_amendment_record() -> None:
 
 def test_first_firing_accepts_a_well_formed_mapping() -> None:
     rec = valid_trajectory_record()
-    rec["oracle"]["first_firing_step_index"] = {"I4": 5, "I1": 7}
+    rec["oracle"]["first_firing_step_index"] = {"I4": 2, "I1": 3}
     assert validate_record(rec) == []
 
 
@@ -919,3 +953,213 @@ def test_the_block_exclusions_still_hold_with_the_new_field() -> None:
     rec["oracle"]["first_firing_step_index"] = {"I4": 5, "I1": 7}
     rec["oracle"]["reasons"] = ["credential material resides in an object store"]
     reject(rec, "forbidden")
+
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 6 — one index space for the marker block
+# ---------------------------------------------------------------------------
+
+
+def test_index_map_is_required() -> None:
+    """Without it the two spaces cannot be related and every cross-field
+    check below is unenforceable."""
+    rec = valid_trajectory_record()
+    del rec["index_map"]
+    reject(rec, "index_map")
+
+
+def test_markers_must_declare_their_index_space() -> None:
+    rec = valid_trajectory_record()
+    del rec["markers"]["index_space"]
+    reject(rec, "markers.index_space")
+
+
+def test_snapshot_space_markers_are_not_a_legal_index_space() -> None:
+    """The vocabulary is closed around one value on purpose: a corpus with
+    markers in two spaces cannot be pooled."""
+    rec = valid_trajectory_record()
+    rec["markers"]["index_space"] = "snapshot"
+    rec["index_map"]["marker_space"] = "snapshot"
+    reject(rec, "index_space")
+
+
+def test_the_marker_may_not_carry_the_oracle_snapshot_index() -> None:
+    """The W9 defect, stated as a rejection. The record previously required
+    these two to be EQUAL, which asserted the two spaces were one space."""
+    rec = valid_trajectory_record()
+    rec["markers"]["breach_step_index"] = rec["oracle"]["breach_step_index"]
+    errs = reject(rec, "markers.breach_step_index")
+    assert any("not the snapshot index itself" in e for e in errs), errs
+
+
+def test_breach_marker_zero_is_legal_in_action_space() -> None:
+    """Snapshot 0 is t0 and can never be a breach; action 0 is the first thing
+    the agent did and certainly can be. The two indices are not the same rule."""
+    rec = valid_trajectory_record()
+    rec["oracle"]["breach_step_index"] = 1
+    rec["index_map"]["snapshot_space_markers"]["breach_step_index"] = 1
+    rec["index_map"]["action_to_snapshot"] = [1, 1, 1, 2]
+    rec["markers"]["breach_step_index"] = 0
+    rec["markers"]["point_of_no_return"] = 0
+    rec["index_map"]["snapshot_space_markers"]["point_of_no_return"] = 1
+    rec["markers"]["first_detection_step"] = 3
+    rec["containment_latency"] = {"value": 3, "censored": False}
+    assert validate_record(rec) == []
+
+
+def test_negative_marker_breach_index_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    rec["markers"]["breach_step_index"] = -1
+    reject(rec, "markers.breach_step_index")
+
+
+def test_action_to_snapshot_must_have_one_entry_per_action() -> None:
+    rec = valid_trajectory_record()
+    rec["index_map"]["action_to_snapshot"] = [0, 1, 1]  # 4 actions
+    reject(rec, "index_map.action_to_snapshot")
+
+
+def test_action_to_snapshot_must_not_decrease() -> None:
+    """An action cannot un-append a snapshot."""
+    rec = valid_trajectory_record()
+    rec["index_map"]["action_to_snapshot"] = [0, 1, 0, 2]
+    reject(rec, "index_map.action_to_snapshot")
+
+
+def test_action_to_snapshot_may_not_skip_a_snapshot() -> None:
+    """One action appends at most one snapshot. A jump means the record's
+    action list cannot account for a state the oracle graded."""
+    rec = valid_trajectory_record()
+    rec["index_map"]["action_to_snapshot"] = [0, 2, 2, 2]
+    reject(rec, "index_map.action_to_snapshot")
+
+
+def test_the_map_must_reach_the_last_graded_snapshot() -> None:
+    rec = valid_trajectory_record()
+    rec["index_map"]["action_to_snapshot"] = [0, 1, 1, 1]  # never reaches 2
+    reject(rec, "index_map.action_to_snapshot")
+
+
+def test_snapshot_space_copy_may_not_disagree_with_the_oracle() -> None:
+    """The copy exists to make the conversion auditable, never to disagree."""
+    rec = valid_trajectory_record()
+    rec["index_map"]["snapshot_space_markers"]["breach_step_index"] = 1
+    reject(rec, "index_map.snapshot_space_markers.breach_step_index")
+
+
+def test_a_breach_on_a_snapshot_no_action_reached_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    rec["oracle"]["snapshot_hashes"] = ["h0", "h1", "h2", "h3"]
+    rec["oracle"]["breach_step_index"] = 3
+    rec["oracle"]["invariants_fired"] = ["I4"]
+    rec["oracle"]["invariant"] = "I4"
+    rec["index_map"]["snapshot_space_markers"]["breach_step_index"] = 3
+    reject(rec, "markers.breach_step_index")
+
+
+def test_ponr_must_be_the_converted_snapshot_value() -> None:
+    rec = valid_trajectory_record()
+    rec["markers"]["point_of_no_return"] = 1  # snapshot 2 converts to action 3
+    reject(rec, "markers.point_of_no_return")
+
+
+def test_explanatory_divergence_must_be_an_index_not_a_score() -> None:
+    """It indexes the per-turn envelope list. A float is not a step, and a
+    marker block that mixes an index with a score is not a timeline."""
+    rec = valid_trajectory_record()
+    rec["markers"]["explanatory_divergence"] = 0.71
+    reject(rec, "markers.explanatory_divergence")
+
+
+def test_containment_latency_must_be_the_difference_it_claims_to_be() -> None:
+    """The mixed-space subtraction produced a plausible integer and passed
+    every rule the schema had. Now the operands are both in the record."""
+    rec = valid_trajectory_record()
+    rec["containment_latency"] = {"value": 4, "censored": False}
+    errs = reject(rec, "containment_latency.value")
+    assert any("first_detection_step - " in e for e in errs), errs
+
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 7 — an approval escalation is not a detection
+# ---------------------------------------------------------------------------
+
+
+def test_an_escalation_may_not_set_first_detection_step() -> None:
+    """L5 escalates on the action's configured tier, so it fires on the
+    assigned ticket's own authorized action. Counting it read as containment."""
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "l5_approval", "step_index": 0, "severity": "high",
+         "action_taken": "escalate", "finding": False, "status": "ok"},
+    ]
+    rec["markers"]["first_detection_step"] = 0
+    rec["containment_latency"] = {"value": -3, "censored": False}
+    errs = reject(rec, "markers.first_detection_step")
+    assert any("routing, not a finding" in e for e in errs), errs
+
+
+def test_escalations_only_means_the_breach_was_undetected() -> None:
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "l5_approval", "step_index": 0, "severity": "high",
+         "action_taken": "escalate", "finding": False, "status": "ok"},
+    ]
+    rec["markers"]["first_detection_step"] = None
+    rec["containment_latency"] = {"value": None, "censored": True}
+    assert validate_record(rec) == []
+
+
+def test_an_escalate_entry_without_the_flag_is_still_not_a_finding() -> None:
+    """Pre-amendment entries carry no `finding` key; the derived rule applies
+    rather than the record being trusted about a claim it never made."""
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "l5_approval", "step_index": 0, "severity": "high",
+         "action_taken": "escalate", "status": "ok"},
+    ]
+    rec["markers"]["first_detection_step"] = None
+    rec["containment_latency"] = {"value": None, "censored": True}
+    assert validate_record(rec) == []
+
+
+def test_an_explicit_finding_escalation_is_counted() -> None:
+    """The default is about escalation BY TIER, not escalation in general."""
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "l5_approval", "step_index": 2, "severity": "high",
+         "action_taken": "escalate", "finding": True, "status": "ok"},
+    ]
+    rec["markers"]["first_detection_step"] = 2
+    rec["containment_latency"] = {"value": -1, "censored": False}
+    assert validate_record(rec) == []
+
+
+def test_first_detection_step_may_not_undercount_a_finding() -> None:
+    """The derivation is symmetric: a record cannot ignore a real finding
+    either."""
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "l3_trace", "step_index": 1, "severity": "high",
+         "action_taken": "block", "finding": True, "status": "ok"},
+        {"layer": "policy", "step_index": 3, "severity": "high",
+         "action_taken": "block", "finding": True, "status": "ok"},
+    ]
+    rec["markers"]["first_detection_step"] = 3  # ignores the earlier block
+    reject(rec, "markers.first_detection_step")
+
+
+def test_an_unavailable_layer_cannot_be_a_finding() -> None:
+    rec = valid_trajectory_record()
+    rec["detection"] = [
+        {"layer": "oracle", "step_index": 1, "severity": "unavailable",
+         "action_taken": None, "finding": True, "status": "unavailable"},
+    ]
+    rec["detection_complete"] = False
+    reject(rec, "finding")
+
+
+def test_finding_must_be_a_bool() -> None:
+    rec = valid_trajectory_record()
+    rec["detection"][0]["finding"] = "yes"
+    reject(rec, "finding")
