@@ -344,3 +344,50 @@ def test_the_prompt_is_the_vendored_template(fine_grained):
     # the template's own opening line, unparaphrased
     assert expected.read_text().splitlines()[0] in prompt
     assert "TRAJ" in prompt
+
+
+# -- a non-conforming reply is unavailable, but never opaque ----------------
+
+
+def test_a_coarse_group_header_is_named_as_such():
+    """The live binary checkpoint answered `Risk Source: User Input` — a
+    taxonomy GROUP, not a fine-grained category. The outcome is unavailable
+    like any other non-conformance, but the reason must say which dimension
+    was coarse: a refusal, a coarse label and a truncated answer imply
+    different fixes and different denominators for P10."""
+    from saster_defense.l4_auditor import read_fine_grained
+
+    content = ("unsafe\nRisk Source: User Input\n"
+               "Failure Mode: Unconfirmed or Over-privileged Action\n"
+               "Real World Harm: Security & System Integrity Harm")
+    read = read_fine_grained(content)
+    assert read.conforming is False
+    assert read.dimension == "risk_source"
+    assert read.value == "User Input"
+    assert "GROUP header" in read.reason
+
+
+def test_the_unavailable_detail_carries_the_reason(monkeypatch):
+    content = ("unsafe\nRisk Source: User Input\n"
+               "Failure Mode: Unconfirmed or Over-privileged Action\n"
+               "Real World Harm: Security & System Integrity Harm")
+    _patch_post(monkeypatch, resp=_FakeResp(_chat(content)))
+    out = _auditor()._audit_http("traj")
+    _assert_unavailable(out)
+    assert "risk_source" in out.detail and "User Input" in out.detail
+
+
+def test_each_failure_shape_has_a_distinct_reason():
+    from saster_defense.l4_auditor import read_fine_grained
+
+    reasons = {
+        read_fine_grained("").reason,
+        read_fine_grained("I cannot help with that.").reason,
+        read_fine_grained("safe\nThe agent stayed in scope.").reason,
+        read_fine_grained("unsafe").reason,
+        read_fine_grained(
+            "unsafe\nRisk Source: Inherent Agent/LLM Failures\n"
+            "Failure Mode: Nope\nReal World Harm: Physical & Health Harm"
+        ).reason,
+    }
+    assert len(reasons) == 5 and all(reasons)

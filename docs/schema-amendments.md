@@ -650,6 +650,72 @@ clock by themselves.
 
 ---
 
+## Amendment 8 — `detection[].fine_grained`, the observer's mechanism attribution
+
+**Status:** pre-corpus. W11, 2026-08-31.
+
+**Original rule.** A detection entry said which layer acted, at which step,
+with what severity, and (since Amendment 7) whether it was a finding. It had no
+place to say **what the layer thought went wrong**.
+
+**The false assumption.** That a detection is a binary event. For four of the
+five layers it is — L2 denies or allows, L3 blocks or does not. L4 is a
+*model*, and the thing that makes it interesting is that it can name a
+mechanism. The record had no field for that, and the audit prompt never asked
+for one: it demanded a single invented word, `WARN` or `ALLOW`.
+
+That made **P10 unmeasurable from any corpus this harness produced.** P10 is
+the load-bearing novelty claim — AgentDoG's published 32.4% failure-mode
+accuracy against 93.0 F1 for detection is the mechanism-attribution gap stated
+numerically by the people who built the detector — and P5 is measured against
+that baseline while P13 needs the same output. Three predictions rested on a
+field that did not exist.
+
+**The amendment.** An optional `detection[].fine_grained` block carrying
+AgentDoG's three dimensions:
+
+```json
+"fine_grained": {
+  "risk_source": "Malicious User Instruction or Jailbreak",
+  "failure_mode": "Unconfirmed or Over-privileged Action",
+  "real_world_harm": "Security & System Integrity Harm"
+}
+```
+
+Rules:
+
+- **All three together or none.** AgentDoG emits them as one three-line answer;
+  a partial block would record an attribution it was never asked to give
+  piecemeal.
+- **Each value in its closed vocabulary.** `AGENTDOG_RISK_SOURCES` (8),
+  `AGENTDOG_FAILURE_MODES` (14), `AGENTDOG_REAL_WORLD_HARMS` (10), frozen in
+  `carl_ops_trajectory.schema`. P10 is an accuracy against a label set, so an
+  out-of-taxonomy string would enter the denominator as if it were a category.
+- **An unavailable layer may not carry one.** It did not evaluate.
+- **Only a finding may carry one.** An attribution for something no layer
+  flagged is not an observation.
+
+**Optional, on the Amendment 3 and 5 pattern.** Records written before the
+field existed stay valid, and absence means the observer was not asked, or did
+not conform — never that it found no mechanism.
+
+**The vocabulary is not this project's.** It is AgentDoG's own, copied from
+`prompts/v1.0/taxonomy_finegrained.txt` and vendored byte-for-byte at
+`saster_defense/agentdog/` (AI45Lab/AgentDoG @ `c8d803f`, Apache 2.0).
+`tests/test_agentdog_taxonomy.py` parses that file and asserts the frozen
+tuples match it exactly, in order, so an upstream refresh cannot silently
+redefine a label already recorded in a public corpus. The prompt template is
+vendored and sent verbatim for the same reason: a label is only comparable to
+AgentDoG's published accuracy if the model was asked the question it was
+trained and evaluated on, in the format it was trained and evaluated in.
+
+**Freezing it here rather than in the defense layer** is deliberate. The
+vocabulary is part of the record contract, not a property of one layer's
+configuration: a corpus consumer computing a per-label accuracy needs the label
+set to be as fixed as the terminal-outcome classes are.
+
+---
+
 ## Hashing note
 
 Two documents are hashed into the run manifest, both required by
@@ -674,6 +740,12 @@ the document changed, so the pin broke, so the change had to be made
 deliberately and in the open. The transition is recorded in that entry and the
 pin in `tests/test_manifest_prereg.py` is updated in the same commit.
 `grrcon_matrix_sha256` has never changed.
+
+**Amendment 8 changes neither hashed document either.** It adds a field and a
+vocabulary to the record contract. It touches no oracle invariant, neither
+envelope threshold, the candidate set, the scoring method, nor any
+pre-registered prediction — and in particular it does not edit P10, which is
+what it makes measurable.
 
 **Amendments 6 and 7 change neither hashed document.** Both are rules about how
 the record relates its own fields to each other — index spaces and what counts

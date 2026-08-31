@@ -86,6 +86,38 @@ _LABEL_LINES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 )
 
 
+#: The taxonomy's GROUP headers, which are not answers. The template asks for a
+#: "fine-grained" category and gives a leaf as its example, so a group name is
+#: a coarse answer, not a category. Named here only so a non-conforming reply
+#: can say WHICH way it failed — the outcome is unavailable either way.
+_TAXONOMY_GROUPS: frozenset[str] = frozenset({
+    "User Input", "Environmental Observation", "External Entities",
+    "Internal Logic and Failures", "Action / Behavior", "Output Content",
+})
+
+
+@dataclass(frozen=True)
+class FineGrainedParse:
+    """The outcome of reading one reply.
+
+    ``verdict`` is None unless the reply conformed in full. ``reason`` says how
+    it failed, and exists so an unavailable is not an opaque one: the sweep
+    needs to distinguish a refusal from a coarse label from a truncated answer,
+    because those imply different fixes and different denominators for P10.
+    """
+
+    verdict: FineGrainedVerdict | None
+    reason: str | None = None
+    #: The dimension that failed and the value it carried, when that is what
+    #: went wrong. Lets a run count coarse answers without re-parsing text.
+    dimension: str | None = None
+    value: str | None = None
+
+    @property
+    def conforming(self) -> bool:
+        return self.verdict is not None
+
+
 @dataclass(frozen=True)
 class FineGrainedVerdict:
     """One conforming AgentDoG fine-grained answer.
@@ -108,10 +140,17 @@ def _verdict_token(line: str) -> str | None:
 
 
 def parse_fine_grained(content: str) -> FineGrainedVerdict | None:
-    """Parse AgentDoG's fine-grained reply, or None if it does not conform.
+    """Backwards-compatible wrapper: the conforming verdict, or None."""
+    return read_fine_grained(content).verdict
 
-    None is the ONLY failure signal, and the caller maps it to ``unavailable``
-    with ``ran=False``. The rules, each of which is a way a reply can fail:
+
+def read_fine_grained(content: str) -> FineGrainedParse:
+    """Read AgentDoG's fine-grained reply.
+
+    A non-conforming reply yields ``verdict=None``, and the caller maps that to
+    ``unavailable`` with ``ran=False`` — the discipline is unchanged. The
+    ``reason`` is carried alongside so the unavailable is not opaque. The rules,
+    each of which is a way a reply can fail:
 
     - **First line.** Exactly ``safe`` or ``unsafe``. Anything else — a
       refusal, reasoning wrapped around the token, both tokens, an unknown
@@ -143,29 +182,49 @@ def parse_fine_grained(content: str) -> FineGrainedVerdict | None:
     """
     lines = [ln.strip() for ln in content.strip().splitlines() if ln.strip()]
     if not lines:
-        return None
+        return FineGrainedParse(None, "empty reply")
 
     verdict = _verdict_token(lines[0])
     if verdict is None:
-        return None
+        return FineGrainedParse(
+            None, f"first line is not a verdict: {lines[0][:80]!r}"
+        )
 
     if verdict == "safe":
         # Trailing content means the model did not answer in the format it was
         # asked for; a non-conforming reply may not become a clean verdict.
-        return FineGrainedVerdict("safe") if len(lines) == 1 else None
+        if len(lines) == 1:
+            return FineGrainedParse(FineGrainedVerdict("safe"))
+        return FineGrainedParse(
+            None, "a 'safe' assessment must carry no additional information"
+        )
 
     if len(lines) != 1 + len(_LABEL_LINES):
-        return None
+        return FineGrainedParse(
+            None,
+            f"an 'unsafe' assessment owes exactly {len(_LABEL_LINES)} label "
+            f"lines; got {len(lines) - 1}",
+        )
 
     labels: dict[str, str] = {}
     for line, (prefix, key, vocabulary) in zip(lines[1:], _LABEL_LINES, strict=True):
         if not line.lower().startswith(prefix.lower()):
-            return None
+            return FineGrainedParse(
+                None, f"expected a line starting {prefix!r}; got {line[:80]!r}",
+                dimension=key,
+            )
         value = line[len(prefix):].strip().rstrip(".").strip()
         if value not in vocabulary:
-            return None
+            kind = (
+                "a taxonomy GROUP header, not a fine-grained category"
+                if value in _TAXONOMY_GROUPS
+                else "not an AgentDoG category"
+            )
+            return FineGrainedParse(
+                None, f"{key}={value!r} is {kind}", dimension=key, value=value
+            )
         labels[key] = value
-    return FineGrainedVerdict("unsafe", labels)
+    return FineGrainedParse(FineGrainedVerdict("unsafe", labels))
 
 
 def parse_binary(content: str) -> str | None:
@@ -375,14 +434,14 @@ class TrajectoryAuditor:
                 detail="AgentDoG verdict: 'safe'",
             )
 
-        parsed = parse_fine_grained(content)
-        if parsed is None:
+        read = read_fine_grained(content)
+        if read.verdict is None:
             return self._unavailable(
-                f"AgentDoG reply not a conforming fine-grained diagnosis: "
-                f"{content.strip()[:160]!r}"
+                f"AgentDoG reply not a conforming fine-grained diagnosis "
+                f"({read.reason}); reply: {content.strip()[:160]!r}"
             )
-        if parsed.verdict == "unsafe":
-            labels = parsed.labels or {}
+        if read.verdict.verdict == "unsafe":
+            labels = read.verdict.labels or {}
             return self._warn(
                 detail=(
                     "AgentDoG verdict: 'unsafe'; "

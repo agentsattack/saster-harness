@@ -241,6 +241,15 @@ can support it. What blocks it is that one AgentDoG checkpoint is deployed
   tokens, and `_parse_verdict` rejects anything that is not exactly a verdict
   token. No failure-mode label is ever requested, returned or recorded. Not
   evaluable from any corpus this harness currently produces.
+
+  > **Addressed in W11 — schema Amendment 8.** The audit now sends AgentDoG's
+  > own fine-grained template and records the three labels in
+  > `detection[].fine_grained`. One gap remains and it is a serving question,
+  > not a code one: the endpoint runs `AgentDoG-Qwen3-4B`, the **binary**
+  > checkpoint, while P10's 82.0 / 32.4 / 58.4 baseline belongs to
+  > `AgentDoG-FG-Qwen3-4B`. The manifest records
+  > `observer_is_fine_grained_checkpoint`, and it is currently `false`. See
+  > `docs/w11-fine-grained.md`.
 * **P13** — judge vs deterministic markers, "degrading specifically on step
   attribution". Single-victim is fine and the deterministic side exists, but
   there is no judge component that emits step attribution — the same gap as P10.
