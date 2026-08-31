@@ -237,3 +237,45 @@ def test_prefix_token_ids_are_reported_for_audit(server):
     dist = cs.score_candidates_chat("http://x", "m", MESSAGES, "c")
     assert dist.n_prefix == len(server.prefix)
     assert dist.prefix_token_ids == tuple(server.prefix)
+
+
+# -- chat-template kwargs are part of the prompt, not a sampling detail ------
+
+
+def test_template_kwargs_reach_every_render(server):
+    """The kwargs decide what the template emits, so a prefix rendered without
+    them is not the prefix the agent sampled from. On Qwen3-8B
+    ``enable_thinking=False`` closes an empty ``<think>`` block at the end of
+    the generation prompt: four extra tokens, a different end point, a
+    different distribution. Every render in the pass must carry them."""
+    cs.score_candidates_chat("http://x", "m", MESSAGES, "c",
+                             chat_template_kwargs={"enable_thinking": False})
+    assert server.render_bodies
+    assert all(
+        b["chat_template_kwargs"] == {"enable_thinking": False}
+        for b in server.render_bodies
+    )
+
+
+def test_no_template_kwargs_sends_the_byte_identical_body_as_before(server):
+    """A model needing no kwargs must post what it posted before the parameter
+    existed — the field is omitted, not sent empty."""
+    cs.score_candidates_chat("http://x", "m", MESSAGES, "c")
+    assert all("chat_template_kwargs" not in b for b in server.render_bodies)
+    cs.score_candidates_chat("http://x", "m", MESSAGES, "c", chat_template_kwargs={})
+    assert all("chat_template_kwargs" not in b for b in server.render_bodies)
+
+
+def test_the_variant_cache_is_keyed_by_template_kwargs(server):
+    """The probe establishes that a variant carries the tool call UNDER ONE
+    template configuration. Reusing that answer under different kwargs would
+    assume what the probe exists to check."""
+    cs.score_candidates_chat("http://x", "m", MESSAGES, "c")
+    cs.score_candidates_chat("http://x", "m", MESSAGES, "c",
+                             chat_template_kwargs={"enable_thinking": False})
+    assert len(cs._VARIANT_CACHE) == 2
+    probes = [b for b in server.render_bodies
+              if not b.get("add_generation_prompt")
+              and b.get("chat_template_kwargs") == {"enable_thinking": False}]
+    # 13 candidates + the 2-candidate variant probe, all under the new key.
+    assert len(probes) == 13 + 2

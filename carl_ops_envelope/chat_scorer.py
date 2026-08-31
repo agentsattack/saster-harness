@@ -111,8 +111,21 @@ def _post(base_url: str, path: str, body: dict, campaign_id: str, timeout: float
 def render_tokens(base_url: str, model: str, messages: list[dict], tools: list[dict],
                   campaign_id: str, *, add_generation_prompt: bool,
                   continue_final_message: bool,
+                  chat_template_kwargs: dict[str, Any] | None = None,
                   timeout: float = DEFAULT_CHAT_SCORER_TIMEOUT_S) -> list[int]:
-    """Token ids for a chat request, as the SERVER renders it."""
+    """Token ids for a chat request, as the SERVER renders it.
+
+    ``chat_template_kwargs`` must be the SAME kwargs the agent samples under.
+    They are part of the prompt, not a sampling detail: on Qwen3-8B,
+    ``enable_thinking=False`` makes the template close an empty ``<think>``
+    block at the end of the generation prompt, so the rendered prefix is four
+    tokens longer and ends somewhere else entirely. Rendering without them
+    while the agent samples with them scores a prefix the agent never held —
+    the same class of surface mismatch this module was written to remove,
+    arriving through the template-kwargs channel instead of the endpoint.
+    Omitted from the body when empty, so a model needing none sends the
+    byte-identical request it sent before this parameter existed.
+    """
     body = {
         "model": model,
         "messages": messages,
@@ -120,6 +133,8 @@ def render_tokens(base_url: str, model: str, messages: list[dict], tools: list[d
         "add_generation_prompt": add_generation_prompt,
         "continue_final_message": continue_final_message,
     }
+    if chat_template_kwargs:
+        body["chat_template_kwargs"] = dict(chat_template_kwargs)
     payload = _post(base_url, "/v1/chat/completions/render", body, campaign_id, timeout)
     tokens = payload.get("token_ids")
     if not tokens:
@@ -155,18 +170,23 @@ _RENDER_VARIANTS = (
     {"add_generation_prompt": False, "continue_final_message": False},
 )
 
-#: (base_url, model) -> the variant that renders distinct candidates there.
-_VARIANT_CACHE: dict[tuple[str, str], dict[str, bool]] = {}
+#: (base_url, model, chat_template_kwargs) -> the variant that renders distinct
+#: candidates there. The kwargs are in the key because they change what the
+#: template emits, so the variant that carries a tool call under one setting is
+#: not established to carry it under another.
+_VARIANT_CACHE: dict[tuple[str, str, str], dict[str, bool]] = {}
 
 
 def _suffix_for(base_url: str, model: str, messages: list[dict], tools: list[dict],
                 campaign_id: str, candidate: Candidate, prefix: list[int],
-                variant: dict[str, bool], timeout: float) -> list[int] | None:
+                variant: dict[str, bool], timeout: float,
+                chat_template_kwargs: dict[str, Any] | None = None) -> list[int] | None:
     """The candidate's tokens under ``variant``, or None if it does not extend
     the prefix (a template that renders something else entirely)."""
     try:
         full = render_tokens(base_url, model, [*messages, candidate_message(candidate)],
-                             tools, campaign_id, timeout=timeout, **variant)
+                             tools, campaign_id, timeout=timeout,
+                             chat_template_kwargs=chat_template_kwargs, **variant)
     except ChatRenderError:
         return None
     if len(full) <= len(prefix) or full[:len(prefix)] != prefix:
@@ -176,7 +196,8 @@ def _suffix_for(base_url: str, model: str, messages: list[dict], tools: list[dic
 
 def _choose_variant(base_url: str, model: str, messages: list[dict], tools: list[dict],
                     campaign_id: str, prefix: list[int], candidates: tuple[Candidate, ...],
-                    timeout: float) -> dict[str, bool]:
+                    timeout: float,
+                    chat_template_kwargs: dict[str, Any] | None = None) -> dict[str, bool]:
     """Pick the render variant that actually distinguishes candidates here.
 
     Probes two candidates: a variant that renders both as prefix extensions AND
@@ -184,14 +205,14 @@ def _choose_variant(base_url: str, model: str, messages: list[dict], tools: list
     that renders them identically is dropping it, and would produce a uniform
     distribution that looks like a measurement.
     """
-    key = (base_url, model)
+    key = (base_url, model, json.dumps(chat_template_kwargs or {}, sort_keys=True))
     if key in _VARIANT_CACHE:
         return _VARIANT_CACHE[key]
     probe = (candidates[0], candidates[1])
     for variant in _RENDER_VARIANTS:
         rendered = [
             _suffix_for(base_url, model, messages, tools, campaign_id, c, prefix,
-                        variant, timeout)
+                        variant, timeout, chat_template_kwargs)
             for c in probe
         ]
         if any(r is None for r in rendered):
@@ -229,27 +250,29 @@ def score_candidates_chat(
     *,
     tools: list[dict] | None = None,
     candidates: tuple[Candidate, ...] = CANDIDATES,
+    chat_template_kwargs: dict[str, Any] | None = None,
     timeout: float = DEFAULT_CHAT_SCORER_TIMEOUT_S,
 ) -> ChatScoredDistribution:
     """Score the candidate set against the chat context the agent would sample
     from at this decision point.
 
     ``messages`` is the conversation so far, ending where the model is about to
-    act — the same list the agent would post.
+    act — the same list the agent would post. ``chat_template_kwargs`` must be
+    the ones that agent posts with; see :func:`render_tokens`.
     """
     tools = tool_schemas() if tools is None else tools
     prefix = render_tokens(base_url, model, messages, tools, campaign_id,
                            add_generation_prompt=True, continue_final_message=False,
-                           timeout=timeout)
+                           chat_template_kwargs=chat_template_kwargs, timeout=timeout)
     n_prefix = len(prefix)
     variant = _choose_variant(base_url, model, messages, tools, campaign_id,
-                              prefix, candidates, timeout)
+                              prefix, candidates, timeout, chat_template_kwargs)
 
     logps: list[float] = []
     suffixes: list[tuple[int, ...]] = []
     for candidate in candidates:
         full = _suffix_for(base_url, model, messages, tools, campaign_id,
-                           candidate, prefix, variant, timeout)
+                           candidate, prefix, variant, timeout, chat_template_kwargs)
         # Assert, never assume. If the template stops appending, slicing at
         # n_prefix would score unrelated tokens and quietly produce a number.
         if full is None:
