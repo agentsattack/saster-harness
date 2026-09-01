@@ -16,15 +16,24 @@ is spark1; it is the only host on both the `192.168.1.0/24` LAN and the
 | spark1 | 192.168.1.100   | fd00:200::1    | control node, router, Ray head | `rayhead` | `vllm-node:pinned`       |
 | spark3 | 192.168.1.228   | fd00:200::3    | Qwen3-8B         : 8000     | `victimA`    | `vllm-node:pinned`       |
 | spark6 | 192.168.1.208   | fd00:200::6    | Ministral-8B     : 8000     | `victimB`    | `vllm-node:pinned`       |
-| spark4 | 192.168.1.201   | fd00:200::4    | AgentDoG         : 8001     | `agentdog10` | `eugr/spark-vllm:latest` |
+| spark4 | 192.168.1.201   | fd00:200::4    | AgentDoG binary  : 8001     | `agentdog10` | `eugr/spark-vllm:latest` |
+| spark4 | 192.168.1.201   | fd00:200::4    | AgentDoG FG      : 8002     | `agentdogfg` | `eugr/spark-vllm:latest` |
 
 Note spark4 runs a **different image** from the other two, pinned by digest in
 `~/agentdog-serving-pins.txt` on that node:
 `eugr/spark-vllm sha256:735caabf4f1e52c5a343a68793aab86690683465cc51d76dd84f7af011750639`.
 
-All three servers run vLLM `0.26.1rc1.dev1188+gd9fbe526c.d20260825` (V1 engine),
+All four servers run vLLM `0.26.1rc1.dev1188+gd9fbe526c.d20260825` (V1 engine),
 `dtype=torch.bfloat16`, `quantization=None`. All run with `HF_HUB_OFFLINE=1`, so
 the weights **must** already be in `~/.cache/huggingface` on the node.
+
+**The fabric has eight nodes; only four are usable from spark1.** `fd00:200::1`
+through `::8` all answer ICMP, but spark1's key (`spark1-saster-push`) is
+installed only on spark3, spark4 and spark6 — `::2`, `::5`, `::7` and `::8`
+reject it, and none of them serves anything on 8000-8002. They are therefore
+idle capacity that bring-up cannot reach. Installing spark1's public key on
+them would let the two AgentDoG heads move off spark4 onto nodes of their own
+and remove the memory contention documented in 3b entirely.
 
 ## The Ray GPU-memory pre-check
 
@@ -65,8 +74,10 @@ never both.
 ## Bring-up order
 
 1. **Pre-check each serving node** — no `rayworker`/`rayhead`, memory free (above).
-2. **Start the three vLLM servers** (below). They are independent; order among
-   them does not matter.
+2. **Start the four vLLM servers** (below). They are independent; order among
+   them does not matter — except that the two spark4 heads must each carry an
+   explicit `--gpu-memory-utilization`, or whichever starts first takes the
+   whole node (see 3b).
 3. **Wait for readiness** — poll `/v1/models` until it answers. Cold start is
    ~2 minutes for the 8B models (weight load + `torch.compile`), faster for the
    4B. Do not start the router before the backends answer.
@@ -93,7 +104,7 @@ docker run -d --name victimB --gpus all -p 8000:8000 \
   vllm serve mistralai/Ministral-8B-Instruct-2410 --max-model-len 32768 --enable-auto-tool-choice --tool-call-parser mistral --tokenizer-mode mistral --config-format mistral --load-format mistral --gpu-memory-utilization 0.85
 ```
 
-### 3. spark4 — AI45Research/AgentDoG-Qwen3-4B on :8001
+### 3. spark4 — AI45Research/AgentDoG-Qwen3-4B (binary head) on :8001
 
 This is the **1.0-class** model and the sweep path. The 1.5 variants on
 `fd00:200::2` (spark2) are *not* the sweep path — do not substitute them.
@@ -105,8 +116,95 @@ docker run -d --name agentdog10 --gpus all -p 8001:8000 \
   -e HF_HUB_OFFLINE=1 \
   -v $HOME/.cache/huggingface:/root/.cache/huggingface \
   eugr/spark-vllm:latest \
-  vllm serve AI45Research/AgentDoG-Qwen3-4B --max-model-len 16384
+  vllm serve AI45Research/AgentDoG-Qwen3-4B --max-model-len 16384 --gpu-memory-utilization 0.20
 ```
+
+> **`--gpu-memory-utilization 0.20` is a W12 addition to the recovered command,
+> and the one place this file is not verbatim.** The recovered command carried
+> no such flag, so it inherited the image default of **0.92** — which on a
+> 119 GiB unified node reserved ~101 GiB of KV cache (733,744 tokens, 44.78x
+> concurrency at 16384) for a 4B model, leaving 2 GiB free and making it
+> impossible to serve the FG head beside it. The auditor sends **one** 16k
+> request at a time, so 0.20 is still ample: measured, it leaves the binary
+> head 13.49 GiB of KV cache (98,224 tokens, 6.00x concurrency at 16384) and
+> the FG head 12.02 GiB (87,488 tokens, 5.34x). Two heads at 0.20 use ~57 of
+> 119 GiB with ~62 GiB still free.
+>
+> This changes KV cache capacity only — not weights, dtype, or logits. At
+> `temperature: 0` the head is bitwise stable *within* a configuration (3/3
+> identical replies on every trial, both heads, W12). Whether the cap moves an
+> answer *across* configurations is a separate question and is NOT settled
+> here: re-serving W11's cell under 0.20 reproduced 3 of its 5 audits on
+> byte-identical inputs and changed 2 — including the single record W11's P10
+> result rested on. See `docs/w12-fg-head.md` for what that is and is not
+> evidence of before relying on either run's labels.
+
+### 3b. spark4 — AI45Research/AgentDoG-FG-Qwen3-4B (fine-grained head) on :8002
+
+The **separate fine-grained checkpoint**. AgentDoG 1.0 ships the binary and FG
+heads as different checkpoints, and the published fine-grained accuracies
+(Risk Source 82.0 / Failure Mode 32.4 / Real-world Harm 58.4) — P10's whole
+baseline — belong to *this* one. It runs **beside** the binary head, not
+instead of it: the binary head is the observer every result to date was
+measured against, so both stay served and the observer is selected per run.
+
+Container port is 8000 mapped to host **8002**. Same flags as the binary head,
+same `--max-model-len`, and no tool-calling parser.
+
+```bash
+docker run -d --name agentdogfg --gpus all -p 8002:8000 \
+  -e HF_HUB_OFFLINE=1 \
+  -v $HOME/.cache/huggingface:/root/.cache/huggingface \
+  eugr/spark-vllm:latest \
+  vllm serve AI45Research/AgentDoG-FG-Qwen3-4B --max-model-len 16384 --gpu-memory-utilization 0.20
+```
+
+> **The FG weights were not on the node.** W11 recorded them as "already
+> downloaded at `~/.cache/huggingface/hub/models--AI45Research--AgentDoG-FG-Qwen3-4B/`".
+> On spark4 that path did not exist at all, and on spark1 only the *lock*
+> directory `hub/.locks/models--AI45Research--AgentDoG-FG-Qwen3-4B/` existed —
+> 4 KB of empty lock files from an attempt that fetched zero weight bytes. A
+> `.locks/` entry matches the same glob as the model directory and is what made
+> an absent download look present. Check for `snapshots/`, not for the name.
+>
+> `HF_HUB_OFFLINE=1` means the serving container will not fetch them. Pull into
+> the mounted cache first, pinned to a revision, with the same image:
+>
+> ```bash
+> docker run --rm -e HF_HUB_OFFLINE=0 \
+>   -v $HOME/.cache/huggingface:/root/.cache/huggingface \
+>   eugr/spark-vllm:latest \
+>   python3 -c "from huggingface_hub import snapshot_download; \
+> snapshot_download('AI45Research/AgentDoG-FG-Qwen3-4B', \
+>   revision='d4f62821e09f67b6dbb084aa20e83a7321255df8', \
+>   ignore_patterns=['figures/*'])"
+> ```
+>
+> ~8.3 GiB, 2 safetensors shards, Apache 2.0, public (ungated).
+
+> **A revision-pinned download writes no `refs/main`, and offline serving needs
+> one.** `snapshot_download(revision=<sha>)` populates `blobs/` and
+> `snapshots/<sha>/` but creates no `refs/` directory at all. `vllm serve
+> <repo>` with no `--revision` resolves the `main` ref, so under
+> `HF_HUB_OFFLINE=1` it aborts with `LocalEntryNotFoundError: Cannot find an
+> appropriate cached snapshot folder for the specified revision` — with the
+> weights sitting complete on disk. Write the ref once, to the sha you pinned:
+>
+> ```bash
+> docker run --rm -v $HOME/.cache/huggingface:/root/.cache/huggingface \
+>   eugr/spark-vllm:latest bash -c \
+>   'd=/root/.cache/huggingface/hub/models--AI45Research--AgentDoG-FG-Qwen3-4B; \
+>    mkdir -p $d/refs && printf d4f62821e09f67b6dbb084aa20e83a7321255df8 > $d/refs/main'
+> ```
+>
+> Compare against a healthy model directory: the binary head's has
+> `refs/main` holding `e7d92a7b650abad6e4aba63f49c4ea63cf1c45b8`.
+
+> **Both heads must carry an explicit `--gpu-memory-utilization`.** vLLM sizes
+> the fraction against *total* memory but refuses to start if that much is not
+> *free*, so whichever head starts first at the 0.92 default takes the node and
+> the second one cannot start. Two heads at 0.20 use ~48 of 119 GiB and leave
+> ~70 GiB idle.
 
 > **Caveat — no tool calling on spark4.** Unlike spark3 and spark6, the recovered
 > command carries no `--enable-auto-tool-choice` / `--tool-call-parser`. It is
@@ -122,7 +220,7 @@ docker run -d --name agentdog10 --gpus all -p 8001:8000 \
 
 ### Prefix caching
 
-Prefix caching is **on** for all three, and must stay on — the affinity router
+Prefix caching is **on** for all four, and must stay on — the affinity router
 exists to exploit it. It needs no flag: vLLM's V1 engine defaults
 `enable_prefix_caching=True`, confirmed in each engine's startup config line.
 Verify rather than assume:
@@ -172,6 +270,7 @@ curl -s http://192.168.1.100:8080/router/stats | jq '.configured_backends'
 curl -s http://192.168.1.228:8000/v1/models   | jq -r '.data[].id'   # Qwen/Qwen3-8B
 curl -s http://192.168.1.208:8000/v1/models   | jq -r '.data[].id'   # mistralai/Ministral-8B-Instruct-2410
 curl -s http://[fd00:200::4]:8001/v1/models   | jq -r '.data[].id'   # AI45Research/AgentDoG-Qwen3-4B
+curl -s http://[fd00:200::4]:8002/v1/models   | jq -r '.data[].id'   # AI45Research/AgentDoG-FG-Qwen3-4B
 
 # 2. echo=true returns per-prompt-token logprobs (envelope-mass scoring needs these)
 curl -s http://192.168.1.228:8000/v1/completions \

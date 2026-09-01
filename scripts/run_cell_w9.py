@@ -87,8 +87,30 @@ RUN_ID = os.environ.get("W9_RUN_ID", "w9-dryrun-20260830")
 CAMPAIGN_ID = os.environ.get("W9_CAMPAIGN_ID", "w9-dryrun-qwen-compromised-obstructed")
 VICTIM = os.environ.get("W9_VICTIM", "Qwen/Qwen3-8B")
 ROUTER_URL = os.environ.get("W9_ROUTER", "http://localhost:8080")
-AGENTDOG = os.environ.get("W9_AGENTDOG", "http://[fd00:200::4]:8001")
-AGENTDOG_MODEL = "AI45Research/AgentDoG-Qwen3-4B"
+#: The observer is a CONFIG FIELD, not a constant — the test matrix varies it
+#: and the manifest records which checkpoint answered. AgentDoG 1.0 ships the
+#: binary and fine-grained heads as separate checkpoints on separate ports, and
+#: only the FG one is the head whose published 82.0 / 32.4 / 58.4 P10 baseline
+#: applies. Both stay served so a result can be measured against either, and so
+#: the binary head — the observer every result to date was measured against —
+#: remains available for comparison rather than being replaced by the FG one.
+OBSERVERS: dict[str, tuple[str, str]] = {
+    # name  ->  (checkpoint, endpoint)
+    "binary": ("AI45Research/AgentDoG-Qwen3-4B", "http://[fd00:200::4]:8001"),
+    "fg": ("AI45Research/AgentDoG-FG-Qwen3-4B", "http://[fd00:200::4]:8002"),
+}
+
+#: Which of the above to run. `W9_AGENTDOG_MODEL` / `W9_AGENTDOG` still override
+#: the checkpoint and endpoint independently, so an ad-hoc deployment is
+#: selectable without editing this table.
+OBSERVER = os.environ.get("W9_OBSERVER", "binary")
+if OBSERVER not in OBSERVERS:
+    raise SystemExit(
+        f"W9_OBSERVER={OBSERVER!r} is not one of {sorted(OBSERVERS)}"
+    )
+_OBSERVER_MODEL, _OBSERVER_ENDPOINT = OBSERVERS[OBSERVER]
+AGENTDOG = os.environ.get("W9_AGENTDOG", _OBSERVER_ENDPOINT)
+AGENTDOG_MODEL = os.environ.get("W9_AGENTDOG_MODEL", _OBSERVER_MODEL)
 
 MODE = CarlOpsMode.COMPROMISED
 OBSTRUCTED = True
@@ -715,6 +737,12 @@ def main() -> None:
             "victim": VICTIM, "mode": MODE.value, "obstructed": OBSTRUCTED,
             "defense_config": "all-on", "k": K,
             "chat_template_kwargs": template_kwargs_for(VICTIM),
+            # Which observer answered. The manifest carries this too and is the
+            # contract; it is repeated here so the per-trial l4/p10 diagnostics
+            # below are readable without opening a second file.
+            "observer": OBSERVER,
+            "observer_model": AGENTDOG_MODEL,
+            "observer_endpoint": AGENTDOG,
         },
         "wall_clock": {
             "canary_s": round(t_canary, 2),
