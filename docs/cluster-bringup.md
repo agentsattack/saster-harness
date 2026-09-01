@@ -67,7 +67,7 @@ splits them:
 | spark2 | ALIVE     | `rayworker`, 1 GPU                                |
 | spark3 | **DEAD**  | by design — serves Qwen3-8B standalone            |
 | spark4 | **DEAD**  | by design — serves both AgentDoG heads standalone |
-| spark5 | ALIVE     | `rayworker`, **advertises no GPU** — see below    |
+| spark5 | ALIVE     | `rayworker`, 1 GPU (see resolved note below)      |
 | spark6 | **DEAD**  | by design — serves Ministral-8B standalone        |
 | spark7 | ALIVE     | `rayworker`, 1 GPU                                |
 | spark8 | ALIVE     | `rayworker`, 1 GPU                                |
@@ -80,14 +80,41 @@ expected consequence of `docker rm -f rayworker`, not an incident. Do not
 "repair" it by restarting a worker on a serving node — that reintroduces the
 exact OOM the pre-check exists to prevent.
 
-> **OPEN ANOMALY — spark5 advertises no GPU to Ray.** `nvidia-smi` on spark5
-> reports a physical `NVIDIA GB10`, but its raylet registers with no `GPU`
-> resource, so the cluster totals 4.0 GPU across five alive nodes instead of
-> 5.0. spark2, spark7 and spark8 each advertise `GPU: 1.0` normally. The
-> hardware is present; Ray is not seeing it. **Uninvestigated as of
-> 2026-08-31** — recorded here so it is not rediscovered as new. Any
-> tensor-parallel job sized against the advertised GPU count will be one GPU
-> short until this is resolved.
+> **RESOLVED 2026-08-31 — a Ray worker can lose its GPU without anything
+> looking wrong.** spark5 was advertising no `GPU` resource to Ray while
+> `nvidia-smi` *on the host* reported a healthy `NVIDIA GB10`, so the cluster
+> totalled 4.0 GPU across five alive nodes instead of 5.0.
+>
+> Every static factor was identical to a working node (spark2 as control):
+> same `DeviceRequests`/`NVIDIA_VISIBLE_DEVICES=all`, same `/dev/nvidia*` nodes
+> bind-mounted *inside* the container, same driver `580.126.09`, same
+> `libnvidia-ml.so`. The single discriminator was `nvidia-smi` **inside** the
+> container:
+>
+> ```
+> spark5:  Failed to initialize NVML: Unknown Error
+> spark2:  NVIDIA GB10
+> ```
+>
+> A running GPU container can lose its device access at the cgroup level — most
+> often when `systemctl daemon-reload` rebuilds the device BPF program on
+> cgroup v2 and does not restore the container's allowance. The device nodes
+> stay bind-mounted and visible, so `docker inspect` and `ls /dev/nvidia*` both
+> look correct; only an NVML call fails. Ray's raylet autodetects GPUs *once at
+> startup*, so a worker that started before the loss keeps running and simply
+> registers `GPU: 0`.
+>
+> **Fix — restart the worker.** The allowance cannot be restored in place:
+>
+> ```bash
+> ssh spark5 'docker restart rayworker'
+> ```
+>
+> **Diagnose this class of fault by running `nvidia-smi` inside the container,
+> never on the host.** The host is healthy in exactly this failure, so a host
+> check reports success and hides it. Cross-check against `ray status`: a GPU
+> total below the alive-node count means some worker registered without its
+> accelerator.
 
 ## The Ray GPU-memory pre-check
 
