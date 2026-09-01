@@ -26,6 +26,27 @@ have produced seven byte-identical cells differing by a string. Every manifest
 carries `saster_category_axis.varied = false`. **Do not read that field as
 category coverage.**
 
+## CORRECTION (W16, 2026-09-01) — the WHOLE corpus stands on 5 seeds
+
+The W15 correction below is narrower than the defect. **Every one of the 27
+cells ran `base_seed=20260830`**, so the entire corpus drew from the same five
+seeds. Measured by content signature, its 135 records are **10 distinct
+trajectories** — a 13.5x inflation of the apparent sample size, not confined to
+the induced arm.
+
+Every rate reported in `ANALYSIS.txt` therefore carries an interval that is too
+narrow. `runs/W16_SEED_AUDIT.md` restates each number against the count of
+distinct trajectories behind it. The largest changes:
+
+    L4 precision   0.500 [37.7, 62.3]  ->  0.444 [18.9, 73.3]
+    breach/config  50.0% [29.9, 70.1]  ->  ~44%  [18.9, 73.3]
+    induced        0/60  [ 0.0,  6.0]  ->  0/6   [ 0.0, 39.0]
+
+What survives: L3 never fired, CVR is 0.000, L4 has no false negatives and
+still fires on non-breaching trajectories, and containment latency is 50%
+censored with median 6. What does not: every interval width, and the tight
+0.500 precision that the "constant classifier" reading rested on.
+
 ## CORRECTION (W15, 2026-09-01) — the induced arm had 5 seeds, not 60
 
 The induced result below reads "0/60". Those 60 trajectories used **5 distinct

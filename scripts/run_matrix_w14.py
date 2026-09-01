@@ -50,14 +50,41 @@ VICTIM = "Qwen/Qwen3-8B"
 ROUTER_URL = "http://localhost:8080"
 K = int(os.environ.get("W14_K", "5"))
 
+#: Seed derivation (W16). Every cell gets its own disjoint block of the seed
+#: space, so no two cells can replay the same trajectory.
+#:
+#: W14 shipped without this: every cell ran ``base_seed=20260830``, so 135
+#: records stood on 5 distinct seeds — a 13.5x inflation of the apparent
+#: sample size, and the reason its induced arm read 0/60 when it was 0/5.
+#:
+#: seed(cell, trial) = SEED_BASE + ordinal(cell) * SEED_STRIDE + trial
+#:
+#: Ordinals come from the fixed plan order, so a re-run reproduces the same
+#: seeds exactly. The stride bounds k: a cell may not run more than
+#: SEED_STRIDE trials without colliding with the next cell's block, and
+#: :func:`cell_plan` asserts that.
+SEED_BASE = int(os.environ.get("W14_SEED_BASE", "20260901"))
+SEED_STRIDE = 1000
+
 DEFENSE_KEYS = ("l2", "l3", "l4", "l3+l4", "all", "none")
 PRECONDITIONS = (("obstructed", "1"), ("unobstructed", "0"))
 FIXTURE_MODES = ("compromised", "induced")
 LADDER_RUNGS = (1, 2, 3)
 
 
-def cell_plan() -> list[dict]:
-    """Every cell, in a fixed order so a resumed run reproduces the sequence."""
+def cell_plan(k: int | None = None) -> list[dict]:
+    """Every cell, in a fixed order so a resumed run reproduces the sequence.
+
+    Each cell carries its own ``seed_base``, disjoint from every other cell's
+    (W16). ``k`` defaults to the module-level K and is a parameter so a test
+    can check the disjointness property at other trial counts.
+    """
+    k = K if k is None else k
+    if k > SEED_STRIDE:
+        raise ValueError(
+            f"k={k} exceeds SEED_STRIDE={SEED_STRIDE}; cell seed blocks would "
+            f"overlap and two cells would replay the same trajectory"
+        )
     cells: list[dict] = []
     for defense in DEFENSE_KEYS:
         for pre_name, pre_val in PRECONDITIONS:
@@ -91,6 +118,10 @@ def cell_plan() -> list[dict]:
                 "fixture_mode": "carl-ops-compromised", "l2_rule_count": n,
             },
         })
+    for ordinal, cell in enumerate(cells):
+        cell["ordinal"] = ordinal
+        cell["seed_base"] = SEED_BASE + ordinal * SEED_STRIDE
+        cell["seeds"] = [cell["seed_base"] + i for i in range(k)]
     return cells
 
 
@@ -143,6 +174,8 @@ def run_cell(cell: dict) -> dict:
         "W9_CAMPAIGN_ID": f"w14-{cell['id']}",
         "W9_SKIP_CANARY": "1",
         "W9_OVERWRITE": "1",
+        # W16 — this cell's own disjoint seed block.
+        "W9_SEED": str(cell["seed_base"]),
     })
     t0 = time.monotonic()
     proc = subprocess.run(
@@ -154,6 +187,7 @@ def run_cell(cell: dict) -> dict:
     n_records = sum(1 for _ in traj.open()) if traj.exists() else 0
     return {
         "id": cell["id"], "arm": cell["arm"], "axes": cell["axes"],
+        "seed_base": cell["seed_base"], "seeds": cell["seeds"],
         "returncode": proc.returncode,
         "ok": proc.returncode == 0 and n_records == K,
         "n_records": n_records, "expected_records": K,
