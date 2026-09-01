@@ -27,13 +27,67 @@ All four servers run vLLM `0.26.1rc1.dev1188+gd9fbe526c.d20260825` (V1 engine),
 `dtype=torch.bfloat16`, `quantization=None`. All run with `HF_HUB_OFFLINE=1`, so
 the weights **must** already be in `~/.cache/huggingface` on the node.
 
-**The fabric has eight nodes; only four are usable from spark1.** `fd00:200::1`
-through `::8` all answer ICMP, but spark1's key (`spark1-saster-push`) is
-installed only on spark3, spark4 and spark6 — `::2`, `::5`, `::7` and `::8`
-reject it, and none of them serves anything on 8000-8002. They are therefore
-idle capacity that bring-up cannot reach. Installing spark1's public key on
-them would let the two AgentDoG heads move off spark4 onto nodes of their own
-and remove the memory contention documented in 3b entirely.
+**The fabric has eight nodes, and all eight are reachable from spark1.**
+`fd00:200::1` through `::8` all answer ICMP, and as of 2026-08-31 spark1's key
+(`spark1-saster-push`) is installed on **all seven** peers. Key-only SSH
+(`BatchMode=yes`) to spark2 through spark8 succeeds and each answers with its
+own hostname.
+
+**spark2, spark5, spark7 and spark8 are not idle.** Earlier revisions of this
+file described them that way; that was wrong. Each runs a
+`rayworker` container on `vllm-node:pinned` and is a live, registered member of
+the Ray cluster. What is true is narrower: they serve nothing on 8000-8002, and
+they hold no standalone vLLM. Treat them as committed Ray capacity, not as free
+nodes — moving an AgentDoG head onto one means first removing its `rayworker`,
+with the same trade described below.
+
+Address these four by their **fabric** address. They hold no DHCP reservation on
+the LAN, so their `192.168.1.x` addresses can move; `fd00:200::N` is stable.
+`~/.ssh/config` on spark1 defines `spark2`, `spark5`, `spark7` and `spark8`
+keyed off the fabric address for exactly this reason.
+
+> **Cloned host keys.** spark2/spark3 and spark7/spark8 were built from common
+> images and were never re-keyed, so each pair presents an *identical* SSH host
+> key: spark2 and spark3 both show
+> `SHA256:DLqscEJ0o78f3tLf6s4xmlKmm3VIhEQ+988adSbvXkM`, spark7 and spark8 both
+> show `SHA256:2tJO+DmA0HeG5UmWiOKDwUytXBqFd0jXwmlfJGiOLy8`. `known_hosts`
+> therefore cannot distinguish the members of a pair — an entry for one silently
+> validates the other. Host-key verification will not catch a wrong-node
+> connection here; the fabric address is what keeps you honest.
+
+### Ray membership is not a fault signal
+
+The Ray head runs on spark1. `ray status` prints all eight nodes under
+`Active:`, which is misleading — the authoritative view is `ray.nodes()`, which
+splits them:
+
+| Node   | Ray state | Note                                              |
+|--------|-----------|---------------------------------------------------|
+| spark1 | ALIVE     | head, 1 GPU                                       |
+| spark2 | ALIVE     | `rayworker`, 1 GPU                                |
+| spark3 | **DEAD**  | by design — serves Qwen3-8B standalone            |
+| spark4 | **DEAD**  | by design — serves both AgentDoG heads standalone |
+| spark5 | ALIVE     | `rayworker`, **advertises no GPU** — see below    |
+| spark6 | **DEAD**  | by design — serves Ministral-8B standalone        |
+| spark7 | ALIVE     | `rayworker`, 1 GPU                                |
+| spark8 | ALIVE     | `rayworker`, 1 GPU                                |
+
+**spark3, spark4 and spark6 showing DEAD is correct, not a failure.** Their
+`rayworker` containers were removed so they could serve standalone vLLM, which
+is precisely the trade documented in the pre-check below. Ray reports them as
+`health check failed due to missing too many heartbeats`; that message is the
+expected consequence of `docker rm -f rayworker`, not an incident. Do not
+"repair" it by restarting a worker on a serving node — that reintroduces the
+exact OOM the pre-check exists to prevent.
+
+> **OPEN ANOMALY — spark5 advertises no GPU to Ray.** `nvidia-smi` on spark5
+> reports a physical `NVIDIA GB10`, but its raylet registers with no `GPU`
+> resource, so the cluster totals 4.0 GPU across five alive nodes instead of
+> 5.0. spark2, spark7 and spark8 each advertise `GPU: 1.0` normally. The
+> hardware is present; Ray is not seeing it. **Uninvestigated as of
+> 2026-08-31** — recorded here so it is not rediscovered as new. Any
+> tensor-parallel job sized against the advertised GPU count will be one GPU
+> short until this is resolved.
 
 ## The Ray GPU-memory pre-check
 
@@ -286,10 +340,25 @@ scoring path is broken even though the endpoint looks healthy.
 
 ## Access from spark1
 
-spark1 reaches the serving nodes by key with these aliases in `~/.ssh/config`:
-`spark3`, `spark6`, `spark4`, plus `spark3-fab` / `spark6-fab` / `spark4-v4` for
-the alternate addresses. spark1's public key (`spark1-saster-push`) is installed
-in `~/.ssh/authorized_keys` on all three.
+spark1 reaches **every** other node by key. `~/.ssh/config` defines `spark2`
+through `spark8`, plus `spark3-fab` / `spark6-fab` / `spark4-v4` for alternate
+addresses on the three original serving nodes. spark1's public key
+(`spark1-saster-push`) is installed in `~/.ssh/authorized_keys` on all seven —
+spark3, spark4 and spark6 from the original build, and spark2, spark5, spark7
+and spark8 added 2026-08-31.
+
+The four added aliases are keyed off the **fabric** address (`fd00:200::N`)
+rather than the LAN, because those nodes hold no DHCP reservation and their
+`192.168.1.x` addresses can move. Note also the cloned-host-key caveat in
+Topology: `known_hosts` cannot tell spark2 from spark3, or spark7 from spark8.
+
+Verify the whole set at once:
+
+```bash
+for h in spark2 spark3 spark4 spark5 spark6 spark7 spark8; do
+  printf '%-8s -> ' "$h"; ssh -o BatchMode=yes -o ConnectTimeout=8 "$h" hostname
+done
+```
 
 Note that spark4 is reachable from spark1 over both the fabric (`fd00:200::4`)
 and the LAN (`192.168.1.201`), but a host with no global IPv6 route cannot reach
