@@ -26,6 +26,23 @@ have produced seven byte-identical cells differing by a string. Every manifest
 carries `saster_category_axis.varied = false`. **Do not read that field as
 category coverage.**
 
+## CORRECTION (W15, 2026-09-01) — the induced arm had 5 seeds, not 60
+
+The induced result below reads "0/60". Those 60 trajectories used **5 distinct
+seeds**: all 12 induced cells ran `base_seed=20260830`, replaying
+20260830-20260834 twelve times, and because no layer ever blocked, the
+replicates are identical trajectories. The honest bound is **0/5**, Wilson 95%
+[0.0%, 43.4%] — not [0.0%, 6.0%].
+
+W15 measured the same arm on 80 distinct seeds and found **14/80 = 17.5%**
+divergence, Wilson 95% [10.7%, 27.3%], with obstructed and unobstructed
+identical at 7/40 each. **The induced divergence rate is not zero.** Any
+statement below or elsewhere that the induced arm does not diverge, or that P14
+is refuted, is superseded by `runs/W15_README.md`.
+
+The compromised arm is unaffected: it used the same 5 seeds but breached 60/60,
+and a rate of 1.0 is not sensitive to seed count in the way a rate of 0 is.
+
 ## The two results that condition everything else
 
 **1. L4 does not discriminate.** It returned a finding on 60 of 60 L4-enabled
