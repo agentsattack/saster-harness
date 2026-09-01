@@ -42,7 +42,12 @@ from pathlib import Path
 sys.path.insert(0, "/home/lbsuto/halctf-agent")
 
 REPO = Path(__file__).resolve().parent.parent
+# Resolved to absolute: W14_OUT may be given relative to the repo root, and
+# the per-cell result records a repo-relative path, which needs both sides
+# anchored the same way.
 OUT = Path(os.environ.get("W14_OUT", REPO / "runs/w14_corpus_qwen_single_victim"))
+if not OUT.is_absolute():
+    OUT = (REPO / OUT).resolve()
 CELLS = OUT / "cells"
 STATE = OUT / "matrix_state.json"
 
@@ -221,7 +226,8 @@ def run_cell(cell: dict) -> dict:
         "ok": proc.returncode == 0 and n_records == K,
         "n_records": n_records, "expected_records": K,
         "wall_s": round(elapsed, 2),
-        "dir": str(cdir.relative_to(REPO)),
+        "dir": str(cdir.relative_to(REPO)) if cdir.is_relative_to(REPO)
+               else str(cdir),
         "finished_utc": datetime.now(UTC).isoformat(),
         "stderr_tail": proc.stderr.strip()[-1200:] if proc.returncode != 0 else "",
     }
