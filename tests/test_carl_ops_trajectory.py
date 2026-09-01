@@ -1032,6 +1032,87 @@ def test_surprisal_status_outside_the_vocabulary_is_rejected() -> None:
     _act(rec)["surprisal_status"] = "approximated"
     reject(rec, "surprisal_status")
 
+
+# -- AMENDMENT 10: agent_stopped_acting + terminal_outcome_detail ------------
+#
+# `error` pooled a backend fault with an agent that stopped calling tools. In
+# the W14 corpus 12 records carried `error` because the model answered in prose
+# at step 5 — agent behaviour, in the same class as serving_error.
+
+
+def _clean(rec: dict, outcome: str) -> dict:
+    """A non-breach record carrying `outcome`. breach<->terminal_outcome is
+    bound, so the oracle has to agree."""
+    rec["oracle"]["breach"] = False
+    rec["oracle"]["breach_step_index"] = None
+    rec["markers"]["breach_step_index"] = None
+    rec["index_map"]["snapshot_space_markers"]["breach_step_index"] = None
+    rec["containment_latency"] = {"value": None, "censored": False}
+    rec["terminal_outcome"] = outcome
+    return rec
+
+
+def test_agent_stopped_acting_is_a_terminal_outcome() -> None:
+    rec = _clean(valid_trajectory_record(), "agent_stopped_acting")
+    assert validate_record(rec) == []
+
+
+def test_agent_stopped_acting_carries_an_agent_detail() -> None:
+    for d in ("no_tool_call", "unparseable_arguments", "unknown_tool", "bad_arguments"):
+        rec = _clean(valid_trajectory_record(), "agent_stopped_acting")
+        rec["terminal_outcome_detail"] = d
+        assert validate_record(rec) == [], f"{d} should be legal"
+
+
+def test_error_carries_a_backend_detail() -> None:
+    for d in ("transport_error", "malformed_response"):
+        rec = _clean(valid_trajectory_record(), "error")
+        rec["terminal_outcome_detail"] = d
+        assert validate_record(rec) == [], f"{d} should be legal"
+
+
+def test_a_backend_detail_cannot_explain_an_agent_outcome() -> None:
+    """The whole point: an agent that stopped talking is not a backend that
+    failed, and the record may not say it was."""
+    rec = _clean(valid_trajectory_record(), "agent_stopped_acting")
+    rec["terminal_outcome_detail"] = "transport_error"
+    reject(rec, "terminal_outcome_detail")
+
+
+def test_an_agent_detail_cannot_explain_a_backend_outcome() -> None:
+    rec = _clean(valid_trajectory_record(), "error")
+    rec["terminal_outcome_detail"] = "no_tool_call"
+    reject(rec, "terminal_outcome_detail")
+
+
+def test_only_those_two_classes_carry_a_detail() -> None:
+    """A breach was not produced by a runner status, so it cannot name one."""
+    rec = valid_trajectory_record()          # breach
+    rec["terminal_outcome_detail"] = "no_tool_call"
+    reject(rec, "terminal_outcome_detail")
+
+
+def test_detail_outside_the_vocabulary_is_rejected() -> None:
+    rec = _clean(valid_trajectory_record(), "agent_stopped_acting")
+    rec["terminal_outcome_detail"] = "model_got_bored"
+    reject(rec, "terminal_outcome_detail")
+
+
+def test_the_detail_is_optional() -> None:
+    """Records written before the amendment carry no detail and stay valid."""
+    rec = _clean(valid_trajectory_record(), "agent_stopped_acting")
+    rec.pop("terminal_outcome_detail", None)
+    assert validate_record(rec) == []
+    rec["terminal_outcome_detail"] = None
+    assert validate_record(rec) == []
+
+
+def test_error_is_still_a_legal_outcome() -> None:
+    """The amendment splits the class; it does not delete the old one, and the
+    W14 records that carry `error` stay valid."""
+    rec = _clean(valid_trajectory_record(), "error")
+    assert validate_record(rec) == []
+
 # -- AMENDMENT 5: oracle.first_firing_step_index -----------------------------
 #
 # invariants_fired is a flat list with no snapshot association, and before

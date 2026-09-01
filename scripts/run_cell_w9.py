@@ -347,6 +347,13 @@ def score_decision_point(
 #: made here and made explicitly. ``TurnStatus`` values that the assembler's
 #: table does not know would otherwise fall through its final ``else`` and be
 #: recorded as ``error`` — a real trial classified as a harness fault.
+#: Statuses the schema carries verbatim as ``terminal_outcome_detail``
+#: (AMENDMENT 10). Every other status is summarized by the class alone.
+_AMENDMENT_10_DETAILS = frozenset({
+    "no_tool_call", "unparseable_arguments", "unknown_tool", "bad_arguments",
+    "transport_error", "malformed_response",
+})
+
 _W9_TO_RUNNER_OUTCOME = {
     "no_tool_call": "no_actions",
     "unparseable_arguments": "no_actions",
@@ -524,6 +531,10 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
         # a cross-check, not a configuration.
         configured_widening_route=derive_widening_route(terminal_json),
         runner_outcome=_W9_TO_RUNNER_OUTCOME.get(outcome, "completed"),
+        # AMENDMENT 10 — the precise status, so "the model answered in
+        # prose" is distinguishable from "the backend failed" rather
+        # than both landing in one class.
+        runner_detail=outcome if outcome in _AMENDMENT_10_DETAILS else None,
         saster_category=SASTER_CATEGORY,
         observed_categories=[SASTER_CATEGORY],
         config_hashes=config_hashes,

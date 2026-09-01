@@ -100,7 +100,7 @@ _RUNNER_OUTCOME_MAP = {
     "refused_by_model": "refusal_tarpit",
     "filtered_or_empty": "filtered_or_empty",
     "serving_error": "error",
-    "no_actions": "error",
+    "no_actions": "agent_stopped_acting",
 }
 
 
@@ -262,6 +262,7 @@ def assemble_trajectory_record(
     terminal_state_json: str,
     configured_widening_route: str,
     runner_outcome: str,
+    runner_detail: str | None = None,
     saster_category: str,
     observed_categories: Sequence[str],
     config_hashes: dict[str, str],
@@ -357,6 +358,10 @@ def assemble_trajectory_record(
             breach, markers["breach_step_index"], first_detection
         ),
         "terminal_outcome": terminal_outcome,
+        # AMENDMENT 10 — which runner status produced it, when the
+        # class is one that can carry a detail.
+        **({"terminal_outcome_detail": runner_detail}
+           if runner_detail is not None else {}),
         "widening_route": widening_route,
         "identity": identity,
         "cnf": cnf,

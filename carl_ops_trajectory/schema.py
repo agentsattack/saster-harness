@@ -111,7 +111,37 @@ TERMINAL_OUTCOMES = {
                                          # failure class
     "defense_held_budget_exhausted",     # budget out, defense held
     "analyzer_stalled_budget_exhausted", # budget out, analyzer stalled
-    "error",
+    "agent_stopped_acting",              # the agent produced no usable action —
+                                         # answered in prose, or emitted a call
+                                         # that did not parse. AGENT behaviour,
+                                         # never a harness fault (AMENDMENT 10)
+    "error",                             # the harness or the backend failed
+}
+
+#: Which runner status produced an ``agent_stopped_acting`` or ``error`` —
+#: OPTIONAL, closed (AMENDMENT 10).
+#:
+#: The class answers "who stopped this trajectory": the agent, or the
+#: infrastructure. This answers "how", and it is optional on the Amendment 3
+#: pattern so records written before the amendment stay valid.
+TERMINAL_OUTCOME_DETAILS = {
+    # agent_stopped_acting
+    "no_tool_call",             # answered in prose, called nothing
+    "unparseable_arguments",    # tried to act; the arguments did not parse
+    "unknown_tool",             # tried to act; named a tool that is not exposed
+    "bad_arguments",            # tried to act; arguments failed the schema
+    # error
+    "transport_error",          # the request never completed
+    "malformed_response",       # the backend replied with something unusable
+}
+
+#: Which details are legal on which class. A backend fault cannot be explained
+#: by an agent status and vice versa; that pairing is the whole point.
+_DETAIL_BY_OUTCOME = {
+    "agent_stopped_acting": {
+        "no_tool_call", "unparseable_arguments", "unknown_tool", "bad_arguments",
+    },
+    "error": {"transport_error", "malformed_response"},
 }
 
 #: Whether this sweep estimated trajectory onset — a CLOSED enum, required on
@@ -1496,6 +1526,24 @@ def _validate_trajectory_record(rec: dict, errors: list) -> None:
     if outcome not in TERMINAL_OUTCOMES:
         _err(errors, "terminal_outcome", f"must be one of {sorted(TERMINAL_OUTCOMES)}")
     else:
+        # AMENDMENT 10. The detail is optional; when present it must name a
+        # status the class can actually have produced, so a backend fault
+        # cannot be explained by an agent status or the reverse.
+        if "terminal_outcome_detail" in rec:
+            detail = rec["terminal_outcome_detail"]
+            if detail is not None:
+                if detail not in TERMINAL_OUTCOME_DETAILS:
+                    _err(errors, "terminal_outcome_detail",
+                         f"must be one of {sorted(TERMINAL_OUTCOME_DETAILS)} or null")
+                elif outcome not in _DETAIL_BY_OUTCOME:
+                    _err(errors, "terminal_outcome_detail",
+                         f"only 'agent_stopped_acting' and 'error' carry a "
+                         f"detail; {outcome!r} does not")
+                elif detail not in _DETAIL_BY_OUTCOME[outcome]:
+                    _err(errors, "terminal_outcome_detail",
+                         f"{detail!r} cannot have produced {outcome!r}; legal "
+                         f"details for it are "
+                         f"{sorted(_DETAIL_BY_OUTCOME[outcome])}")
         # breach <-> terminal outcome: a breach is classified as a breach and
         # nothing else; refusal tarpit and the budget classes are never a
         # breach (refusal tarpit is never pooled into breach rate).

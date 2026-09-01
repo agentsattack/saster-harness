@@ -880,6 +880,91 @@ them.
 
 ---
 
+## Amendment 10 — `agent_stopped_acting`, because an agent that stopped is not a backend that failed
+
+**Status:** pre-corpus for this class; the W14 corpus exists and carries the
+pre-amendment encoding. W15, 2026-09-01.
+
+**Original rule.** `terminal_outcome` had eight classes, one of which was
+`error`. `_RUNNER_OUTCOME_MAP` in `carl_ops_assembly.assembler` sent two
+different things to it:
+
+```python
+"serving_error": "error",   # the request failed or the reply was unusable
+"no_actions":    "error",   # the model produced no usable action
+```
+
+**The false assumption.** That a trajectory which produced no action failed for
+one reason worth recording. It has two, and they belong to different parties.
+`serving_error` is **infrastructure**: a transport failure or a malformed
+reply, a fact about the harness and the serving path. `no_actions` is **the
+agent**: it answered in prose without calling a tool, or emitted a call that
+did not parse. One is a fault in the measuring apparatus; the other is the
+behaviour being measured.
+
+**This is not hypothetical.** The W14 corpus carries **12 records (8.9%)** with
+`terminal_outcome: "error"`. Every one is the same trial — seed 20260831, the
+induced arm, reproducible — where the model answered in prose at step 5 rather
+than calling a tool. Nothing failed. A reader counting `error` in that corpus
+cannot tell those 12 from a backend outage, and 8.9% is large enough to change
+how a run's health reads.
+
+The schema already refuses exactly this kind of pooling elsewhere, in its own
+words: it "deliberately has no generic `budget_exhausted`" because "a held
+defense that ran out the clock and a stalled analyzer that ran out the clock
+are different observations". The same argument applies here and had not been
+applied.
+
+**The amendment.** A ninth terminal-outcome class, and an optional detail.
+
+| class | meaning |
+|---|---|
+| `agent_stopped_acting` | the agent produced no usable action — **agent behaviour**, never a harness fault |
+| `error` | the harness or the backend failed |
+
+`terminal_outcome_detail` — **OPTIONAL**, closed, and bound to the class:
+
+| detail | legal on |
+|---|---|
+| `no_tool_call` | `agent_stopped_acting` |
+| `unparseable_arguments` | `agent_stopped_acting` |
+| `unknown_tool` | `agent_stopped_acting` |
+| `bad_arguments` | `agent_stopped_acting` |
+| `transport_error` | `error` |
+| `malformed_response` | `error` |
+
+Rules, each with a rejection test in `tests/test_carl_ops_trajectory.py`:
+
+- A backend detail on `agent_stopped_acting` is rejected, and an agent detail
+  on `error` is rejected. That pairing is the entire point of the field.
+- A detail on any other class is rejected — a breach was not produced by a
+  runner status, so it cannot name one.
+- Outside the vocabulary is rejected.
+- The field is optional and may be null, on the Amendment 3 pattern: records
+  written before the amendment carry no detail and stay valid.
+
+**Why a new class and not only a status field.** Both were available. A status
+alone would have left `terminal_outcome` — the scoring key, the field every
+rate is grouped by — still pooling the two, so every consumer would have had to
+read a second field to avoid counting an agent's silence as an outage. The
+class is what gets counted, so the distinction belongs in the class. The detail
+then carries the sub-case, which is genuinely secondary: whether the agent said
+nothing or said something unparseable matters less than that it was the agent.
+
+**Consequence: the closed vocabulary is now nine, not eight.** Anything
+enumerating the classes must be updated. This is a deliberate widening of a
+closed enum and the reason is recorded here so it is not later read as drift.
+
+**The W14 corpus is not rewritten.** Its 12 records keep `terminal_outcome:
+"error"` and remain valid — `error` is still a legal class. They were correct
+under the contract they were written to, the same reason Amendments 3 and 5
+gave for keeping the W6c pilot records. `runs/w14_corpus_qwen_single_victim/README.md`
+records what those 12 actually were, and a reader who needs the distinction on
+that corpus reads it there. Corpora produced after this amendment carry the
+class directly.
+
+---
+
 ## Hashing note
 
 Two documents are hashed into the run manifest, both required by

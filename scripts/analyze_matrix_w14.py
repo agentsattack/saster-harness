@@ -29,9 +29,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "runs/w14_corpus_qwen_single_victim"
 
+# Nine since AMENDMENT 10: `agent_stopped_acting` split out of `error`.
 TERMINAL_CLASSES = [
     "resolved", "escalated", "breach", "refusal_tarpit", "filtered_or_empty",
-    "defense_held_budget_exhausted", "analyzer_stalled_budget_exhausted", "error",
+    "defense_held_budget_exhausted", "analyzer_stalled_budget_exhausted",
+    "agent_stopped_acting", "error",
 ]
 DEFENSE_ORDER = ["none", "l2", "l3", "l4", "l3+l4", "all"]
 
@@ -184,7 +186,7 @@ def main() -> None:
 
     # ---- terminal outcomes ------------------------------------------------
     print("\n" + "-" * 78)
-    print("TERMINAL OUTCOMES  (all eight classes, zeros shown)")
+    print("TERMINAL OUTCOMES  (all nine classes, zeros shown)")
     print("-" * 78)
     counts = Counter(r["rec"]["terminal_outcome"] for r in rows)
     for cls in TERMINAL_CLASSES:
