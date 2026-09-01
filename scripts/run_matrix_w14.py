@@ -50,21 +50,45 @@ VICTIM = "Qwen/Qwen3-8B"
 ROUTER_URL = "http://localhost:8080"
 K = int(os.environ.get("W14_K", "5"))
 
-#: Seed derivation (W16). Every cell gets its own disjoint block of the seed
-#: space, so no two cells can replay the same trajectory.
+#: Seed derivation — PAIRED (W17, replacing W16's fully-disjoint scheme).
 #:
-#: W14 shipped without this: every cell ran ``base_seed=20260830``, so 135
-#: records stood on 5 distinct seeds — a 13.5x inflation of the apparent
-#: sample size, and the reason its induced arm read 0/60 when it was 0/5.
+#: A seed depends on the STRATUM — ``(precondition, fixture_mode)`` — and the
+#: trial index, and NOT on the defense config:
 #:
-#: seed(cell, trial) = SEED_BASE + ordinal(cell) * SEED_STRIDE + trial
+#:     seed(cell, trial) = SEED_BASE + stratum_ordinal(cell) * SEED_STRIDE + trial
 #:
-#: Ordinals come from the fixed plan order, so a re-run reproduces the same
-#: seeds exactly. The stride bounds k: a cell may not run more than
-#: SEED_STRIDE trials without colliding with the next cell's block, and
-#: :func:`cell_plan` asserts that.
-SEED_BASE = int(os.environ.get("W14_SEED_BASE", "20260901"))
+#: Two cells differing ONLY in defense config therefore get the SAME seeds, and
+#: two cells differing in precondition or fixture mode get different ones.
+#:
+#: **Sharing across configs is deliberate and is the right design.** Marginal
+#: layer contribution is a paired comparison: the same trajectory run under six
+#: configs isolates the layer effect with no sampling variance between columns.
+#: Giving each config its own seeds — W16's scheme — would have put sampling
+#: noise exactly where the ablation reads its signal.
+#:
+#: The W14 defect was NOT that configs shared seeds. It was two other things:
+#: all 27 cells shared ONE base, so the precondition and fixture-mode cells
+#: collapsed together too; and every rate was reported against the record count
+#: rather than the number of distinct trajectories. Both are fixed — this, and
+#: the effective-n reporting in ``scripts/analyze_matrix_w14.py``.
+#:
+#: Ordinals come from STRATA order, so a re-run reproduces the same seeds.
+SEED_BASE = int(os.environ.get("W14_SEED_BASE", "20261101"))
 SEED_STRIDE = 1000
+
+#: The strata a seed varies over. Order is fixed; it determines the ordinals.
+STRATA = (
+    ("obstructed", "compromised"),
+    ("obstructed", "induced"),
+    ("unobstructed", "compromised"),
+    ("unobstructed", "induced"),
+)
+
+
+def stratum_ordinal(precondition: str, mode: str) -> int:
+    """Index of this cell's seed stratum. Defense config is NOT an input."""
+    return STRATA.index((precondition, mode))
+
 
 DEFENSE_KEYS = ("l2", "l3", "l4", "l3+l4", "all", "none")
 PRECONDITIONS = (("obstructed", "1"), ("unobstructed", "0"))
@@ -120,7 +144,11 @@ def cell_plan(k: int | None = None) -> list[dict]:
         })
     for ordinal, cell in enumerate(cells):
         cell["ordinal"] = ordinal
-        cell["seed_base"] = SEED_BASE + ordinal * SEED_STRIDE
+        so = stratum_ordinal(cell["axes"]["precondition"],
+                             cell["axes"]["fixture_mode"].replace("carl-ops-", ""))
+        cell["stratum"] = STRATA[so]
+        cell["stratum_ordinal"] = so
+        cell["seed_base"] = SEED_BASE + so * SEED_STRIDE
         cell["seeds"] = [cell["seed_base"] + i for i in range(k)]
     return cells
 
@@ -188,6 +216,7 @@ def run_cell(cell: dict) -> dict:
     return {
         "id": cell["id"], "arm": cell["arm"], "axes": cell["axes"],
         "seed_base": cell["seed_base"], "seeds": cell["seeds"],
+        "stratum": list(cell["stratum"]),
         "returncode": proc.returncode,
         "ok": proc.returncode == 0 and n_records == K,
         "n_records": n_records, "expected_records": K,
