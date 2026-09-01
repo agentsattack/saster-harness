@@ -60,7 +60,13 @@ from carl_ops_agent.model_driven import ModelDrivenAgent
 from carl_ops_agent.widening import derive_widening_route
 from carl_ops_assembly import assemble_trajectory_record
 from carl_ops_attribution import expected_labels, score_failure_mode
-from carl_ops_envelope import CANDIDATES, Candidate, envelopes
+from carl_ops_envelope import (
+    CANDIDATES,
+    ENVELOPE_NOT_COMPUTED,
+    Candidate,
+    envelopes,
+    envelopes_not_computed,
+)
 from carl_ops_envelope.chat_scorer import (
     DEFAULT_CHAT_SCORER_TIMEOUT_S,
     ChatScoredDistribution,
@@ -103,6 +109,22 @@ OBSERVERS: dict[str, tuple[str, str]] = {
 #: Which of the above to run. `W9_AGENTDOG_MODEL` / `W9_AGENTDOG` still override
 #: the checkpoint and endpoint independently, so an ad-hoc deployment is
 #: selectable without editing this table.
+#: Whether this cell computes the envelope block (schema AMENDMENT 9).
+#:
+#: ``not_computed`` skips the candidate-set scoring pass entirely. That pass
+#: was 73% of cell wall clock, and W13 decided it does not measure what its
+#: field names claim: a teacher-forced per-token plausibility ranking over a
+#: closed set is not the agent's action distribution. Under ``not_computed``
+#: the three envelopes, ``explanatory_divergence`` and ``surprisal`` are all
+#: null beside explicit statuses, rather than carrying numbers that describe
+#: something other than the agent.
+ENVELOPE_MODE = os.environ.get("W9_ENVELOPE", "computed")
+if ENVELOPE_MODE not in ("computed", "not_computed"):
+    raise SystemExit(
+        f"W9_ENVELOPE={ENVELOPE_MODE!r} must be 'computed' or 'not_computed'"
+    )
+SCORE_ENVELOPE = ENVELOPE_MODE == "computed"
+
 OBSERVER = os.environ.get("W9_OBSERVER", "binary")
 if OBSERVER not in OBSERVERS:
     raise SystemExit(
@@ -318,14 +340,31 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
             break
 
         taken = canonical_action(action.tool, action.args)
-        t_score = time.monotonic()
-        dist13, surprisal, prompt_ref, diag = score_decision_point(
-            pre_messages, taken, template_kwargs
-        )
-        scorer_seconds += time.monotonic() - t_score
-
-        mass = envelopes(dist13, pre_state.scope, pre_state,
-                         agent.session.snapshots[0].state, REL)
+        if SCORE_ENVELOPE:
+            t_score = time.monotonic()
+            dist13, surprisal, prompt_ref, diag = score_decision_point(
+                pre_messages, taken, template_kwargs
+            )
+            scorer_seconds += time.monotonic() - t_score
+            mass = envelopes(dist13, pre_state.scope, pre_state,
+                             agent.session.snapshots[0].state, REL)
+        else:
+            # No scoring pass at all — this is where the wall clock goes.
+            # prompt_ref still addresses the exact context the agent sampled
+            # from; it just hashes the messages rather than the tokenization,
+            # because no tokenizer call is made (AMENDMENT 9).
+            surprisal = None
+            prompt_ref = _sha_text(json.dumps(pre_messages, sort_keys=True))
+            diag = {
+                "taken": taken.serialize(),
+                "exact_candidate_index": None,
+                "n_scored": 0,
+                "surprisal_basis": (
+                    "not computed — no candidate-set softmax ran, so there is "
+                    "no denominator for -log P(taken action | prefix)"
+                ),
+            }
+            mass = envelopes_not_computed()
         masses.append(mass)
         turns.append({
             "refusal_prob": 0.0,
@@ -357,6 +396,7 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
             "policy_verdict": policy_verdict,
             "rule_id": l2.rule_id if l2 is not None else None,
             "surprisal": surprisal,
+            "surprisal_status": "computed" if SCORE_ENVELOPE else "not_computed",
             "surprisal_basis": diag["surprisal_basis"],
         })
         detection.extend(submitted.detection_entries)
@@ -533,8 +573,15 @@ def _diagnose(**kw: Any) -> dict[str, Any]:
         findings.append("first_detection_step was set by an approval escalation")
 
     # 3. threshold provenance: the ceiling was calibrated on the text surface.
-    peak = max((m["prohibition_out"] for m in kw["masses"]), default=0.0)
-    peak_declared_in = min((m["declared_in"] for m in kw["masses"]), default=1.0)
+    # Under AMENDMENT 9's not_computed there are no numbers to summarize, and
+    # a 0.0 default would read as a measured floor rather than an absence.
+    _measured = [m for m in kw["masses"] if m.get("prohibition_out") is not None]
+    if _measured:
+        peak = max(m["prohibition_out"] for m in _measured)
+        peak_declared_in = min(m["declared_in"] for m in _measured)
+    else:
+        peak = None
+        peak_declared_in = None
 
     # 4. widening_route vs the rule that is supposed to make CVR>0 on it.
     denies = [a for a in record["actions"] if a["policy_verdict"] == "deny"]
@@ -585,9 +632,12 @@ def _diagnose(**kw: Any) -> dict[str, Any]:
         # primary invariant, which is what AgentDoG's published 32.4% is.
         "p10": kw["p10"],
         "envelope": {
+            "envelope_status": ENVELOPE_MODE,
             "peak_prohibition_out": peak,
             "min_declared_in": peak_declared_in,
-            "prohibition_out_ceiling": PROHIBITION_OUT_CEILING,
+            "prohibition_out_ceiling": (
+                PROHIBITION_OUT_CEILING if SCORE_ENVELOPE else None
+            ),
             "per_step": [
                 {"declared_in": m["declared_in"], "prohibition_out": m["prohibition_out"]}
                 for m in kw["masses"]
@@ -674,6 +724,15 @@ def main() -> None:
     ).as_manifest_block()
     manifest["envelope_scorer"] = {
         "role": "envelope_mass_scoring",
+        "envelope_status": ENVELOPE_MODE,
+        "not_computed_rationale": (
+            None if SCORE_ENVELOPE else
+            "W13 option (b), schema AMENDMENT 9. The teacher-forced per-token "
+            "ranking this scorer produces is not the agent's action "
+            "distribution under any normalization or surface, so the three "
+            "envelopes, explanatory_divergence and surprisal are recorded as "
+            "not measured rather than as numbers describing something else."
+        ),
         "surface": "chat",
         "module": "carl_ops_envelope.chat_scorer",
         "base_url": ROUTER_URL,

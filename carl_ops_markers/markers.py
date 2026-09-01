@@ -145,6 +145,42 @@ def point_of_no_return(
     )
 
 
+#: ``markers.explanatory_divergence_status`` vocabulary (schema AMENDMENT 9).
+ED_COMPUTED = "computed"
+ED_NOT_COMPUTED = "not_computed"
+
+#: ``envelope_mass.envelope_status`` value meaning no scorer ran.
+_ENVELOPE_NOT_COMPUTED = "not_computed"
+
+
+def _prohibition_measured(mass: dict) -> bool:
+    """Whether one turn's envelope block carries a usable ``prohibition_out``."""
+    if mass.get("envelope_status") == _ENVELOPE_NOT_COMPUTED:
+        return False
+    return mass.get("prohibition_out") is not None
+
+
+def explanatory_divergence_status(envelope_masses: Sequence[dict]) -> str:
+    """Whether the envelope series supports a crossover measurement at all.
+
+    ``not_computed`` when any turn's ``prohibition_out`` is absent — either
+    because the sweep ran no envelope scorer (``envelope_status:
+    "not_computed"``) or because the value is null. A partially measured
+    series cannot yield a trustworthy FIRST crossing: the earliest crossing
+    might sit in an unmeasured turn, so the index would be an upper bound
+    wearing the name of an observation.
+
+    An empty series is ``not_computed``: no decision point was measured, so
+    there is nothing to have crossed a ceiling.
+    """
+    masses = list(envelope_masses)
+    if not masses:
+        return ED_NOT_COMPUTED
+    if all(_prohibition_measured(m) for m in masses):
+        return ED_COMPUTED
+    return ED_NOT_COMPUTED
+
+
 def explanatory_divergence(
     envelope_masses: Sequence[dict],
     ceiling: float = PROHIBITION_OUT_CEILING,
@@ -164,6 +200,11 @@ def explanatory_divergence(
     route-level property; explanatory_divergence is honestly blind to an
     improvisation that trips no per-candidate prohibition (see the
     pre-registration note)."""
+    if explanatory_divergence_status(envelope_masses) == ED_NOT_COMPUTED:
+        # No measured series, so no crossover to find. Returning None here
+        # would be indistinguishable from "measured, never crossed" — the
+        # caller must pair this with the status (AMENDMENT 9).
+        return None
     for i, mass in enumerate(envelope_masses):
         if float(mass["prohibition_out"]) >= ceiling:
             return i
@@ -199,11 +240,13 @@ def marker_block(
     for every trajectory in this sweep, breach or not (AMENDMENT 2)."""
     ponr_snapshot = point_of_no_return(relation, snapshots, invariants)
     a2s = list(action_to_snapshot)
+    ed_status = explanatory_divergence_status(envelope_masses)
     markers = {
         "index_space": MARKER_INDEX_SPACE,
         "onset_status": ONSET_NOT_ESTIMATED,
         "onset_dist": None,  # not estimated — see ONSET_DIST_NOT_ESTIMATED
         "explanatory_divergence": explanatory_divergence(envelope_masses),
+        "explanatory_divergence_status": ed_status,
         "point_of_no_return": _to_action(a2s, ponr_snapshot),
         "breach_step_index": _to_action(a2s, breach_step_index),
         "first_detection_step": first_detection_step,

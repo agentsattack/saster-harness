@@ -851,13 +851,186 @@ def test_omitting_the_status_is_not_a_back_door_for_a_null() -> None:
 
 def test_the_other_three_envelopes_are_still_required_numbers() -> None:
     """The amendment loosens exactly one field. declared_in, declared_out and
-    prohibition_out are real measurements and stay mandatory."""
+    prohibition_out are real measurements and stay mandatory.
+
+    SUPERSEDED IN PART by AMENDMENT 9, which makes all three nullable under an
+    explicit ``envelope_status: "not_computed"``. This test pins the rule that
+    still holds: with no ``envelope_status`` present, the pre-amendment
+    requirement applies unchanged, so the reversal cannot be reached by
+    omission."""
     for key in ("declared_in", "declared_out", "prohibition_out"):
         rec = valid_trajectory_record()
         _em(rec).update({"scored": None, "scored_status": "not_computed"})
         del _em(rec)[key]
         reject(rec, key)
 
+
+
+# -- AMENDMENT 9: envelope_status governs the three envelopes ----------------
+#
+# This REVERSES Amendment 3's stated commitment that declared_in, declared_out
+# and prohibition_out remain required numbers. The false assumption corrected
+# is that a teacher-forced per-token plausibility ranking over a closed
+# candidate set is the agent's action distribution. See docs/schema-amendments.md.
+
+
+def test_three_envelopes_may_be_null_under_not_computed() -> None:
+    rec = valid_trajectory_record()
+    _em(rec).update({
+        "envelope_status": "not_computed",
+        "declared_in": None, "declared_out": None, "prohibition_out": None,
+    })
+    assert validate_record(rec) == []
+
+
+def test_computed_owes_all_three_numbers() -> None:
+    """A sweep that says it measured owes the measurement, one field at a time."""
+    for key in ("declared_in", "declared_out", "prohibition_out"):
+        rec = valid_trajectory_record()
+        _em(rec)["envelope_status"] = "computed"
+        _em(rec)[key] = None
+        reject(rec, key)
+
+
+def test_not_computed_rejects_any_non_null_envelope() -> None:
+    """The exact pre-amendment shape. Rejecting it is the point: a scorer that
+    did not run cannot have produced a number."""
+    for key, value in (("declared_in", 0.9), ("declared_out", 0.1),
+                       ("prohibition_out", 0.05)):
+        rec = valid_trajectory_record()
+        _em(rec).update({
+            "envelope_status": "not_computed",
+            "declared_in": None, "declared_out": None, "prohibition_out": None,
+        })
+        _em(rec)[key] = value
+        reject(rec, key)
+
+
+def test_envelope_status_outside_the_vocabulary_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    _em(rec)["envelope_status"] = "partially_computed"
+    reject(rec, "envelope_status")
+
+
+def test_a_bogus_envelope_status_does_not_excuse_the_fields() -> None:
+    """Falls back to the pre-amendment rule rather than letting an
+    unrecognized status carry nulls through."""
+    rec = valid_trajectory_record()
+    _em(rec).update({"envelope_status": "nonsense", "declared_in": None})
+    errs = reject(rec, "envelope_status")
+    assert any("declared_in" in e for e in errs), errs
+
+
+def test_omitting_envelope_status_is_not_a_back_door_for_nulls() -> None:
+    """The guard AMENDMENT 2 established, applied to the three envelopes."""
+    for key in ("declared_in", "declared_out", "prohibition_out"):
+        rec = valid_trajectory_record()
+        _em(rec).pop("envelope_status", None)
+        _em(rec)[key] = None
+        reject(rec, key)
+
+
+# -- AMENDMENT 9: explanatory_divergence_status ------------------------------
+#
+# "never crossed the ceiling" and "never measured" were both encoded as a null
+# index. They are different claims and a reader must be able to tell them
+# apart — the conflation Amendment 2 exists to prevent.
+
+
+def _markers(rec: dict) -> dict:
+    return rec["markers"]
+
+
+def test_explanatory_divergence_may_be_null_under_not_computed() -> None:
+    rec = valid_trajectory_record()
+    _markers(rec)["explanatory_divergence_status"] = "not_computed"
+    _markers(rec)["explanatory_divergence"] = None
+    assert validate_record(rec) == []
+
+
+def test_not_computed_rejects_a_divergence_index() -> None:
+    """An index names a step in a series nothing measured."""
+    rec = valid_trajectory_record()
+    _markers(rec)["explanatory_divergence_status"] = "not_computed"
+    _markers(rec)["explanatory_divergence"] = 2
+    reject(rec, "explanatory_divergence")
+
+
+def test_computed_still_admits_a_null_meaning_never_crossed() -> None:
+    """The distinction the field creates: under `computed` a null is a
+    measurement — the ceiling was never crossed."""
+    rec = valid_trajectory_record()
+    _markers(rec)["explanatory_divergence_status"] = "computed"
+    _markers(rec)["explanatory_divergence"] = None
+    assert validate_record(rec) == []
+
+
+def test_explanatory_divergence_status_outside_the_vocabulary_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    _markers(rec)["explanatory_divergence_status"] = "inferred"
+    reject(rec, "explanatory_divergence_status")
+
+
+def test_absent_divergence_status_keeps_the_pre_amendment_meaning() -> None:
+    """Records written before the amendment stay valid, and their null keeps
+    meaning "computed, never crossed"."""
+    rec = valid_trajectory_record()
+    _markers(rec).pop("explanatory_divergence_status", None)
+    _markers(rec)["explanatory_divergence"] = None
+    assert validate_record(rec) == []
+
+
+def test_a_score_is_still_not_an_index_under_a_status() -> None:
+    """AMENDMENT 6's rule survives: explanatory_divergence is an action index,
+    never a score, and adding a status must not reopen that."""
+    rec = valid_trajectory_record()
+    _markers(rec)["explanatory_divergence_status"] = "computed"
+    _markers(rec)["explanatory_divergence"] = 0.42
+    reject(rec, "explanatory_divergence")
+
+
+# -- AMENDMENT 9: surprisal_status ------------------------------------------
+#
+# surprisal is read off the SAME teacher-forced softmax as the envelopes, so a
+# sweep that cannot compute them cannot compute it either.
+
+
+def _act(rec: dict) -> dict:
+    return rec["actions"][0]
+
+
+def test_surprisal_may_be_null_under_not_computed() -> None:
+    rec = valid_trajectory_record()
+    _act(rec)["surprisal_status"] = "not_computed"
+    _act(rec)["surprisal"] = None
+    assert validate_record(rec) == []
+
+
+def test_not_computed_rejects_a_surprisal_number() -> None:
+    rec = valid_trajectory_record()
+    _act(rec)["surprisal_status"] = "not_computed"
+    _act(rec)["surprisal"] = 2.5
+    reject(rec, "surprisal")
+
+
+def test_computed_owes_a_surprisal_number() -> None:
+    rec = valid_trajectory_record()
+    _act(rec)["surprisal_status"] = "computed"
+    _act(rec)["surprisal"] = None
+    reject(rec, "surprisal")
+
+
+def test_omitting_surprisal_status_is_not_a_back_door() -> None:
+    rec = valid_trajectory_record()
+    _act(rec).pop("surprisal_status", None)
+    _act(rec)["surprisal"] = None
+    reject(rec, "surprisal")
+
+
+def test_surprisal_status_outside_the_vocabulary_is_rejected() -> None:
+    rec = valid_trajectory_record()
+    _act(rec)["surprisal_status"] = "approximated"
+    reject(rec, "surprisal_status")
 
 # -- AMENDMENT 5: oracle.first_firing_step_index -----------------------------
 #

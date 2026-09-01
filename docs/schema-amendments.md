@@ -716,6 +716,170 @@ set to be as fixed as the terminal-outcome classes are.
 
 ---
 
+## Amendment 9 — `envelope_status` governs the three envelopes, and two fields read off the same distribution
+
+**Status:** pre-corpus. W13, 2026-08-31.
+
+**This amendment REVERSES a commitment made in Amendment 3.** That amendment
+loosened `scored` and said so explicitly:
+
+> `declared_in`, `declared_out` and `prohibition_out` remain required numbers.
+> The amendment loosens exactly one field, the one that was never a
+> measurement.
+
+That sentence is withdrawn. All three become nullable under an explicit
+`envelope_status: "not_computed"`, and so do `markers.explanatory_divergence`
+and `actions[].surprisal`. Amendment 3's reasoning was correct about `scored`
+and wrong about the boundary: it located the defect in one field's
+normalization when the defect is in what the scoring method measures at all.
+
+**The false assumption.** That a **teacher-forced per-token plausibility
+ranking over a closed candidate set is the agent's action distribution.**
+
+Every envelope is a softmax over 13 candidates the agent never chose among.
+The agent samples freely from its full action space, with its own arguments;
+the scorer forces 13 pre-registered serializations after the same prefix and
+ranks them. Those are different objects. The envelope describes what the model
+finds *plausible to continue with when the continuation is dictated to it* —
+not what it *does*. `declared_in` was read as scope compliance and
+`prohibition_out` as prohibition compliance; both are properties of a ranking
+over a set the agent had no part in choosing.
+
+**The measurement.** The two distributions are not close, and the gap is not a
+matter of calibration:
+
+| quantity | value |
+|---|---|
+| agent's own action distribution, entropy as % of uniform | **1.3%** |
+| envelope scorer's distribution, entropy as % of uniform | **99.0%** |
+| Qwen under the original SUM scoring, entropy | **0.000** |
+
+The agent is a near point mass — it does one thing, with 1.3% of the entropy a
+uniform choice over the same support would carry. The scorer against the same
+prefixes sits at 99.0% of uniform: near-flat, spreading mass almost evenly over
+13 candidates. A near-uniform ranking cannot be a measurement of a near point
+mass. It is not a noisy estimate of the agent's distribution; it is a
+measurement of a different thing.
+
+**Neither normalization rescues it, and this was checked before deciding.** SUM
+was already replaced once for being a length contest
+(`docs/envelope-preregistration.md` §1); under SUM, Qwen's distribution
+saturates to entropy **0.000** — a hard point mass on whichever serialization
+is shortest, which is a property of the tokenizer. MEAN removes the length
+artifact and lands at near-uniform. The method has two settings: saturated and
+uninformative. Neither is the agent.
+
+**Why not the sampled alternative — option (b) chose against (a).** Scoring the
+actions the agent actually sampled measures the right object. Its scalar
+conflates two things that must stay separate: *composition* (which tool, in
+which order) and *argument noise* (that the model wrote `bucket-7f2` where the
+candidate said `ops-audit-x`). A single number over both moves when the model
+renames a bucket, and the corpus would carry that as though it were a change in
+behavior. The right object with the wrong scalar is not an improvement on the
+wrong object.
+
+**Why not option (c).** It moves both hashed documents and retires calibrated
+thresholds. `envelope_preregistration_sha256` and `grrcon_matrix_sha256` both
+change, every pre-registered threshold loses its negative control, and the
+calibration work is redone under deadline. That is paper work, not GrrCON work,
+and doing it here would mean publishing a corpus whose thresholds were selected
+after the data existed — the failure pre-registration exists to prevent.
+
+**The amendment.** Three new fields, each a closed vocabulary, each governing a
+nullability that was previously unconditional.
+
+`envelope_mass.envelope_status`:
+
+| value | meaning | `declared_in`, `declared_out`, `prohibition_out` |
+|---|---|---|
+| `computed` | a scorer ran | ALL three MUST be numbers |
+| `not_computed` | no scorer ran for this sweep | ALL three MUST be null |
+
+`markers.explanatory_divergence_status`:
+
+| value | meaning | `explanatory_divergence` |
+|---|---|---|
+| `computed` | an envelope series existed to scan | int >= 0, or null meaning **never crossed the ceiling** |
+| `not_computed` | no series was measured | MUST be null |
+
+`actions[].surprisal_status`:
+
+| value | meaning | `surprisal` |
+|---|---|---|
+| `computed` | the candidate-set softmax ran | MUST be a number |
+| `not_computed` | it did not | MUST be null |
+
+Rules, each with a rejection test in `tests/test_carl_ops_trajectory.py`:
+
+- `computed` with any of the three envelopes null is rejected — a scorer that
+  claims to have measured owes all three.
+- `not_computed` with any of them non-null is rejected. This is the exact
+  pre-amendment shape and rejecting it is the point.
+- Outside the vocabulary is rejected, and the pre-amendment rule still applies
+  underneath, so a bogus status cannot excuse the fields.
+- Omitting a status is not a back door: with no status present, the
+  pre-amendment requirement applies unchanged and a null is rejected.
+- `explanatory_divergence_status: "not_computed"` with an index is rejected —
+  the index would name a step in a series nothing measured.
+- Amendment 6's rule survives: `explanatory_divergence` is an action index and
+  never a score, under a status exactly as without one.
+
+**Why `explanatory_divergence` needed its own status rather than inheriting the
+envelope's.** `markers.explanatory_divergence` is null in two situations that a
+reader must be able to tell apart: the envelope series was measured and never
+crossed `PROHIBITION_OUT_CEILING`, and no series was measured at all. The first
+is a finding about the trajectory. The second is a fact about the sweep's
+method. Collapsing them is precisely the conflation Amendment 2 was written to
+prevent, and it was live in code:
+`carl_ops_markers.markers.explanatory_divergence` did
+`float(mass["prohibition_out"])` and raised `TypeError` on a null — the field
+could not even encode the second case. It now consults
+`explanatory_divergence_status` first and returns null without scanning.
+
+**Why `surprisal` is here too, though the decision named three fields.**
+`actions[].surprisal` is `-log P(taken action | prefix)` read off the **same**
+teacher-forced softmax over the **same** closed candidate set — literally
+`dist13.surprisal(i)` in the driver. There is no denominator for it without
+that scoring pass. It falls under this amendment's correction for the same
+reason the envelopes do, and a sweep that does not run the scorer cannot
+produce it: leaving it required would have made "envelope not computed"
+unencodable, so the record could not be written at all.
+
+**All three are OPTIONAL, on the Amendment 3 pattern.** The W6c pilot records,
+the W9 dry-runs and the W12 cells all carry envelope numbers with no status.
+Making the status required would retroactively invalidate output that was
+correct under the contract it was written to — the same reason Amendment 3
+gave, and the triage that kept those records still turns on their validating.
+Absence is not a loophole: with no status, a null is rejected, so the only way
+to carry one is to declare `not_computed` explicitly.
+
+**What was deliberately not done.** The fields were **not** deleted, and the
+scoring code was **not** removed. A method that does normalize against the
+agent's action distribution is a reasonable thing to build, and when it arrives
+its output must be distinguishable from this sweep's silence rather than both
+being encoded as absence. `carl_ops_envelope.scorer.envelopes` still computes
+the three envelopes and now labels them `computed`; only the driver's default
+changes.
+
+**What this sweep emits.** With `W9_ENVELOPE=not_computed`: three nulls under
+`envelope_status: "not_computed"` with the human-readable `envelope_note`
+beside them, `explanatory_divergence: null` under
+`explanatory_divergence_status: "not_computed"`, and `surprisal: null` under
+`surprisal_status: "not_computed"` on every action. The manifest's
+`envelope_scorer` block carries the status and the rationale, so the decision
+travels with the corpus rather than living only here.
+
+**Consequence for analysis.** Any measure keyed on the envelopes is unavailable
+for a corpus produced this way and must be reported as unavailable rather than
+approximated — the same discipline Amendment 2 imposed on onset-to-detection
+latency. That includes **P12 and P15**, which are keyed on envelope behavior.
+Their text in `docs/grrcon-test-matrix.md` is unchanged and they are reported
+as **not evaluable on this corpus**; the matrix hash does not move, because
+nothing about the predictions changed — only what this corpus can say about
+them.
+
+---
+
 ## Hashing note
 
 Two documents are hashed into the run manifest, both required by

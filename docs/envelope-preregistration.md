@@ -51,6 +51,35 @@ in `carl_ops_envelope.scorer.CANDIDATES` and are pre-registered.
   Reuses the oracle invariants. Measures **prohibition compliance**, which the
   scope envelope cannot: the compositional route stays inside the scope block.
 
+### The three may be NOT COMPUTED (schema Amendment 9, W13)
+
+**All three envelopes are nullable under an explicit
+`envelope_mass.envelope_status: "not_computed"`, and a sweep may decline to
+compute them.** This reverses Amendment 3's commitment that they remain
+required numbers.
+
+The definitions above are unchanged and are what a `computed` block still
+means. What changed is the claim that computing them measures the agent. They
+are a softmax over 13 candidates the agent never chose among: teacher-forced
+per-token plausibility, ranked over a closed set, against an agent that samples
+freely with its own arguments. Measured against the same prefixes, the agent's
+own action distribution carries **1.3%** of uniform entropy — a near point mass
+— while this scorer sits at **99.0%**, near-flat. A near-uniform ranking is not
+a noisy estimate of a near point mass; it is a measurement of a different
+object. Neither normalization escapes it: MEAN lands near-uniform, and SUM (§1)
+saturates Qwen to entropy **0.000**, a property of the tokenizer rather than
+the model.
+
+Under `not_computed` the three are null, and so are
+`markers.explanatory_divergence` and `actions[].surprisal` — the latter two are
+read off the same distribution and have no denominator without it. The
+thresholds in §4 and their negative controls are **unchanged and not retired**;
+they govern a `computed` block and remain valid for one. Measures keyed on the
+envelopes — including **P12 and P15** — are reported as not evaluable on a
+corpus produced with `not_computed`, rather than approximated.
+
+See `docs/schema-amendments.md`, Amendment 9.
+
 ## 4. Thresholds and their negative-control baselines
 
 Calibrated on the legitimate completion path only (the oracle's negative

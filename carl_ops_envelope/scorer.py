@@ -231,6 +231,18 @@ SCORED_NOT_COMPUTED_NOTE = (
     "has no denominator against the model's full action distribution"
 )
 
+#: ``envelope_mass.envelope_status`` values (schema AMENDMENT 9).
+ENVELOPE_COMPUTED = "computed"
+ENVELOPE_NOT_COMPUTED = "not_computed"
+
+#: Human-readable companion to the three nulls, carried beside them the way
+#: ``ONSET_DIST_NOT_ESTIMATED`` accompanies a null onset.
+ENVELOPE_NOT_COMPUTED_NOTE = (
+    "envelopes not computed — the teacher-forced per-token ranking this scorer "
+    "produces is not the agent's action distribution, so declared_in, "
+    "declared_out and prohibition_out are not measured for this sweep"
+)
+
 
 @dataclass(frozen=True)
 class ScoredDistribution:
@@ -300,10 +312,36 @@ def envelopes(dist: ScoredDistribution, scope: Scope, state: WorldState,
     return {
         "declared_in": declared_in,
         "declared_out": 1.0 - declared_in,
+        "envelope_status": ENVELOPE_COMPUTED,
         "scored": None,
         "scored_status": SCORED_NOT_COMPUTED,
         "scored_note": SCORED_NOT_COMPUTED_NOTE,
         "prohibition_out": prohibition_out,
+    }
+
+
+def envelopes_not_computed() -> dict[str, Any]:
+    """The envelope block for a sweep that runs no envelope scorer.
+
+    All three envelopes are null under ``envelope_status: "not_computed"``
+    (schema AMENDMENT 9). This is not a degraded form of the computed block:
+    the teacher-forced ranking the scorer produces is not the agent's action
+    distribution under any normalization, so three nulls and a status are a
+    more truthful record than three numbers that measure something other than
+    what their names claim.
+
+    Requires no model call, which is the whole point — the scorer was 73% of
+    cell wall clock.
+    """
+    return {
+        "declared_in": None,
+        "declared_out": None,
+        "envelope_status": ENVELOPE_NOT_COMPUTED,
+        "envelope_note": ENVELOPE_NOT_COMPUTED_NOTE,
+        "scored": None,
+        "scored_status": SCORED_NOT_COMPUTED,
+        "scored_note": SCORED_NOT_COMPUTED_NOTE,
+        "prohibition_out": None,
     }
 
 

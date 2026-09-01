@@ -137,6 +137,46 @@ ONSET_STATUSES = {"estimated", "not_estimated"}
 #: valid and absence cannot be used to smuggle a null through.
 SCORED_STATUSES = {"computed", "not_computed"}
 
+#: Whether the three envelopes hold measurements — a CLOSED enum
+#: (AMENDMENT 9; see ``docs/schema-amendments.md``). ``computed`` says a
+#: scorer ran and owes three numbers; ``not_computed`` says none ran and all
+#: three are null.
+#:
+#: This REVERSES Amendment 3's commitment that ``declared_in``,
+#: ``declared_out`` and ``prohibition_out`` remain required numbers. That
+#: commitment rested on the assumption that a teacher-forced per-token
+#: plausibility ranking over a closed candidate set is the agent's action
+#: distribution. It is not — see the amendment for the measurement.
+#:
+#: OPTIONAL, on the Amendment 3 pattern: when absent the pre-amendment rule
+#: applies and all three must be numbers, so records written before the
+#: amendment stay valid and absence cannot smuggle a null through.
+ENVELOPE_STATUSES = {"computed", "not_computed"}
+
+#: The three envelope fields ``envelope_status`` governs, together.
+ENVELOPE_FIELDS = ("declared_in", "declared_out", "prohibition_out")
+
+#: Whether ``markers.explanatory_divergence`` holds a measurement — a CLOSED
+#: enum (AMENDMENT 9). explanatory_divergence is the first index at which
+#: ``prohibition_out`` crosses a ceiling, so it is only defined when the
+#: envelopes were computed. Without this field a null means either "measured,
+#: never crossed the ceiling" or "never measured", and those are different
+#: claims about a corpus — the exact conflation Amendment 2 exists to prevent.
+#:
+#: OPTIONAL for the same reason as ``envelope_status``: absent, the null keeps
+#: its pre-amendment meaning of "computed, never crossed".
+EXPLANATORY_DIVERGENCE_STATUSES = {"computed", "not_computed"}
+
+#: Whether ``actions[].surprisal`` holds a measurement — a CLOSED enum
+#: (AMENDMENT 9). surprisal is ``-log P(taken action | prefix)`` read off the
+#: SAME teacher-forced softmax over the same closed candidate set as the three
+#: envelopes; there is no denominator for it without that scoring pass. It
+#: therefore falls under the amendment's correction for the same reason, and a
+#: sweep that does not compute the envelopes cannot compute this either.
+#:
+#: OPTIONAL, on the same pattern: absent, surprisal must be a number.
+SURPRISAL_STATUSES = {"computed", "not_computed"}
+
 #: Policy-engine verdict vocabulary — a CLOSED enum. CVR is computed by
 #: counting ``deny``, so a drifting verdict vocabulary would silently deflate
 #: that headline. ``unavailable`` is the engine's own down/absent state and
@@ -450,6 +490,48 @@ def _validate_scored(em: dict, path: str, errors: list) -> None:
              "must be null when scored_status is 'not_computed'")
 
 
+def _validate_envelope_status(em: dict, path: str, errors: list) -> None:
+    """AMENDMENT 9 — ``envelope_status`` governs the three envelopes' nullability.
+
+    Mirrors ``onset_status`` / ``onset_dist`` (AMENDMENT 2) and
+    ``scored_status`` / ``scored`` (AMENDMENT 3). ``envelope_status`` is
+    optional; when it is missing or outside the vocabulary the pre-amendment
+    rule applies unchanged (all three must be numbers), so pre-amendment
+    records keep validating and a missing status is not a back door for
+    carrying nulls.
+    """
+    status = em.get("envelope_status")
+    if status is None and "envelope_status" not in em:
+        for k in ENVELOPE_FIELDS:
+            if not _is_num(em.get(k, None)):
+                _err(errors, f"{path}.{k}", "required number")
+        return
+    if status not in ENVELOPE_STATUSES:
+        _err(errors, f"{path}.envelope_status",
+             f"must be one of {sorted(ENVELOPE_STATUSES)}")
+        # Fall back to the pre-amendment rule rather than letting an
+        # unrecognized status excuse the fields.
+        for k in ENVELOPE_FIELDS:
+            if not _is_num(em.get(k, None)):
+                _err(errors, f"{path}.{k}", "required number")
+        return
+    if status == "computed":
+        for k in ENVELOPE_FIELDS:
+            if not _is_num(em.get(k, None)):
+                _err(errors, f"{path}.{k}",
+                     "required number when envelope_status is 'computed'")
+        return
+    # not_computed: every one of the three must be null, and the key must be
+    # present. A scorer that did not run cannot have measured any of them.
+    for k in ENVELOPE_FIELDS:
+        if k not in em:
+            _err(errors, f"{path}.{k}",
+                 "required (null) when envelope_status is 'not_computed'")
+        elif em[k] is not None:
+            _err(errors, f"{path}.{k}",
+                 "must be null when envelope_status is 'not_computed'")
+
+
 def _validate_turns(turns: Any, errors: list) -> None:
     if not isinstance(turns, list):
         _err(errors, "turns", "required array")
@@ -466,9 +548,7 @@ def _validate_turns(turns: Any, errors: list) -> None:
         if not isinstance(em, dict):
             _err(errors, f"{p}.envelope_mass", "required object")
         else:
-            for k in ("declared_in", "declared_out", "prohibition_out"):
-                if not _is_num(em.get(k, None)):
-                    _err(errors, f"{p}.envelope_mass.{k}", "required number")
+            _validate_envelope_status(em, f"{p}.envelope_mass", errors)
             _validate_scored(em, f"{p}.envelope_mass", errors)
         # content addressing — refs, never inline
         for k in _TRAJ_INLINE_FORBIDDEN:
@@ -503,7 +583,19 @@ def _validate_actions(actions: Any, errors: list) -> None:
             _err(errors, f"{p}.rule_id", "must be string or null")
         # surprisal is -log P(action | prefix) in nats, and so is non-negative.
         surprisal = act.get("surprisal", None)
-        if not _is_num(surprisal):
+        s_status = act.get("surprisal_status")
+        s_status_present = "surprisal_status" in act
+        if s_status_present and s_status not in SURPRISAL_STATUSES:
+            _err(errors, f"{p}.surprisal_status",
+                 f"must be one of {sorted(SURPRISAL_STATUSES)}")
+            s_status, s_status_present = None, False
+        if s_status_present and s_status == "not_computed":
+            # No candidate-set softmax ran, so there is no denominator and
+            # therefore no -log P to record (AMENDMENT 9).
+            if surprisal is not None:
+                _err(errors, f"{p}.surprisal",
+                     "must be null when surprisal_status is 'not_computed'")
+        elif not _is_num(surprisal):
             _err(errors, f"{p}.surprisal", "required number (-log P in nats)")
         elif float(surprisal) < 0.0:
             _err(
@@ -1141,8 +1233,33 @@ def _validate_markers(
     # null", which admitted a float — and a float is not a step. A marker
     # block that mixes an index with a score cannot be read as a timeline.
     ed = markers.get("explanatory_divergence", "__missing__")
+    ed_status = markers.get("explanatory_divergence_status")
+    ed_status_present = "explanatory_divergence_status" in markers
+
+    # AMENDMENT 9. The status is optional; absent, the pre-amendment rule
+    # applies and a null keeps its original meaning of "computed, never
+    # crossed the ceiling".
+    if ed_status_present and ed_status not in EXPLANATORY_DIVERGENCE_STATUSES:
+        _err(
+            errors,
+            "markers.explanatory_divergence_status",
+            f"must be one of {sorted(EXPLANATORY_DIVERGENCE_STATUSES)}",
+        )
+        ed_status = None
+        ed_status_present = False
+
     if ed == "__missing__":
         _err(errors, "markers.explanatory_divergence", "required (int >= 0 or null)")
+    elif ed_status_present and ed_status == "not_computed":
+        # No scorer ran, so there is no series to cross a ceiling. A non-null
+        # index here would name a step nothing measured.
+        if ed is not None:
+            _err(
+                errors,
+                "markers.explanatory_divergence",
+                "must be null when explanatory_divergence_status is "
+                "'not_computed'; no envelope series was measured",
+            )
     elif ed is not None and (not _is_int(ed) or ed < 0):
         _err(
             errors,

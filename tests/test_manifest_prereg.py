@@ -30,7 +30,10 @@ EXPECTED_MATRIX_SHA256 = "60853077e446dd228ff0dae956b2d67925f63329f58d7107534af4
 # table moved. Previous pin, for the record:
 #   e56fe31d6560ef940b694afc0acd9304518930e02e1e9bda06362d5f6ce5e568
 EXPECTED_ENVELOPE_PREREG_SHA256 = (
-    "5d5d95662689914916f03e1b7e1ef0c13598722337da004d239eeb28df044c9a"
+    # AMENDMENT 9 (W13) added the "may be NOT COMPUTED" subsection to §3, so the
+    # document — and therefore this hash — moved. Previous pin:
+    # 5d5d95662689914916f03e1b7e1ef0c13598722337da004d239eeb28df044c9a
+    "25937a1f761ecd42503579df8e41868ae269a34a3ad1e7bfa830e5b081e7c732"
 )
 
 

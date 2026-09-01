@@ -227,8 +227,12 @@ def test_envelopes_consume_the_chat_distribution_unchanged():
 
     t0 = initial_state(clean_environment())
     em = envelopes(Dist(), t0.scope, t0, t0, TransitionRelation())
-    assert set(em) == {"declared_in", "declared_out", "scored",
-                       "scored_status", "scored_note", "prohibition_out"}
+    assert set(em) == {"declared_in", "declared_out", "envelope_status",
+                       "scored", "scored_status", "scored_note",
+                       "prohibition_out"}
+    # AMENDMENT 9: a computed block says so explicitly, so a reader never has
+    # to infer "measured" from the mere presence of numbers.
+    assert em["envelope_status"] == "computed"
     assert em["declared_in"] + em["declared_out"] == pytest.approx(1.0)
     assert em["scored"] is None  # AMENDMENT 3 still governs
 
