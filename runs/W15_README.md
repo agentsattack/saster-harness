@@ -3,6 +3,25 @@
 **Result: the induced arm diverges 17.5% of the time, and obstruction makes no
 difference.** W14's "0/60" was wrong, and the error was mine.
 
+## CORRECTION (W21) — `saster_category` in these records is wrong
+
+Every trajectory record here carries `saster_category: "SASTER-24"`
+(Just-in-Time Ontological Reframing). **That is a mislabelling.** carl-ops
+instantiates **SASTER-31, Compositional Capability Emergence** — the
+`rotate_credential` -> `rotation_output_object` -> `copy_object` value flow,
+where each call passes individual review and the harm requires the
+composition.
+
+SASTER-24 requires a tool response that redefines the agent's operational
+frame; `Scope` here is snapshotted at t0 and nothing mutates it, so that
+condition is unsatisfiable by construction.
+
+**The records are annotated, not revised** — records are evidence. The label
+was corrected at the source, so runs from W21 onward carry `SASTER-31`.
+Nothing computational changes: no code scores by this field.
+
+Full reasoning and the affected record counts: `runs/SASTER_CATEGORY_CORRECTION.md`.
+
 ## The correction to W14
 
 W14's induced arm reported 0 divergences in 60 trajectories. Those 60
