@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import degenerate as _dg
+from . import metrics as _m
 
 # ---------------------------------------------------------------------------
 # Class 1 — the degenerate-input matrix (docs/instrument-test-plan.md, Class 1)
@@ -193,16 +194,74 @@ WRAPPERS: dict[str, WrapperSpec] = {
     ),
 }
 
+_UNIFORM_13 = (1.0 / 13,) * 13
+_C2 = ("test_metric_probe_never_returns_a_number",)
+
 METRICS: dict[str, MetricSpec] = {
-    "declared_in": MetricSpec("declared_in", "turns[].envelope_mass.declared_in"),
-    "declared_out": MetricSpec("declared_out", "turns[].envelope_mass.declared_out"),
-    "prohibition_out": MetricSpec("prohibition_out", "turns[].envelope_mass.prohibition_out"),
-    "surprisal": MetricSpec("surprisal", "actions[].surprisal"),
-    "refusal_prob": MetricSpec("refusal_prob", "turns[].refusal_prob"),
+    "declared_in": MetricSpec(
+        "declared_in", "turns[].envelope_mass.declared_in",
+        probes={
+            "uniform_distribution": lambda: _m.assert_not_degenerate_distribution(_UNIFORM_13),
+            "empty_candidate_set": lambda: _m.assert_not_degenerate_distribution(()),
+            "single_candidate": lambda: _m.assert_not_degenerate_distribution((1.0,)),
+            "all_zero_logprobs": lambda: _m.assert_not_degenerate_distribution(_m.softmax([0.0] * 13)),
+        },
+        covered_by=_C2 + ("test_envelopes_refuse_a_uniform_distribution",
+                          "test_length_invariance_of_mean_scoring",
+                          "test_dynamic_range_check"),
+    ),
+    "declared_out": MetricSpec(
+        "declared_out", "turns[].envelope_mass.declared_out",
+        probes={
+            "uniform_distribution": lambda: _m.assert_not_degenerate_distribution(_UNIFORM_13),
+            "single_candidate": lambda: _m.assert_not_degenerate_distribution((1.0,)),
+        },
+        covered_by=_C2 + ("test_envelopes_refuse_a_uniform_distribution",),
+    ),
+    "prohibition_out": MetricSpec(
+        "prohibition_out", "turns[].envelope_mass.prohibition_out",
+        probes={
+            "uniform_distribution": lambda: _m.assert_not_degenerate_distribution(_UNIFORM_13),
+            "empty_candidate_set": lambda: _m.assert_not_degenerate_distribution(()),
+            "no_dynamic_range": lambda: _m.dynamic_range((), ()),
+        },
+        covered_by=_C2 + ("test_envelopes_refuse_a_uniform_distribution",
+                          "test_dynamic_range_check",
+                          "test_prohibition_out_has_no_dynamic_range_on_the_preregistered_numbers"),
+    ),
+    "surprisal": MetricSpec(
+        "surprisal", "actions[].surprisal",
+        probes={
+            "terminal_step_no_draws": lambda: _m.surprisal((), 0),
+            "uniform_distribution": lambda: _m.surprisal(_UNIFORM_13, 3),
+            "k1_variance_floor": lambda: _m.variance_floor([2.5], 0.7),
+        },
+        covered_by=_C2 + ("test_variance_floor_across_k",),
+    ),
+    "refusal_prob": MetricSpec(
+        "refusal_prob", "turns[].refusal_prob",
+        probes={
+            "not_measured_zero": lambda: _m.measured_refusal_prob(
+                {"refusal_prob": 0.0, "refusal_prob_status": "not_measured"}),
+        },
+        covered_by=_C2 + ("test_not_measured_refusal_prob_is_not_zero",),
+    ),
     "containment_latency": MetricSpec("containment_latency", "containment_latency.value"),
-    "cvr": MetricSpec("cvr", "report:cvr"),
-    "breach_rate": MetricSpec("breach_rate", "report:breach_within_k"),
-    "records_distinct_ratio": MetricSpec("records_distinct_ratio", "report:records/distinct"),
+    "cvr": MetricSpec(
+        "cvr", "report:cvr",
+        probes={"nothing_evaluated": lambda: _m.cvr_rate([{"policy_verdict": "unavailable"}] * 5)},
+        covered_by=_C2 + ("test_policy_verdict_of_wrapper_failure_is_unavailable",),
+    ),
+    "breach_rate": MetricSpec(
+        "breach_rate", "report:breach_within_k",
+        probes={"k_zero": lambda: _m.breach_within_k([])},
+        covered_by=_C2 + ("test_breach_within_k_over_zero_trials_is_not_a_rate",),
+    ),
+    "records_distinct_ratio": MetricSpec(
+        "records_distinct_ratio", "report:records/distinct",
+        probes={"no_records": lambda: _m.records_distinct_ratio([])},
+        covered_by=_C2 + ("test_records_distinct_is_derived_from_content_hashes",),
+    ),
 }
 
 MARKERS: dict[str, MarkerSpec] = {
