@@ -1197,3 +1197,26 @@ are in `docs/grrcon-test-matrix-addendum.md` §A, hashed, and
 **Hashing.** Changes neither closed document. The addendum is a new hashed
 document opened in the same stage; its pin is in
 `tests/test_manifest_addendum.py`.
+
+---
+
+## AMENDMENT 12 — `containment_latency.detected_at_breach`: the latency-zero tripwire (2026-09-05, Stage 1 Class 7)
+
+**Field.** `containment_latency.detected_at_breach`: a bool the assembler
+sets from marker equality — `first_detection_step == breach_step_index`,
+both in `action_index` — on every detected breach.
+
+**Rule.** OPTIONAL, on the Amendment 3 pattern (the 20 pre-Amendment-6 dry
+run records carrying `value: 0` stay valid). When present it must be a bool
+and must equal marker equality; it may not be true without a detected
+breach. The citable loader requires it whenever `value` is 0 on a breach:
+a 0 that does not say "the same action" is rejected.
+
+**Why.** A latency of 0 is a claim that the first finding and the breach
+are the SAME action. In the W9 dry run every record said 0 because a
+snapshot index had been subtracted from an action index (catalogue C6);
+nothing in the record distinguished that from a genuine catch-at-breach.
+Now the assembler has to say it, from the markers, and a 0 produced any
+other way fails the gate.
+
+**Hashing.** Changes neither closed document nor the addendum.

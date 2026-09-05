@@ -553,7 +553,7 @@ def _validate_envelope_status(em: dict, path: str, errors: list) -> None:
     status = em.get("envelope_status")
     if status is None and "envelope_status" not in em:
         for k in ENVELOPE_FIELDS:
-            if not _is_num(em.get(k, None)):
+            if not _is_num(em.get(k)):
                 _err(errors, f"{path}.{k}", "required number")
         return
     if status not in ENVELOPE_STATUSES:
@@ -562,12 +562,12 @@ def _validate_envelope_status(em: dict, path: str, errors: list) -> None:
         # Fall back to the pre-amendment rule rather than letting an
         # unrecognized status excuse the fields.
         for k in ENVELOPE_FIELDS:
-            if not _is_num(em.get(k, None)):
+            if not _is_num(em.get(k)):
                 _err(errors, f"{path}.{k}", "required number")
         return
     if status == "computed":
         for k in ENVELOPE_FIELDS:
-            if not _is_num(em.get(k, None)):
+            if not _is_num(em.get(k)):
                 _err(errors, f"{path}.{k}",
                      "required number when envelope_status is 'computed'")
         return
@@ -1458,6 +1458,22 @@ def _validate_containment_latency(
         if not _is_int(value):
             _err(errors, "containment_latency.value", "required int when breach was detected")
         elif _is_int(breach_step_index):
+            # AMENDMENT 12 — the latency-zero tripwire. OPTIONAL on the
+            # Amendment 3 pattern (pre-amendment records carry no flag; the
+            # citable loader requires it). When present it must be a bool
+            # and must equal marker equality: a 0 that is not "the same
+            # action" is a cross-space subtraction wearing a latency's name.
+            if "detected_at_breach" in latency:
+                flag = latency["detected_at_breach"]
+                if not isinstance(flag, bool):
+                    _err(errors, "containment_latency.detected_at_breach", "must be bool")
+                elif flag != (first_detection_step == breach_step_index):
+                    _err(
+                        errors,
+                        "containment_latency.detected_at_breach",
+                        f"must equal (first_detection_step == breach_step_index) = "
+                        f"{first_detection_step == breach_step_index}; got {flag}",
+                    )
             # Both operands are ACTION indices (AMENDMENT 6) and the record
             # carries both, so the subtraction is checkable — which is the
             # point. A latency computed across two index spaces produced a
@@ -1475,6 +1491,9 @@ def _validate_containment_latency(
             _err(errors, "containment_latency.censored", "must be false when there is no breach")
         if value is not None:
             _err(errors, "containment_latency.value", "must be null when there is no breach")
+    if breach is not True and latency.get("detected_at_breach") is True:
+        _err(errors, "containment_latency.detected_at_breach",
+             "cannot be true without a detected breach")
 
 
 def _validate_scoring_and_config(rec: dict, errors: list) -> None:

@@ -11,6 +11,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from carl_ops_trajectory import latency as _lat
+from saster_defense.stack import DefenseConfig as _DC
+from saster_harness.families import FAMILIES as _FAMILIES
+
 from . import degenerate as _dg
 from . import metrics as _m
 
@@ -246,7 +250,16 @@ METRICS: dict[str, MetricSpec] = {
         },
         covered_by=_C2 + ("test_not_measured_refusal_prob_is_not_zero",),
     ),
-    "containment_latency": MetricSpec("containment_latency", "containment_latency.value"),
+    "containment_latency": MetricSpec(
+        "containment_latency", "containment_latency.value",
+        probes={
+            "censored_in_mean": lambda: _lat.mean_latency([_lat.CENSORED]),
+            "null_is_not_zero": lambda: _lat.step_average([None, None]),
+            "no_breach_no_latency": lambda: _lat.latency_of({"oracle": {"breach": False}}),
+        },
+        covered_by=_C2 + ("test_mean_over_a_censored_latency_raises",
+                          "test_null_step_is_excluded_not_coerced"),
+    ),
     "cvr": MetricSpec(
         "cvr", "report:cvr",
         probes={"nothing_evaluated": lambda: _m.cvr_rate([{"policy_verdict": "unavailable"}] * 5)},
@@ -284,6 +297,32 @@ MARKERS: dict[str, MarkerSpec] = {
         covered_by=_C4 + ("test_joiner_refuses_cross_unit_arithmetic",)),
 }
 
-DEFENSE_CONFIGS: dict[str, DefenseConfigSpec] = {}
+_C7 = ("test_stack_negative_control_yields_no_detections",
+       "test_stack_negative_control_against_the_real_l4")
 
-VICTIM_FAMILIES: dict[str, VictimFamily] = {}
+#: The ablation cells. Keys and factories mirror scripts/run_cell_w9.py's
+#: _DEFENSE_CONFIGS (the meta-test asserts equality). "all" is L2+L3+L4 —
+#: the matrix's all-on — and "all5" is the pilot's five-layer stack. The
+#: seventh, vendor-shaped (P17), is added in Stage 2 under the addendum.
+DEFENSE_CONFIGS: dict[str, DefenseConfigSpec] = {
+    "l2": DefenseConfigSpec("l2", lambda: _DC(l2=True), covered_by=_C7),
+    "l3": DefenseConfigSpec("l3", lambda: _DC(l3=True), covered_by=_C7),
+    "l4": DefenseConfigSpec("l4", lambda: _DC(l4=True), covered_by=_C7),
+    "l3+l4": DefenseConfigSpec("l3+l4", lambda: _DC(l3=True, l4=True), covered_by=_C7),
+    "all": DefenseConfigSpec("all", lambda: _DC(l2=True, l3=True, l4=True), covered_by=_C7),
+    "none": DefenseConfigSpec("none", lambda: _DC(), covered_by=_C7),
+    "all5": DefenseConfigSpec(
+        "all5", lambda: _DC(l1=True, l2=True, l3=True, l4=True, l5=True),
+        pre_registered=False, covered_by=_C7),
+}
+
+_ARM_A = ("test_families_have_distinct_template_conventions",
+          "test_tool_call_round_trips_through_the_family_template")
+
+VICTIM_FAMILIES: dict[str, VictimFamily] = {
+    key: VictimFamily(
+        key=key, model=fam.model, chat_template_kwargs=fam.chat_template_kwargs,
+        tool_call_parser=fam.tool_call_parser, covered_by=_ARM_A,
+    )
+    for key, fam in _FAMILIES.items()
+}
