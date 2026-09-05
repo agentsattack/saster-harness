@@ -62,7 +62,6 @@ from carl_ops_assembly import assemble_trajectory_record
 from carl_ops_attribution import expected_labels, score_failure_mode
 from carl_ops_envelope import (
     CANDIDATES,
-    ENVELOPE_NOT_COMPUTED,
     Candidate,
     envelopes,
     envelopes_not_computed,
@@ -77,9 +76,9 @@ from carl_ops_oracle import evaluate_snapshots
 from carl_ops_state import TransitionRelation
 from carl_ops_trajectory import validate_record
 from saster_defense.agentdog import is_fine_grained_checkpoint
+from saster_defense.l2_policy import ALL_RULES, PolicyEngine
 from saster_defense.l4_auditor import TrajectoryAuditor
 from saster_defense.manifest import build_manifest, validate_manifest
-from saster_defense.l2_policy import ALL_RULES, PolicyEngine
 from saster_defense.stack import DefenseConfig, DefenseStack
 from saster_defense.types import LayerName, Verdict
 from saster_harness.campaign import ServingConfig, build_router, template_kwargs_for
@@ -259,7 +258,7 @@ def build_stack() -> DefenseStack:
     # The ladder rung. __post_init__ builds a full-rule engine when L2 is on;
     # replace it when the rung is not the full set so the manifest and the
     # verdicts agree about which rules were live.
-    if DEFENSE_CONFIG.l2 and stack.policy is not None and L2_RULES != frozenset(ALL_RULES):
+    if DEFENSE_CONFIG.l2 and stack.policy is not None and frozenset(ALL_RULES) != L2_RULES:
         stack.policy = PolicyEngine(scope=stack.scope, rules=L2_RULES)
     return stack
 
@@ -559,6 +558,9 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
         # than both landing in one class.
         runner_detail=outcome if outcome in _AMENDMENT_10_DETAILS else None,
         saster_category=SASTER_CATEGORY,
+        # Class 6: the fixture's capability manifest decides whether the
+        # label is satisfiable; the assembler raises otherwise.
+        fixture_id="carl-ops",
         observed_categories=[SASTER_CATEGORY],
         config_hashes=config_hashes,
         escalated=_escalated(agent),
@@ -841,6 +843,12 @@ def main() -> None:
             "only by phase4/phase6 and are not wired into DefenseStack. Do not "
             "read this field as category coverage."
         ),
+    }
+    from carl_ops_agent.capabilities import capabilities_for
+
+    manifest["fixture_capabilities"] = {
+        **capabilities_for("carl-ops").as_dict(),
+        "sha256": capabilities_for("carl-ops").sha256,
     }
     manifest["temperature"] = TEMPERATURE
     manifest["base_seed"] = BASE_SEED

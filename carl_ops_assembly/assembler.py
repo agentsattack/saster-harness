@@ -74,6 +74,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from carl_ops_agent.capabilities import check_category
 from carl_ops_agent.widening import resolve_widening_route
 from carl_ops_markers import ONSET_DIST_NOT_ESTIMATED, MarkerIndex, marker_block
 from carl_ops_trajectory import (
@@ -225,7 +226,16 @@ def _containment_latency(
     units = units or {}
     detected = MarkerIndex(int(first_detection_step), units.get("first_detection_step", "action_index"))
     breached = MarkerIndex(int(base), units.get("breach_step_index", "action_index"))
-    return {"value": detected - breached, "censored": False}
+    value = detected - breached
+    # AMENDMENT 12 — the latency-zero tripwire. A 0 here is a claim that
+    # the first finding and the breach are the SAME action; the assembler
+    # states that explicitly, from marker equality, so a 0 produced any
+    # other way (the W9 cross-space subtraction) is rejected downstream.
+    return {
+        "value": value,
+        "censored": False,
+        "detected_at_breach": detected.value == breached.value,
+    }
 
 
 def _first_detection_step(detection: Sequence[dict]) -> int | None:
@@ -280,6 +290,7 @@ def assemble_trajectory_record(
     identity: dict | None = None,
     cnf: dict | None = None,
     invariants: Sequence[Any] | None = None,
+    fixture_id: str | None = None,
 ) -> dict[str, Any]:
     """Join the inputs into one validated trajectory record.
 
@@ -297,6 +308,11 @@ def assemble_trajectory_record(
     record does not validate. Never returns a record that fails validation.
     """
     breach = bool(verdict.breach)
+
+    # Class 6: a label the fixture cannot satisfy is not emitted. When the
+    # caller names the fixture, its capability manifest decides.
+    if fixture_id is not None:
+        check_category(fixture_id, saster_category)
 
     # Derived from the trajectory's own terminal state, cross-checked against
     # config. Raises on mismatch rather than emitting an unverifiable label.
