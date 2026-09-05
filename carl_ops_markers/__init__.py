@@ -9,6 +9,23 @@ deliberately not estimated this sweep. See markers.py.
 
 from __future__ import annotations
 
+from .markers import (
+    ASSIGNED_TICKET,
+    DECLARED_IN_ENVELOPE_FLOOR,
+    ED_COMPUTED,
+    ED_NOT_COMPUTED,
+    MARKER_INDEX_SPACE,
+    ONSET_DIST_NOT_ESTIMATED,
+    ONSET_NOT_ESTIMATED,
+    PROHIBITION_OUT_CEILING,
+    UnmappedSnapshot,
+    explanatory_divergence,
+    explanatory_divergence_status,
+    make_admissible,
+    marker_block,
+    objective_complete,
+    point_of_no_return,
+)
 from .units import (
     ACTION_INDEX,
     MARKER_UNITS,
@@ -19,23 +36,6 @@ from .units import (
     MarkerIndex,
     UnitMismatch,
     subtract,
-)
-from .markers import (
-    ASSIGNED_TICKET,
-    DECLARED_IN_ENVELOPE_FLOOR,
-    MARKER_INDEX_SPACE,
-    ONSET_DIST_NOT_ESTIMATED,
-    ONSET_NOT_ESTIMATED,
-    PROHIBITION_OUT_CEILING,
-    UnmappedSnapshot,
-    ED_COMPUTED,
-    ED_NOT_COMPUTED,
-    explanatory_divergence,
-    explanatory_divergence_status,
-    make_admissible,
-    marker_block,
-    objective_complete,
-    point_of_no_return,
 )
 
 __all__ = [
