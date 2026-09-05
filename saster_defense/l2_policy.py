@@ -17,7 +17,12 @@ import ipaddress
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
-from .opa_backend import evaluate_opa, opa_available
+from .opa_backend import (
+    OpaBackendError,
+    OpaMalformedDecision,
+    evaluate_opa,
+    opa_available,
+)
 from .types import (
     POLICY_VERDICT_VALUES,
     ActionRequest,
@@ -77,10 +82,25 @@ class PolicyEngine:
                 detail="policy engine (OPA) unavailable",
             )
         if self._opa_active:
-            decision = evaluate_opa(
-                request.tool, request.args, sorted(self.rules),
-                list(self.scope.networks), list(self.scope.roles_assignable),
-            )
+            # Stage 1 defect D1. A backend that does not decide is
+            # UNAVAILABLE (ran=False); one that answers outside the closed
+            # vocabulary is ERROR (it ran, unusably). Neither is a verdict,
+            # and neither propagates out of the cell as a crash.
+            try:
+                decision = evaluate_opa(
+                    request.tool, request.args, sorted(self.rules),
+                    list(self.scope.networks), list(self.scope.roles_assignable),
+                )
+            except OpaMalformedDecision as exc:
+                return LayerOutcome(
+                    LayerName.L2_POLICY, Verdict.ERROR, ran=True,
+                    detail=f"backend=opa malformed decision: {exc}",
+                )
+            except OpaBackendError as exc:
+                return LayerOutcome(
+                    LayerName.L2_POLICY, Verdict.UNAVAILABLE, ran=False,
+                    detail=f"backend=opa unavailable: {exc}",
+                )
             verdict = Verdict(decision["verdict"])
             rule_id = decision.get("rule_id")
         else:

@@ -1017,3 +1017,41 @@ whoever hits it to update the pin reflexively — which is the habit that makes
 the other two pins worthless. Git history carries this file. The distinction
 is that the hashed documents are *fixed commitments* whose change should be an
 event, while this one is a *record of changes* and is expected to grow.
+
+---
+
+# Stage 1 — instrument defects
+
+These are not schema amendments. They are defects in components the schema
+describes, found by the Stage 1 instrument tests (`docs/instrument-test-plan.md`)
+and recorded here because the GrrCON sweep prompt requires every real defect to
+carry an entry naming the false assumption. Each has its own commit; none was
+fixed before its check failed.
+
+## D1 — L2 policy engine: an undefined OPA decision defaulted to allow, and every backend failure crashed the cell
+
+**Found by:** `tests/test_instrument_class1_silent_default.py`, rows
+`l2_policy/*` and `opa_client/*` (Class 1).
+
+**False assumption:** that `opa eval` either answers in the closed verdict
+vocabulary or does not answer at all, so the only cases worth handling were
+"decision present" and "no result". `evaluate_opa` mapped an empty `result`
+to `{"verdict": "allow"}` and let everything else — a non-zero exit, a hang,
+non-JSON output, a result in the wrong shape, a verdict outside
+`allow|deny|error|unavailable` — raise out of `PolicyEngine.evaluate` and
+abort the trial.
+
+**Why it matters:** an empty result is OPA's encoding of UNDEFINED — the
+policy did not evaluate (a load error, a wrong package, a type error in a
+rule body). P16 is precisely a rule body going undefined on an unexpected
+input type. Reading that as `allow` is a silent default on the P3 layer,
+and it is the direction of error that reads as "the defense held".
+
+**Fix:** `saster_defense/opa_backend.py` raises `OpaBackendError`
+(transport, exit, timeout, no output, non-JSON), `OpaUndefinedDecision`
+(empty result) or `OpaMalformedDecision` (wrong shape, out-of-vocabulary
+verdict); `opa eval` carries a timeout. `PolicyEngine.evaluate` maps the
+first two to `unavailable` (`ran=False`) and the third to `error`
+(`ran=True`). `policy_verdict_of` and `cvr` in
+`saster_instrument/metrics.py` keep both out of CVR's numerator and
+denominator. No path returns a default verdict.

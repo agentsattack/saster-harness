@@ -15,8 +15,32 @@ import subprocess
 from functools import lru_cache
 from pathlib import Path
 
+from .types import POLICY_VERDICT_VALUES
+
 _POLICY_PATH = Path(__file__).with_name("policy.rego")
 _DECISION_QUERY = "data.saster.carlops.decision"
+
+#: Bound on one ``opa eval``. Unbounded, a hung binary hangs the cell; the
+#: layer reports unavailable instead (Stage 1 defect D1).
+DEFAULT_OPA_TIMEOUT_S = 30.0
+
+
+class OpaBackendError(RuntimeError):
+    """The opa binary did not produce a decision — it was absent, exited
+    non-zero, timed out, or answered with something that is not JSON. The
+    layer maps this to ``unavailable``; it is never a verdict."""
+
+
+class OpaUndefinedDecision(OpaBackendError):
+    """The decision query evaluated to UNDEFINED (an empty ``result``). Before
+    Stage 1 this returned ``{"verdict": "allow"}`` — a silent default on the
+    one layer whose whole prediction (P3) is about what it declines to see."""
+
+
+class OpaMalformedDecision(OpaBackendError):
+    """opa answered, but not in the closed verdict vocabulary or not in the
+    decision shape. The layer maps this to ``error`` — it ran and its answer
+    is unusable — never to a verdict guessed from the text."""
 
 
 @lru_cache(maxsize=1)
@@ -42,37 +66,81 @@ def evaluate_opa(
     rules: list[str],
     networks: list[str],
     roles_assignable: list[str],
+    timeout: float = DEFAULT_OPA_TIMEOUT_S,
 ) -> dict:
     """Evaluate one action through real OPA. Returns the decision object
-    ``{"verdict": ..., "rule_id": ...}``. Raises if opa is unavailable."""
+    ``{"verdict": ..., "rule_id": ...}`` with ``verdict`` in the closed
+    vocabulary, or raises :class:`OpaBackendError` (a subclass for undefined
+    and malformed). It never returns a default: every path that is not a
+    conforming decision raises."""
     opa = find_opa()
     if opa is None:
-        raise RuntimeError("opa binary not found")
+        raise OpaBackendError("opa binary not found")
     input_doc = {"tool": tool, "args": args}
     data_doc = {
         "config": {"rules": rules},
         "scope": {"networks": networks, "roles_assignable": roles_assignable},
     }
-    proc = subprocess.run(
-        [
-            opa, "eval",
-            "-d", str(_POLICY_PATH),
-            "--stdin-input",
-            "--data", _write_data(data_doc),
-            "--format", "json",
-            _DECISION_QUERY,
-        ],
-        input=json.dumps(input_doc),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    out = json.loads(proc.stdout)
+    try:
+        proc = subprocess.run(
+            [
+                opa, "eval",
+                "-d", str(_POLICY_PATH),
+                "--stdin-input",
+                "--data", _write_data(data_doc),
+                "--format", "json",
+                _DECISION_QUERY,
+            ],
+            input=json.dumps(input_doc),
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise OpaBackendError(f"opa eval timed out after {timeout}s") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "")[:300] if isinstance(exc.stderr, str) else ""
+        raise OpaBackendError(f"opa eval exited {exc.returncode}: {stderr!r}") from exc
+    except OSError as exc:
+        raise OpaBackendError(f"opa eval could not start: {exc}") from exc
+
+    stdout = getattr(proc, "stdout", None)
+    if not isinstance(stdout, str) or not stdout.strip():
+        raise OpaBackendError("opa eval produced no output")
+    try:
+        out = json.loads(stdout)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise OpaBackendError(f"opa eval output is not JSON: {stdout[:120]!r}") from exc
+    if not isinstance(out, dict):
+        raise OpaMalformedDecision(f"opa eval output is not an object: {stdout[:120]!r}")
     result = out.get("result")
     if not result:
-        return {"verdict": "allow", "rule_id": None}
-    value: dict = result[0]["expressions"][0]["value"]
-    return value
+        # UNDEFINED. policy.rego declares a default decision, so this means
+        # the policy did not evaluate at all — a load error, a wrong package,
+        # a type error in a rule body. Nothing here is evidence of allow.
+        raise OpaUndefinedDecision(
+            "the decision query is undefined (empty result); refusing to "
+            "default to allow"
+        )
+    try:
+        value = result[0]["expressions"][0]["value"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise OpaMalformedDecision(
+            f"opa eval result is not in the decision shape: {stdout[:160]!r}"
+        ) from exc
+    if not isinstance(value, dict) or "verdict" not in value:
+        raise OpaMalformedDecision(f"decision carries no verdict: {value!r}"[:200])
+    verdict = value.get("verdict")
+    if verdict not in POLICY_VERDICT_VALUES:
+        raise OpaMalformedDecision(
+            f"verdict {verdict!r} is outside the closed vocabulary "
+            f"{sorted(POLICY_VERDICT_VALUES)}"
+        )
+    rule_id = value.get("rule_id")
+    if rule_id is not None and not isinstance(rule_id, str):
+        raise OpaMalformedDecision(f"rule_id {rule_id!r} is not a string or null")
+    return {"verdict": verdict, "rule_id": rule_id}
 
 
 def _write_data(data_doc: dict) -> str:
