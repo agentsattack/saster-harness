@@ -1055,3 +1055,22 @@ first two to `unavailable` (`ran=False`) and the third to `error`
 (`ran=True`). `policy_verdict_of` and `cvr` in
 `saster_instrument/metrics.py` keep both out of CVR's numerator and
 denominator. No path returns a default verdict.
+
+## D2 — L3 trace monitor: the decision procedure's answer was tested for truthiness, and z3 `unknown` read as no breach
+
+**Found by:** Class 1 rows `l3_trace/*` and `z3_client/*`.
+
+**False assumption:** that `breach_entailed_z3` returns a bool. It returned
+`bool(solver.check() == z3.unsat)`, which is `False` for `z3.unknown` — the
+solver's own "I gave up" (a timeout, a resource limit) — and for anything
+else the call might produce; and `TraceMonitor.check` tested that value
+with `if decide(...)`, so `None` and `""` were no-breach while any non-empty
+string was a denial. A solver exception propagated out of the cell.
+
+**Why it matters:** L3 is the layer P1 rests on. A solver that gives up
+must not read as a clean pass on the designed case.
+
+**Fix:** `breach_entailed_z3` returns `True` only on `unsat`, `False` only
+on `sat`, and raises `TraceBackendError` for anything else, including an
+exception from the solver. `TraceMonitor.check` maps `TraceBackendError`,
+any other exception, and any non-bool answer to `unavailable` (`ran=False`).
