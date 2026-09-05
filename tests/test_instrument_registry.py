@@ -143,8 +143,13 @@ def test_every_wrapper_has_degenerate_matrix(name):
     spec = WRAPPERS[name]
     assert spec.has_matrix, f"{name}: no degenerate-input adapter and no no_parse_surface reason"
     if spec.degenerate is not None:
+        from saster_instrument.degenerate import RowNotApplicable
+
         for row in DEGENERATE_ROWS:
             run, patches = spec.degenerate(row)
+            if isinstance(run, RowNotApplicable):
+                assert run.reason.strip(), f"{name}/{row}: not-applicable without a reason"
+                continue
             assert callable(run), f"{name}/{row}: adapter returned no runner"
             assert isinstance(patches, list), f"{name}/{row}"
 

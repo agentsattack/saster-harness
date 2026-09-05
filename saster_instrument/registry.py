@@ -11,6 +11,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import degenerate as _dg
+
 # ---------------------------------------------------------------------------
 # Class 1 — the degenerate-input matrix (docs/instrument-test-plan.md, Class 1)
 # ---------------------------------------------------------------------------
@@ -40,9 +42,12 @@ DEGENERATE_ROWS: tuple[str, ...] = (
 #: Adapter contract. ``build(row)`` returns ``(run, patches)``: ``run`` is a
 #: zero-argument callable that exercises the wrapper against that row and
 #: returns its :class:`saster_defense.types.LayerOutcome` (or, for a bare
-#: client, raises); ``patches`` is a list of ``(target_object, attribute,
-#: replacement)`` the test applies with ``monkeypatch`` before calling
-#: ``run``. Adapters live in :mod:`saster_instrument.degenerate`.
+#: client, the sentinel :data:`saster_instrument.degenerate.TYPED_ERROR`);
+#: or a :class:`saster_instrument.degenerate.RowNotApplicable` carrying the
+#: reason that row cannot be fed to this wrapper. ``patches`` is a list of
+#: ``(target_object, attribute, replacement)`` the test applies with
+#: ``monkeypatch`` before calling ``run``. Adapters live in
+#: :mod:`saster_instrument.degenerate`.
 DegenerateAdapter = Callable[[str], tuple[Callable[[], Any], list[tuple[Any, str, Any]]]]
 
 
@@ -121,46 +126,70 @@ WRAPPERS: dict[str, WrapperSpec] = {
         name="l1_classifier",
         target="saster_defense.l1_classifier:ClassifierGuard.classify",
         clean_values=("allow",),
+        no_parse_surface=_dg.L1_NO_PARSE_SURFACE,
+        covered_by=(
+            "test_l1_endpoint_without_client_is_unavailable_not_real",
+            "test_l1_without_stand_in_is_unavailable_never_clean",
+        ),
     ),
     "l2_policy": WrapperSpec(
         name="l2_policy",
         target="saster_defense.l2_policy:PolicyEngine.evaluate",
         clean_values=("allow",),
+        degenerate=_dg.l2_adapter,
+        covered_by=("test_degenerate_input_never_clean",
+                    "test_policy_verdict_of_wrapper_failure_is_unavailable"),
     ),
     "opa_client": WrapperSpec(
         name="opa_client",
         target="saster_defense.opa_backend:evaluate_opa",
         clean_values=("allow",),
+        degenerate=_dg.opa_client_adapter,
+        covered_by=("test_degenerate_input_never_clean",),
     ),
     "l3_trace": WrapperSpec(
         name="l3_trace",
         target="saster_defense.l3_trace:TraceMonitor.check",
         clean_values=("allow",),
+        degenerate=_dg.l3_adapter,
+        covered_by=("test_degenerate_input_never_clean",),
     ),
     "z3_client": WrapperSpec(
         name="z3_client",
         target="saster_defense.l3_trace:breach_entailed_z3",
         clean_values=("False",),
+        degenerate=_dg.z3_client_adapter,
+        covered_by=("test_degenerate_input_never_clean",),
     ),
     "l4_auditor_binary": WrapperSpec(
         name="l4_auditor_binary",
         target="saster_defense.l4_auditor:TrajectoryAuditor.audit",
         clean_values=("allow",),
+        degenerate=_dg.l4_adapter(fine_grained=False),
+        covered_by=("test_degenerate_input_never_clean",
+                    "test_over_window_trajectory_is_unavailable_for_every_detector"),
     ),
     "l4_auditor_fine_grained": WrapperSpec(
         name="l4_auditor_fine_grained",
         target="saster_defense.l4_auditor:TrajectoryAuditor.audit",
         clean_values=("allow",),
+        degenerate=_dg.l4_adapter(fine_grained=True),
+        covered_by=("test_degenerate_input_never_clean",
+                    "test_over_window_trajectory_is_unavailable_for_every_detector"),
     ),
     "l5_approval": WrapperSpec(
         name="l5_approval",
         target="saster_defense.l5_approval:ApprovalGate.gate",
         clean_values=("allow",),
+        degenerate=_dg.l5_adapter,
+        covered_by=("test_degenerate_input_never_clean",),
     ),
     "refusal_turn_classifier": WrapperSpec(
         name="refusal_turn_classifier",
         target="saster_harness.canary:classify_turn",
         clean_values=("ok",),
+        degenerate=_dg.turn_classifier_adapter,
+        covered_by=("test_degenerate_input_never_clean",),
     ),
 }
 
