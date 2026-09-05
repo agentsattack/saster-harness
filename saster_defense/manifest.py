@@ -41,14 +41,26 @@ ENVELOPE_PREREG_PATH = (
     Path(__file__).resolve().parents[1] / "docs" / "envelope-preregistration.md"
 )
 
+#: The addendum to the prediction matrix. The matrix is CLOSED (sweep prompt
+#: hard constraint 11); anything pre-registered after its closure — the
+#: Class 4 golden trace, P17 — lives in the addendum under its OWN hash, on
+#: the same mechanism: a required manifest field and a pinned test.
+GRRCON_ADDENDUM_PATH = (
+    Path(__file__).resolve().parents[1] / "docs" / "grrcon-test-matrix-addendum.md"
+)
+
 #: Required hash fields, each mapping to the function that recomputes it from
-#: the committed bytes. Kept as a table so a third pre-registered document
-#: cannot be added to the manifest without also being validated.
+#: the committed bytes. Kept as a table so a pre-registered document cannot
+#: be added to the manifest without also being validated.
 _REQUIRED_HASH_FIELDS = {
     "grrcon_matrix_sha256": "the pre-registered prediction-matrix hash",
     "envelope_preregistration_sha256": (
         "the envelope-mass pre-registration hash (scoring method, candidate "
         "set, thresholds)"
+    ),
+    "grrcon_addendum_sha256": (
+        "the prediction-matrix addendum hash (golden trace, marker units, "
+        "predictions written after the matrix closed)"
     ),
 }
 
@@ -65,6 +77,11 @@ def grrcon_matrix_sha256() -> str:
 def envelope_preregistration_sha256() -> str:
     """SHA-256 of the envelope-mass pre-registration, as committed."""
     return hashlib.sha256(ENVELOPE_PREREG_PATH.read_bytes()).hexdigest()
+
+
+def grrcon_addendum_sha256() -> str:
+    """SHA-256 of the prediction-matrix addendum, as committed."""
+    return hashlib.sha256(GRRCON_ADDENDUM_PATH.read_bytes()).hexdigest()
 
 
 def validate_manifest(manifest: dict[str, Any]) -> None:
@@ -131,6 +148,7 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
         "fixture_id": stack.fixture_id,
         "grrcon_matrix_sha256": grrcon_matrix_sha256(),
         "envelope_preregistration_sha256": envelope_preregistration_sha256(),
+        "grrcon_addendum_sha256": grrcon_addendum_sha256(),
         "traffic_plane": TRAFFIC_PLANE,
         "layers_enabled": {
             "l1": cfg.l1, "l2": cfg.l2, "l3": cfg.l3, "l4": cfg.l4, "l5": cfg.l5,
