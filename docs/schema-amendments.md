@@ -1123,3 +1123,21 @@ endpoint and no client the layer is `unavailable` (`ran=False`) and the
 manifest keeps `backend_status: stand-in`. The Stage 2 L1 work flips the
 flag when a client exists. The existing preflight finding stands: the
 weights are not on any node.
+
+## D6 — canary: a router exception escaped the loop uncounted, and an error body classified as ok
+
+**Found by:** Class 1 rows `refusal_turn_classifier/http_4xx_5xx_body` and
+`refusal_turn_classifier/timeout_exception`.
+
+**False assumption:** that `router.generate` returns on every turn and that
+a non-empty completion is a completed turn. An exception from the router
+propagated out of `run_canary`, so the turn was counted as nothing — not
+an error — and the gate read its rate off the turns before it. A response
+whose body was `{"error": {...}}` with no `choices` reached
+`classify_turn` as non-empty text and classified as `ok`.
+
+**Fix:** `run_canary` catches the exception, counts it as an error with its
+type in `error_detail`, and continues; `classify_turn` returns
+`TurnClass.ERROR` for an error body with no choices, and `run_canary`
+counts that class as an error. The filter rate's denominator is unchanged
+(errors were already excluded from it).
