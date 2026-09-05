@@ -44,6 +44,8 @@ from carl_ops_oracle.oracle import EvalContext, Invariant, load_invariants
 from carl_ops_state import TransitionRelation, WorldState
 from carl_ops_trajectory import to_action_index
 
+from .units import MARKER_UNITS
+
 #: The index space this block is emitted in (schema AMENDMENT 6).
 #:
 #: point_of_no_return and breach_step_index are computed over SNAPSHOTS —
@@ -243,6 +245,9 @@ def marker_block(
     ed_status = explanatory_divergence_status(envelope_masses)
     markers = {
         "index_space": MARKER_INDEX_SPACE,
+        # Per-marker unit (schema AMENDMENT 11): the block-wide index_space,
+        # stated once per marker so the joiner can check it.
+        "units": dict(MARKER_UNITS),
         "onset_status": ONSET_NOT_ESTIMATED,
         "onset_dist": None,  # not estimated — see ONSET_DIST_NOT_ESTIMATED
         "explanatory_divergence": explanatory_divergence(envelope_masses),

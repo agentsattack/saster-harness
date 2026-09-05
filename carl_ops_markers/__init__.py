@@ -9,6 +9,17 @@ deliberately not estimated this sweep. See markers.py.
 
 from __future__ import annotations
 
+from .units import (
+    ACTION_INDEX,
+    MARKER_UNITS,
+    SNAPSHOT_INDEX,
+    SNAPSHOT_SPACE_UNIT,
+    TURN_INDEX,
+    UNITS,
+    MarkerIndex,
+    UnitMismatch,
+    subtract,
+)
 from .markers import (
     ASSIGNED_TICKET,
     DECLARED_IN_ENVELOPE_FLOOR,
@@ -28,6 +39,15 @@ from .markers import (
 )
 
 __all__ = [
+    "ACTION_INDEX",
+    "MARKER_UNITS",
+    "SNAPSHOT_INDEX",
+    "SNAPSHOT_SPACE_UNIT",
+    "TURN_INDEX",
+    "UNITS",
+    "MarkerIndex",
+    "UnitMismatch",
+    "subtract",
     "ASSIGNED_TICKET",
     "DECLARED_IN_ENVELOPE_FLOOR",
     "MARKER_INDEX_SPACE",

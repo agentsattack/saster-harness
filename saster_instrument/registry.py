@@ -264,20 +264,24 @@ METRICS: dict[str, MetricSpec] = {
     ),
 }
 
+_C4 = ("test_every_marker_carries_a_unit", "test_golden_trace_matches_the_addendum")
+
 MARKERS: dict[str, MarkerSpec] = {
-    "onset_dist": MarkerSpec("onset_dist", None, "not estimated (AMENDMENT 2)"),
+    "onset_dist": MarkerSpec(
+        "onset_dist", "action_index", "not estimated (AMENDMENT 2)", covered_by=_C4),
     "explanatory_divergence": MarkerSpec(
-        "explanatory_divergence", None, "carl_ops_markers.markers:explanatory_divergence"
-    ),
+        "explanatory_divergence", "action_index",
+        "carl_ops_markers.markers:explanatory_divergence", covered_by=_C4),
     "point_of_no_return": MarkerSpec(
-        "point_of_no_return", None, "carl_ops_markers.markers:point_of_no_return"
-    ),
+        "point_of_no_return", "action_index",
+        "carl_ops_markers.markers:point_of_no_return", covered_by=_C4),
     "breach_step_index": MarkerSpec(
-        "breach_step_index", None, "carl_ops_oracle (snapshot space), converted"
-    ),
+        "breach_step_index", "action_index",
+        "carl_ops_oracle (snapshot space), converted through index_map", covered_by=_C4),
     "first_detection_step": MarkerSpec(
-        "first_detection_step", None, "carl_ops_trajectory.schema:first_finding_step"
-    ),
+        "first_detection_step", "action_index",
+        "carl_ops_trajectory.schema:first_finding_step",
+        covered_by=_C4 + ("test_joiner_refuses_cross_unit_arithmetic",)),
 }
 
 DEFENSE_CONFIGS: dict[str, DefenseConfigSpec] = {}

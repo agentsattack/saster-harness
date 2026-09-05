@@ -290,6 +290,26 @@ _FINE_GRAINED_VOCABULARIES = {
 #: producer that wants snapshot-space markers is producing a different corpus.
 MARKER_INDEX_SPACES = {"action"}
 
+#: Per-marker units (AMENDMENT 11; see ``docs/schema-amendments.md``). The
+#: block-wide ``index_space`` says every marker is an action index; this
+#: says it once per marker, in a closed vocabulary, so the assembler's joiner
+#: can refuse arithmetic between two markers whose units differ instead of
+#: relying on a reader to remember the block-wide rule.
+#:
+#: OPTIONAL, on the Amendment 3 pattern: absent, the block-wide rule
+#: governs and records written before the amendment stay valid. When
+#: present, the key set must be exactly the five markers and every unit must
+#: agree with ``index_space``. The citable loader requires it.
+MARKER_UNIT_VOCABULARY = {"action_index", "snapshot_index", "turn_index"}
+MARKER_NAMES = (
+    "onset_dist",
+    "explanatory_divergence",
+    "point_of_no_return",
+    "breach_step_index",
+    "first_detection_step",
+)
+_INDEX_SPACE_TO_UNIT = {"action": "action_index"}
+
 #: The space the ORACLE block is expressed in. The oracle grades serialized
 #: world-state snapshots and nothing else, so its indices are snapshot indices
 #: and they stay that way; ``index_map`` carries the conversion.
@@ -1237,6 +1257,8 @@ def _validate_markers(
             f"the snapshot sequence the oracle grades",
         )
 
+    _validate_marker_units(markers, errors)
+
     onset_status = markers.get("onset_status", "__missing__")
     if onset_status == "__missing__":
         _err(
@@ -1356,6 +1378,36 @@ def _validate_markers(
         _err(errors, "markers.first_detection_step", "must be int >= 0 or null")
         fds = None
     return fds
+
+
+def _validate_marker_units(markers: dict, errors: list) -> None:
+    """``markers.units`` — AMENDMENT 11. Optional; when present, complete,
+    in-vocabulary, and consistent with ``index_space``."""
+    if "units" not in markers:
+        return
+    units = markers["units"]
+    p = "markers.units"
+    if not isinstance(units, dict):
+        _err(errors, p, "must be an object mapping marker name to unit")
+        return
+    expected = set(MARKER_NAMES)
+    if set(units) != expected:
+        _err(
+            errors, p,
+            f"key set must be exactly the five markers {sorted(expected)}; "
+            f"got {sorted(units)}",
+        )
+    space_unit = _INDEX_SPACE_TO_UNIT.get(markers.get("index_space"))
+    for name, unit in sorted(units.items()):
+        if unit not in MARKER_UNIT_VOCABULARY:
+            _err(errors, f"{p}.{name}",
+                 f"must be one of {sorted(MARKER_UNIT_VOCABULARY)}")
+        elif space_unit is not None and unit != space_unit:
+            _err(
+                errors, f"{p}.{name}",
+                f"is {unit!r} but index_space {markers.get('index_space')!r} "
+                f"puts every marker in {space_unit!r}; a block cannot mix units",
+            )
 
 
 def _validate_containment_latency(

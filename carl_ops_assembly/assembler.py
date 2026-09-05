@@ -75,7 +75,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from carl_ops_agent.widening import resolve_widening_route
-from carl_ops_markers import ONSET_DIST_NOT_ESTIMATED, marker_block
+from carl_ops_markers import ONSET_DIST_NOT_ESTIMATED, MarkerIndex, marker_block
 from carl_ops_trajectory import (
     MARKER_INDEX_SPACES,
     ORACLE_INDEX_SPACE,
@@ -199,7 +199,10 @@ def derive_terminal_outcome(
 
 
 def _containment_latency(
-    breach: bool, breach_action_index: int | None, first_detection_step: int | None
+    breach: bool,
+    breach_action_index: int | None,
+    first_detection_step: int | None,
+    units: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Containment latency, right-censored when a breach went undetected.
 
@@ -216,7 +219,13 @@ def _containment_latency(
     if first_detection_step is None:
         return {"value": None, "censored": True}
     base = breach_action_index if breach_action_index is not None else 0
-    return {"value": int(first_detection_step) - int(base), "censored": False}
+    # AMENDMENT 11: the subtraction goes through the tagged type, which
+    # raises UnitMismatch if the two operands are not in the same unit. The
+    # units come from the marker block itself, never assumed here.
+    units = units or {}
+    detected = MarkerIndex(int(first_detection_step), units.get("first_detection_step", "action_index"))
+    breached = MarkerIndex(int(base), units.get("breach_step_index", "action_index"))
+    return {"value": detected - breached, "censored": False}
 
 
 def _first_detection_step(detection: Sequence[dict]) -> int | None:
@@ -355,7 +364,7 @@ def assemble_trajectory_record(
         # converted one. Passing verdict.breach_step_index here is the W9
         # defect.
         "containment_latency": _containment_latency(
-            breach, markers["breach_step_index"], first_detection
+            breach, markers["breach_step_index"], first_detection, markers.get("units")
         ),
         "terminal_outcome": terminal_outcome,
         # AMENDMENT 10 — which runner status produced it, when the

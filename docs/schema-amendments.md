@@ -1164,3 +1164,36 @@ are unchanged. ``tests/test_chat_scorer.py``'s fake server scored every
 candidate with the same logprob and so produced exactly the shape now
 refused; it is corrected as a test fixture (per-candidate logprobs), and one
 test that built a literal uniform distribution now builds a real one.
+
+---
+
+## AMENDMENT 11 — `markers.units`: the index unit, per marker (2026-09-05, Stage 1 Class 4)
+
+**Field.** `markers.units`: an object mapping each of the five marker names
+(`onset_dist`, `explanatory_divergence`, `point_of_no_return`,
+`breach_step_index`, `first_detection_step`) to a unit from the closed
+vocabulary `action_index | snapshot_index | turn_index`.
+
+**Rule.** OPTIONAL, on the Amendment 3 pattern: absent, the block-wide
+`index_space` (Amendment 6) governs and every record written before this
+amendment stays valid. When present the key set must be exactly the five
+markers, every unit must be in the vocabulary, and every unit must agree
+with `index_space` — a block cannot mix units. The citable loader requires
+the field (a corpus without it is not citable).
+
+**Why.** Amendment 6 fixed the space block-wide after `containment_latency`
+had subtracted a snapshot index from an action index and produced a
+plausible integer every time (catalogue C6). A block-wide statement is a
+rule a reader has to remember; a per-marker unit is a value a joiner can
+check. `carl_ops_markers.units.MarkerIndex` is that joiner: the assembler's
+only subtraction now goes through it, and it raises `UnitMismatch` on two
+operands in different units rather than computing.
+
+**Golden trace.** The reference route's expected values — the pinned
+latency 6, and the unit-mismatch number 7 a refactor must not produce —
+are in `docs/grrcon-test-matrix-addendum.md` §A, hashed, and
+`tests/test_instrument_class4_units.py` recomputes them from the fixture.
+
+**Hashing.** Changes neither closed document. The addendum is a new hashed
+document opened in the same stage; its pin is in
+`tests/test_manifest_addendum.py`.
