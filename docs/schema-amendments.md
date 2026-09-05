@@ -1087,3 +1087,20 @@ times out or returns an error body is not a decision either way.
 
 **Fix:** an exception or a non-bool answer maps to `unavailable`
 (`ran=False`); the gate decides only on `True`/`False`.
+
+## D4 — L4 auditor: the verdict token was case-folded, so `SAFE` was the clean class
+
+**Found by:** Class 1 row `wrong_casing_of_token`, both heads.
+
+**False assumption:** that case is noise in AgentDoG's answer. The template
+asks for exactly `safe` or `unsafe`; `_verdict_token` lower-cased the line
+before matching, so a reply in a shape the model was not trained to emit
+(`SAFE`, `Safe.`) became the one verdict that reads as "the defense
+held". Every other non-conforming shape already mapped to `unavailable`
+(commit 594e8f3); this was the one leniency left, and it leaned the wrong
+way.
+
+**Fix:** exact-token match, no case folding. Whitespace and a single
+trailing period are still tolerated. `tests/test_l4_robustness.py::
+test_binary_mode_parses_agentdogs_own_tokens` asserted ` Safe.` as ALLOW
+and was wrong as a test; it now asserts UNAVAILABLE, and the commit says so.

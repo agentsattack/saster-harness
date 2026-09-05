@@ -245,8 +245,11 @@ def test_conforming_safe_is_allow_and_carries_no_labels(monkeypatch):
 
 
 def test_binary_mode_parses_agentdogs_own_tokens(monkeypatch):
+    # Whitespace and one trailing period are tolerated; case is NOT (Stage 1
+    # defect D4). " Safe." used to be asserted as ALLOW here — that was the
+    # wrong-casing row of the degenerate matrix reading as the clean class.
     for content, expect in [("unsafe", Verdict.WARN), ("safe", Verdict.ALLOW),
-                            (" Safe.\n", Verdict.ALLOW)]:
+                            (" safe.\n", Verdict.ALLOW), (" Safe.\n", Verdict.UNAVAILABLE)]:
         _patch_post(monkeypatch, resp=_FakeResp(_chat(content)))
         assert _binary()._audit_http("traj").verdict is expect
 
