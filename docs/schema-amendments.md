@@ -1104,3 +1104,22 @@ way.
 trailing period are still tolerated. `tests/test_l4_robustness.py::
 test_binary_mode_parses_agentdogs_own_tokens` asserted ` Safe.` as ALLOW
 and was wrong as a test; it now asserts UNAVAILABLE, and the commit says so.
+
+## D5 — L1 classifier: an endpoint string made the manifest say `real` while the stand-in kept answering
+
+**Found by:** `test_l1_endpoint_without_client_is_unavailable_not_real`
+(Class 1; L1 has no parse surface, so it is covered by a label test rather
+than the matrix — the registry says why).
+
+**False assumption:** that configuring an endpoint means a real backend is
+in the path. `ClassifierGuard.classify` has no HTTP client at all; with
+`endpoint` set it went on returning the representative stand-in's answer,
+while `representative` (and so the manifest's `backend_status`) flipped to
+`real`. A corpus produced that way would have been citable under hard
+constraint 4 with a stand-in verdict on every action.
+
+**Fix:** `CLIENT_IMPLEMENTED = False` in `l1_classifier.py`; with an
+endpoint and no client the layer is `unavailable` (`ran=False`) and the
+manifest keeps `backend_status: stand-in`. The Stage 2 L1 work flips the
+flag when a client exists. The existing preflight finding stands: the
+weights are not on any node.

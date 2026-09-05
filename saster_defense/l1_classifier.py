@@ -29,6 +29,13 @@ DEFAULT_L1_MODEL = "LlamaGuard3-8B"
 #: point. Kept as data so the manifest can record it.
 LLAMAGUARD3_ATBENCH_RECALL = 0.068
 
+#: Whether this module carries a client that can call ``endpoint``. It does
+#: not (Stage 1 defect D5): ``classify()`` has no HTTP path, so an endpoint
+#: string used to flip the manifest to ``backend_status: real`` while the
+#: stand-in went on answering. Until a client exists, an endpoint makes the
+#: layer UNAVAILABLE, and the manifest keeps saying stand-in.
+CLIENT_IMPLEMENTED = False
+
 
 @dataclass
 class ClassifierGuard:
@@ -47,11 +54,24 @@ class ClassifierGuard:
 
     @property
     def representative(self) -> bool:
-        # Real only when a LlamaGuard endpoint is wired; the weights are not
-        # obtainable in this environment, so this is a stand-in here.
-        return self.endpoint is None
+        # Real only when a LlamaGuard endpoint is wired AND a client exists to
+        # call it. Neither holds here: the weights are not obtainable in this
+        # environment and no client is implemented, so this is a stand-in.
+        return self.endpoint is None or not CLIENT_IMPLEMENTED
 
     def classify(self, request: ActionRequest) -> LayerOutcome:
+        if self.endpoint is not None and not CLIENT_IMPLEMENTED:
+            # An endpoint we cannot call. Answering from the stand-in here
+            # would put a stand-in verdict under a real-looking label.
+            return LayerOutcome(
+                LayerName.L1_CLASSIFIER,
+                Verdict.UNAVAILABLE,
+                ran=False,
+                detail=(
+                    f"LlamaGuard endpoint {self.endpoint!r} configured but no "
+                    f"client is implemented; not answering from the stand-in"
+                ),
+            )
         if self.endpoint is None and not self.use_representative:
             # No backend and no stand-in: unavailable, never clean.
             return LayerOutcome(
