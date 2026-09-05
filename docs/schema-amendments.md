@@ -1074,3 +1074,16 @@ must not read as a clean pass on the designed case.
 on `sat`, and raises `TraceBackendError` for anything else, including an
 exception from the solver. `TraceMonitor.check` maps `TraceBackendError`,
 any other exception, and any non-bool answer to `unavailable` (`ran=False`).
+
+## D3 — L5 approval gate: an approver that raised or answered a non-bool was decided by truthiness
+
+**Found by:** Class 1 rows `l5_approval/*`.
+
+**False assumption:** that the approver callback returns a bool. `gate`
+tested its answer with `if approved`, so `None`/`""` denied and any
+non-empty string escalated-and-proceeded; an exception propagated out of
+the cell. On stage the approver is a human behind a queue; a queue that
+times out or returns an error body is not a decision either way.
+
+**Fix:** an exception or a non-bool answer maps to `unavailable`
+(`ran=False`); the gate decides only on `True`/`False`.
