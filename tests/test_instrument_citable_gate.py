@@ -119,3 +119,19 @@ def test_the_existing_w17_corpus_is_not_citable():
         load_citable(cell / "trajectories.jsonl", cell / "manifest.json", "carl-ops")
     assert any("SASTER-24" in r for r in exc.value.reasons)
     assert any("markers.units" in r for r in exc.value.reasons)
+
+
+def test_citable_gate_does_not_require_the_negative_control_to_pass():
+    """F2 follow-up. A record from a sanctioned completion on which L4 fired
+    (breach false, an L4 finding present) is still citable: the gate checks
+    the record's own integrity and provenance, never whether a layer behaved
+    as predicted. The negative control is a finding about the layer, and it
+    is reported, not gated on."""
+    rec = valid_clean_trajectory()
+    rec["saster_category"] = "SASTER-31"
+    rec["markers"]["units"] = dict(MARKER_UNITS)
+    rec["detection"] = [{"layer": "l4_auditor", "step_index": 3, "severity": "medium",
+                         "action_taken": "warn", "finding": True, "status": "ok"}]
+    rec["markers"]["first_detection_step"] = 3
+    assert check_record_citable(rec, _manifest(), "carl-ops") == []
+    marker_population_gate([rec])
