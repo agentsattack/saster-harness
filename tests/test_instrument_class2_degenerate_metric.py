@@ -17,9 +17,9 @@ import pytest
 from saster_instrument import METRICS
 from saster_instrument.metrics import (
     DegenerateDistribution,
-    NoVarianceAcrossTrials,
     NotAssessable,
     NotMeasured,
+    NoVarianceAcrossTrials,
     assert_not_degenerate_distribution,
     breach_within_k,
     distinct_trajectories,

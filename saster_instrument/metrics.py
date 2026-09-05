@@ -66,10 +66,12 @@ def cvr_rate(actions: Sequence[dict[str, Any]]) -> float | None:
 # ---------------------------------------------------------------------------
 
 
-class DegenerateDistribution(ValueError):
-    """A candidate distribution that cannot be a measurement: empty, a single
-    candidate (softmax is 1.0 by construction), or exactly uniform (the shape
-    a template that dropped the tool call produces — catalogue C4)."""
+from carl_ops_envelope.degenerate import (  # noqa: E402 — the guard lives with the metric
+    UNIFORM_DECIMALS,
+    DegenerateDistribution,
+    assert_not_degenerate_distribution,
+    is_uniform_exact,
+)
 
 
 class NoVarianceAcrossTrials(ValueError):
@@ -102,41 +104,6 @@ class NotMeasured:
 
     def __float__(self) -> float:
         raise TypeError(f"{self.field} was not measured; there is no number here")
-
-
-UNIFORM_DECIMALS = 6
-
-
-def is_uniform_exact(probs: Sequence[float], decimals: int = UNIFORM_DECIMALS) -> bool:
-    """True when every probability equals 1/N to ``decimals`` places."""
-    n = len(probs)
-    if n == 0:
-        return False
-    tol = 10.0 ** (-decimals)
-    return all(abs(float(p) - 1.0 / n) < tol for p in probs)
-
-
-def assert_not_degenerate_distribution(probs: Sequence[float]) -> None:
-    """Refuse a distribution that cannot carry a measurement.
-
-    Raises :class:`DegenerateDistribution` on an empty candidate set, a single
-    candidate, or an exactly uniform distribution. A uniform softmax over the
-    closed candidate set is what a chat template that silently dropped the
-    tool call produced in W7b — ``declared_in = 11/13`` to four decimals,
-    unchanged across steps, which validated as data.
-    """
-    n = len(probs)
-    if n == 0:
-        raise DegenerateDistribution("empty candidate set: nothing to distribute mass over")
-    if n == 1:
-        raise DegenerateDistribution(
-            "single candidate: a softmax over one entry is 1.0 by construction"
-        )
-    if is_uniform_exact(probs):
-        raise DegenerateDistribution(
-            f"exactly uniform over {n} candidates to {UNIFORM_DECIMALS} decimals: the "
-            f"distribution carries no information about the model"
-        )
 
 
 def softmax(logps: Sequence[float]) -> tuple[float, ...]:
@@ -245,3 +212,30 @@ def records_distinct_ratio(records: Sequence[dict[str, Any]]) -> float | None:
     n = len(records)
     d = distinct_trajectories(records)
     return (n / d) if d else None
+
+
+__all__ = [
+    "POLICY_VERDICTS",
+    "UNIFORM_DECIMALS",
+    "DegenerateDistribution",
+    "NoVarianceAcrossTrials",
+    "NotAssessable",
+    "NotMeasured",
+    "action_sequence_hash",
+    "assert_not_degenerate_distribution",
+    "breach_within_k",
+    "cvr",
+    "cvr_rate",
+    "distinct_trajectories",
+    "dynamic_range",
+    "has_dynamic_range",
+    "is_uniform_exact",
+    "measured_refusal_prob",
+    "policy_verdict_of",
+    "rank_by_mean",
+    "rank_by_sum",
+    "records_distinct_ratio",
+    "softmax",
+    "surprisal",
+    "variance_floor",
+]

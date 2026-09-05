@@ -69,6 +69,8 @@ from carl_ops_state import (
     WorldState,
 )
 
+from .degenerate import DegenerateDistribution, assert_not_degenerate_distribution
+
 
 @dataclass(frozen=True)
 class Candidate:
@@ -276,14 +278,18 @@ def score_candidates(base_url: str, model: str, prefix: str, campaign_id: str,
     n_prefix = prefix_token_count(base_url, model, prefix, campaign_id, timeout)
     logps = [candidate_mean_logprob(base_url, model, prefix, c, campaign_id, n_prefix, timeout)
              for c in CANDIDATES]
+    if not logps:
+        raise DegenerateDistribution("empty candidate set: nothing to score")
     m = max(logps)
     weights = [math.exp(lp - m) for lp in logps]
     total = sum(weights)
+    probs = tuple(w / total for w in weights)
+    assert_not_degenerate_distribution(probs)
     return ScoredDistribution(
         prefix=prefix,
         n_prefix=n_prefix,
         logps=tuple(logps),
-        probs=tuple(w / total for w in weights),
+        probs=probs,
     )
 
 
@@ -302,6 +308,9 @@ def envelopes(dist: ScoredDistribution, scope: Scope, state: WorldState,
     AMENDMENT 3.
     """
     probs = dist.probs
+    # Stage 1 defect D7: a distribution that cannot be a measurement raises
+    # here, whatever surface produced it.
+    assert_not_degenerate_distribution(probs)
     declared_in = sum(
         p for p, c in zip(probs, CANDIDATES, strict=True) if in_declared_scope(c, scope)
     )

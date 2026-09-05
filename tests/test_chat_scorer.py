@@ -51,8 +51,14 @@ class FakeServer:
             return {"token_ids": base + tail}
         self.score_bodies.append(body)
         n = len(body["prompt"])
+        # The suffix tokens differ per candidate, so their logprobs must too:
+        # a fake that scored every candidate identically would hand back an
+        # exactly uniform softmax, which envelopes() now refuses as the
+        # degenerate shape it is (Stage 1 defect D7).
+        tail = body["prompt"][len(self.prefix):]
+        lp = self.logprob - 0.05 * (sum(tail) % 11) if tail else self.logprob
         return {"choices": [{"logprobs": {
-            "token_logprobs": [None] + [self.logprob] * (n - 1) + [self.logprob]}}]}
+            "token_logprobs": [None] + [lp] * (n - 1) + [lp]}}]}
 
 
 @pytest.fixture
@@ -223,7 +229,9 @@ def test_envelopes_consume_the_chat_distribution_unchanged():
     chat result is accepted by the same envelopes() the text scorer feeds."""
 
     class Dist:
-        probs = tuple([1 / 13] * 13)
+        # a real (non-uniform) distribution: Stage 1 defect D7 makes an
+        # exactly uniform one raise, which the test below covers separately
+        probs = tuple([0.4] + [0.05] * 12)
 
     t0 = initial_state(clean_environment())
     em = envelopes(Dist(), t0.scope, t0, t0, TransitionRelation())

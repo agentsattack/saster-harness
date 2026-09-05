@@ -15,6 +15,11 @@ from .context import (
     prefixes_along,
     render_step,
 )
+from .degenerate import (
+    DegenerateDistribution,
+    assert_not_degenerate_distribution,
+    is_uniform_exact,
+)
 from .scorer import (
     CANDIDATES,
     DEFAULT_SCORER_TIMEOUT_S,
@@ -36,6 +41,9 @@ from .scorer import (
 )
 
 __all__ = [
+    "DegenerateDistribution",
+    "assert_not_degenerate_distribution",
+    "is_uniform_exact",
     "CANDIDATES",
     "DEFAULT_SCORER_TIMEOUT_S",
     "Candidate",

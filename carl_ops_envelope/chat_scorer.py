@@ -49,6 +49,7 @@ import httpx
 
 from carl_ops_agent.tool_schemas import tool_schemas, wire_name
 
+from .degenerate import DegenerateDistribution, assert_not_degenerate_distribution
 from .scorer import CANDIDATES, Candidate
 
 #: vLLM requires a tool-call id of exactly 9 alphanumeric characters. The same
@@ -286,14 +287,19 @@ def score_candidates_chat(
                                           campaign_id, timeout))
     _assert_not_degenerate(suffixes, model)
 
+    if not logps:
+        raise DegenerateDistribution("empty candidate set: nothing to score")
     m = max(logps)
     weights = [math.exp(lp - m) for lp in logps]
     total = sum(weights)
+    probs = tuple(w / total for w in weights)
+    # Stage 1 defect D7: the shape guard, independent of the token guard above.
+    assert_not_degenerate_distribution(probs)
     return ChatScoredDistribution(
         prefix_token_ids=tuple(prefix),
         n_prefix=n_prefix,
         logps=tuple(logps),
-        probs=tuple(w / total for w in weights),
+        probs=probs,
     )
 
 

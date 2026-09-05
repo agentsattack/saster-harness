@@ -22,7 +22,6 @@ from typing import Any
 
 import httpx
 
-import saster_defense.l1_classifier as l1
 import saster_defense.l3_trace as l3
 import saster_defense.l4_auditor as l4
 import saster_defense.l5_approval as l5

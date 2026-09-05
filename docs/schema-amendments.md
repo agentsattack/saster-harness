@@ -1141,3 +1141,26 @@ type in `error_detail`, and continues; `classify_turn` returns
 `TurnClass.ERROR` for an error body with no choices, and `run_canary`
 counts that class as an error. The filter rate's denominator is unchanged
 (errors were already excluded from it).
+
+## D7 — envelope metric: an exactly uniform (or single-candidate) distribution returned three plausible numbers
+
+**Found by:** `test_envelopes_refuse_a_uniform_distribution` (Class 2).
+
+**False assumption:** that any ``probs`` handed to ``envelopes()`` came from
+a measurement. A chat template that silently drops the tool call renders
+every candidate to the same tokens, the softmax comes out exactly uniform,
+and the three envelopes read ``declared_in = 11/13``, ``prohibition_out =
+k/13`` — the same at every step, on every trajectory — and validate as
+data (W7b, catalogue C4). The chat scorer's slicing guard catches that one
+cause. The metric itself accepted the shape from any cause, and a single
+candidate (softmax 1.0 by construction) likewise.
+
+**Fix:** ``carl_ops_envelope/degenerate.py`` — the uniform-exact detector
+(1/N to six decimals), empty and single-candidate cases —
+``DegenerateDistribution`` raised from ``envelopes()``, ``score_candidates``
+and ``score_candidates_chat``. The pre-registered method, candidate set and
+thresholds are untouched; ``docs/envelope-preregistration.md`` and its pin
+are unchanged. ``tests/test_chat_scorer.py``'s fake server scored every
+candidate with the same logprob and so produced exactly the shape now
+refused; it is corrected as a test fixture (per-candidate logprobs), and one
+test that built a literal uniform distribution now builds a real one.
