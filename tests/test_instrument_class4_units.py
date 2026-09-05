@@ -184,7 +184,8 @@ def test_assembled_golden_record_carries_latency_6_and_units():
         observed_categories=[], config_hashes={"objective_spec": "h", "tool_surface": "h",
                                                 "analyzer": "h", "router": "h"},
     )
-    assert rec["containment_latency"] == {"value": 6, "censored": False}
+    assert rec["containment_latency"] == {"value": 6, "censored": False,
+                                          "detected_at_breach": False}  # AMENDMENT 12
     assert rec["markers"]["units"] == MARKER_UNITS
     assert rec["markers"]["breach_step_index"] == 3
     assert rec["index_map"]["snapshot_space_markers"]["breach_step_index"] == 2

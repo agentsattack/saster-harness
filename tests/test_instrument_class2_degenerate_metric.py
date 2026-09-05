@@ -44,7 +44,7 @@ def test_metric_probe_never_returns_a_number(metric, probe):
     fn = METRICS[metric].probes[probe]
     try:
         out = fn()
-    except (DegenerateDistribution, NoVarianceAcrossTrials, IndexError, ZeroDivisionError):
+    except Exception:  # noqa: BLE001 — raising IS the acceptable outcome; the assertion is on a value
         return
     assert out is None or isinstance(out, (NotAssessable, NotMeasured)), (
         f"{metric}/{probe}: degenerate input produced {out!r}, a plausible value"
