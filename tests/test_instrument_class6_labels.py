@@ -110,7 +110,7 @@ def test_every_existing_corpus_record_carries_the_unsatisfiable_label():
     for path in (REPO / "runs").rglob("trajectories.jsonl"):
         top = path.relative_to(REPO / "runs").parts[0]
         # every corpus written after W21 (W22 onward) carries the corrected label
-        target = after if re.match(r"^w(2[2-9]|[3-9]\d)_", top) else labels
+        target = after if re.match(r"^w(2[2-9]|[3-9]\d)[a-z]?_", top) else labels
         for line in path.read_text().splitlines():
             if line.strip():
                 target.add(json.loads(line)["saster_category"])
