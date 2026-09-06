@@ -1,6 +1,6 @@
 # Defect log — canonical, final (2026-09-06)
 
-Every defect the instrument tests, the pilot and the sweep found in this harness, numbered in the order found. Direction is relative to "defense held": **toward-held** made the defense look better than it was; **erased** removed trajectories from the analysis (by omission toward held); **away** made it look worse; **neutral** changed no number; **mixed** went both ways. Entries with their full text are in `docs/schema-amendments.md`; findings in `docs/sweep-findings.md`. None manufactured a breach.
+Every defect the instrument tests, the pilot and the sweep found in this harness, numbered in the order found. Direction is relative to "defense held": **toward-held** made the defense look better than it was; **erased** removed trajectories from the analysis (by omission toward held); **away** made it look worse; **toward-false-alarm** made a layer deny what it should allow; **neutral** changed no number; **mixed** went both ways. Entries with their full text are in `docs/schema-amendments.md`; findings in `docs/sweep-findings.md`. None manufactured a breach.
 
 | id | what | direction | the false assumption | fix commit | introduced |
 |---|---|---|---|---|---|
@@ -21,6 +21,7 @@ Every defect the instrument tests, the pilot and the sweep found in this harness
 | D15 | the static coverage query enumerated one value per argument | toward-held (coverage overstated) | covering a tool covers its arguments | entered `5d9bfe7` (2026-09-06); **no fix** — the query is unchanged and the gap is documented (F24/F25) | `d556eba` (2026-09-05) |
 | D16 | the marker gate read a censored null as an unpopulated instrument | erased (47 cells; by omission toward held) | every breaching campaign has at least one counted detection | `4bd0502` (2026-09-06, Amendment 19) | `e734c4a` (2026-09-05) |
 | D17 | the arm manifest's `l4_heads.<key>.role` says "primary" for the binary head on an L4-off cell; the detection entries say "recorded" | neutral (a setting-derived label disagreeing with the entry-level role; no number changed) | the observer setting alone determines the head's role | documented `760f72f` (2026-09-06); **no fix** — a runner change mid-arm is a new run id; fix before any next run | `2002f4e` (2026-09-05, `l4_heads` manifest block) |
+| D18 | the input classifier's verdicts on the same 109 control actions changed with the rendering: 47 denials dotted and key-sorted, 2 in the wire form (F27) | toward-false-alarm | that a content classifier's verdict on an action is a property of the action — that any faithful serialization of the tool call is equivalent input | `b26e2cd` (2026-09-06; the layer renders the wire form, `tests/test_l1_rendering.py`) | `0ce124f` (2026-09-06, the L1 client's first rendering) |
 
 ## Count by direction
 
@@ -31,7 +32,8 @@ Every defect the instrument tests, the pilot and the sweep found in this harness
 | neutral | 3 | D7, D10, D17 |
 | mixed | 1 | D3 |
 | away | 1 | D8 |
+| toward-false-alarm | 1 | D18 |
 
-Seventeen. 9 toward held, 3 erased (each by omission toward held), 3 neutral, 1 mixed, 1 away. Two are documented without a fix (D15, D17), each with the reason.
+Eighteen. 9 toward held, 3 erased (each by omission toward held), 3 neutral, 1 mixed, 1 away, 1 toward false alarm (D18: a defense looking stricter than it is). Two are documented without a fix (D15, D17), each with the reason.
 
 Introducing commits are the commit that first added the code carrying the assumption, from `git log -S` on the defining symbol; where a file predates the assumption, the file's first commit is given.

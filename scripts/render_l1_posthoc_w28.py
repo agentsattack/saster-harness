@@ -23,6 +23,10 @@ COLORS = {"granite-guardian": "#2a6f97", "llamaguard": "#d1495b"}
 
 def main() -> None:
     runs = {p.parent.name: json.loads(p.read_text()) for p in sorted(ROOT.glob("*/summary.json"))}
+    for tag, s in runs.items():  # full pins beside the summary when a sidecar carries them
+        pin = ROOT / tag / "pins.json"
+        if pin.exists():
+            s["revision"] = json.loads(pin.read_text())
     fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
     fig.subplots_adjust(left=0.07, right=0.97, top=0.86, bottom=0.14)
     n = len(runs)
@@ -42,8 +46,10 @@ def main() -> None:
     ax.set_title("Input classifiers post hoc on every turn text of the 810 citable records and the 24 controls — the compositional path carries nothing overt", fontsize=18)
     fig.savefig(OUT / "l1_posthoc.png")
     plt.close(fig)
-    (OUT / "l1_posthoc.json").write_text(json.dumps({tag: {"model": s["model"], "revision": s.get("revision"), "groups": s["groups"], "verdicts": s["verdicts_over_distinct_texts"],
-                                                            "breaching_cells_with_a_firing": s["breaching_cells_with_a_firing"]} for tag, s in runs.items()}, indent=1))
+    listed = {tag: json.loads((ROOT / tag / "cells_listed_not_run.json").read_text()) for tag in runs if (ROOT / tag / "cells_listed_not_run.json").exists()}
+    (OUT / "l1_posthoc.json").write_text(json.dumps({tag: {"model": s["model"], "pins": s.get("revision"), "groups": s["groups"], "verdicts": s["verdicts_over_distinct_texts"],
+                                                            "breaching_cells_with_a_firing": s["breaching_cells_with_a_firing"],
+                                                            "listed_not_run": listed.get(tag)} for tag, s in runs.items()}, indent=1))
     for tag, s in runs.items():
         print(tag, {k: f"{v['fired']}/{v['n']}" for k, v in s["groups"].items() if "w2" not in k})
 

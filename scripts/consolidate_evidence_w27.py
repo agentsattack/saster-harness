@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path.home() / "evidence"
-STORES = ["pre-sweep"] + sorted(p.name for p in (ROOT / "sweep").iterdir() if p.is_dir()) if (ROOT / "sweep").exists() else ["pre-sweep"]
+STORES = ["pre-sweep", "beat1"] + (sorted(p.name for p in (ROOT / "sweep").iterdir() if p.is_dir()) if (ROOT / "sweep").exists() else [])
 WHY = {
     "pre-sweep": "Stage 0 archive of every pre-sweep artifact; tag pre-sweep-2026-09",
     "w24_sweep_qwen3": "first Stage 4 launch, halted by the operator on D12 after two cells; kept",
@@ -25,6 +25,8 @@ WHY = {
     "w25p_sweep_qwen3": "addendum §P: Qwen under tool_choice required on the 30 cells where Ministral breached",
     "w26r_sweep_qwen3": "addendum §R: R6 on l2, all and vendor-shaped",
     "w26r_sweep_ministral": "addendum §R: R6 on l2, all and vendor-shaped",
+    "w29s_sweep_ministral": "addendum §S: Granite Guardian as L1 under l2+L1 and l3+L1 on the two induced cells",
+    "beat1": "beat 1: carl-support under the scripted ramp with Granite as L1; every run kept, seed 20260924-r2 is the citable clip",
 }
 
 
@@ -46,7 +48,7 @@ def main() -> None:
     verify_only = "--verify-only" in sys.argv
     entries = {}
     for name in STORES:
-        store = ROOT / name if name == "pre-sweep" else ROOT / "sweep" / name
+        store = ROOT / name if name in ("pre-sweep", "beat1") else ROOT / "sweep" / name
         if not (store / "SHA256SUMS").exists():
             continue
         d, n, mm = store_digest(store)

@@ -488,3 +488,42 @@ unchanged.
 
 **Category matrix: not built**, per instruction. One category ran; the
 posterior render covers it. `saster-score` is not on this machine.
+
+## 21. Closing the L1 work (2026-09-06)
+
+- **D18 (F27)** is in `docs/defect-log.md`: the input classifier's verdicts
+  on the same 109 control actions changed with the rendering — 47 denials
+  dotted and key-sorted, 2 in the wire form. Direction **toward false
+  alarm**; false assumption: that a content classifier's verdict on an
+  action is a property of the action rather than of its serialization. Fix
+  `b26e2cd`, introduced `0ce124f`. Count by direction is now eighteen: 9
+  toward held, 3 erased, 3 neutral, 1 mixed, 1 away, 1 toward false alarm.
+- **§S as run** is appended to the addendum under the unchanged
+  pre-registered text: configs l2+L1 and l3+L1, the two induced Ministral
+  cells, seeds 20261907–20261911 (the sweep's obstructed-induced stratum),
+  admission 107/109 on the wire form, first clause held, second untestable
+  because the sweep's breaching trajectories did not reproduce on the same
+  seeds. Prior hash `d5b753c4…` logged; the addendum is now `d1fe956f…`.
+- **Llama Guard 3 8B post hoc**, pinned at revision
+  `7327bd9f6efbbe6101dc6cc4736302b3cbb6e425` on image `735caabf…`
+  (`runs/w28_l1_posthoc/llamaguard/pins.json`): the two-classifier render
+  `deck/l1_posthoc.png` with `l1_posthoc.json` behind it now carries both
+  pins and the 18 Ministral cells (21 trajectories) where it fired,
+  with trajectory ids and firing turns, marked **listed, not run**
+  (`cells_listed_not_run.json`).
+- **Beat 1 package**: `runs/w25_stage5/demo/beat1_real/` — the citable
+  record, manifest, per-turn oracle (`oracle_per_turn.json`), the L1
+  diagnoses, and the typescript with timing — beside the three sweep beats,
+  with the README line that it is the recorded citable run at the victim's
+  temperature, not a byte-reproducible replay. `deckw25.zip` and
+  `demow25.zip` regenerated.
+- **Placeholders** regenerated a last time with `l1.granite.*`,
+  `l1.llamaguard.*`, `arm_s.*`, `beat1.*` and `f27`; 170 keys, everything
+  else unchanged.
+- **Evidence**: `~/evidence/MANIFEST.json` now covers twelve stores — the
+  ten before plus `w29s_sweep_ministral` (82 files) and `beat1` (77 files,
+  every run) — 11,517 files, 0 mismatches on spark1 and on the spark8
+  mirror. The top-level hash for the last slide, verified independently on
+  both hosts, replacing `2e77e193…`:
+
+  `d01f0c2a62ae7236287ee64623a4d69b103784a10235de934ffd2bce093336c3`

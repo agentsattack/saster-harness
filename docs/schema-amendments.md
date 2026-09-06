@@ -1668,3 +1668,18 @@ the detection entries carry the role that actually applied ("recorded"),
 and the primary slot is the `unavailable` L4-off entry. Read the entries,
 not the label. Found after the arm's first cell had started; not changed
 mid-arm (a runner change is a new run id).
+
+## D18 — the input classifier's verdict changed with the rendering of the same action (2026-09-06, F27)
+
+**Found by:** the §N admission for the L1 arm. **False assumption:** that
+a content classifier's verdict on an action is a property of the action —
+that any faithful serialization of the tool call is equivalent input. On
+the 109 actions of the 24 sanctioned controls, Granite Guardian denied 47
+rendered `secrets.rotate_credential {"credential_ref": ...}` (dotted,
+key-sorted) and 2 rendered `secrets_rotate_credential {...}` (the wire
+form the model emits). **Direction:** toward false alarm — a blocking
+layer denying what it should allow, the defense looking stricter than it
+is. **Fix:** `b26e2cd` — `render_action_text` produces the wire form,
+pinned by `tests/test_l1_rendering.py`; both admission attempts are in
+`runs/w29_l1_admission.json`. Introduced in `0ce124f`, the client's first
+rendering.
