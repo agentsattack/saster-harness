@@ -16,7 +16,7 @@ from carl_ops_trajectory.citable import (  # noqa: E402
     marker_population_gate,
 )
 
-ROOTS = ("w24b", "w24c", "w25p")
+ROOTS = ("w24b", "w24c", "w25p", "w26r")
 
 
 def main() -> None:
@@ -29,7 +29,7 @@ def main() -> None:
             for cid, cell in json.loads(sp.read_text())["cells"].items():
                 d = REPO / cell["dir"]
                 if (d / "trajectories.jsonl").exists():
-                    chosen[(tag if root != "w25p" else "w25p/" + tag, cid)] = (root, d)
+                    chosen[(tag if root not in ("w25p", "w26r") else root + "/" + tag, cid)] = (root, d)
     for (tag, cid), (root, d) in sorted(chosen.items()):
         if True:
             if True:

@@ -1658,3 +1658,13 @@ the manifest gains `l2_rules`, `l2_rules_extra`, `policy_rego_path` and
 actually evaluated. Sweep manifests without the new fields read as R1–R4
 on `policy.rego`. The R6 arm file `policy_r6.rego` (`296bf240…`) and the
 in-force lock (`7f3a8dc7…`) are pinned beside the sweep policy.
+
+## Note: the manifest's head-role label under an L4-off cell (2026-09-06, w26r)
+
+In the §R arm, cells with L4 off record all four heads (`record_heads_always`).
+The manifest's `l4_heads.<key>.role` is derived from the observer setting
+alone, so it labels the binary head "primary" even where no primary ran;
+the detection entries carry the role that actually applied ("recorded"),
+and the primary slot is the `unavailable` L4-off entry. Read the entries,
+not the label. Found after the arm's first cell had started; not changed
+mid-arm (a runner change is a new run id).
