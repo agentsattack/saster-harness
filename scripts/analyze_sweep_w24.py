@@ -20,21 +20,30 @@ from saster_instrument.metrics import (  # noqa: E402
 )
 
 OUT = Path(os.environ.get("W24_READBACK", REPO / "runs/w24_sweep_readback.json"))
+#: Sweep roots to merge, in precedence order: a cell id present in a later
+#: root (a re-run under a new run id) REPLACES the same cell from an earlier
+#: root, so the union is one record set per cell id. Default: w24b then w24c.
+ROOTS = [r for r in os.environ.get("W24_ROOTS", "w24b,w24c").split(",") if r]
 ARMS = ("obstructed", "unobstructed")
 
 
 def load():
+    chosen: dict[tuple[str, str], dict] = {}
+    for root in ROOTS:
+        for sp in sorted((REPO / "runs").glob(f"{root}_sweep_*/sweep_state.json")):
+            st = json.loads(sp.read_text()); tag = sp.parent.name.split("_sweep_", 1)[1]
+            for cid, cell in st["cells"].items():
+                traj = REPO / cell["dir"] / "trajectories.jsonl"
+                if not traj.exists():
+                    continue
+                chosen[(tag, cid)] = {"root": root, "tag": tag, "cell": cell, "traj": traj}
     rows = []
-    for sp in sorted((REPO / "runs").glob("w24_sweep_*/sweep_state.json")):
-        st = json.loads(sp.read_text()); tag = sp.parent.name.replace("w24_sweep_", "")
-        for cid, cell in st["cells"].items():
-            traj = REPO / cell["dir"] / "trajectories.jsonl"
-            if not traj.exists():
-                continue
-            for line in traj.open():
-                if line.strip():
-                    rows.append({"victim": tag, "cell": cid, "arm": cell["arm"], "axes": cell["axes"],
-                                 "storage": cell.get("storage", {}), "ok": cell["ok"], "rec": json.loads(line)})
+    for (tag, cid), c in chosen.items():
+        for line in c["traj"].open():
+            if line.strip():
+                rows.append({"victim": tag, "cell": cid, "root": c["root"], "arm": c["cell"]["arm"],
+                             "axes": c["cell"]["axes"], "storage": c["cell"].get("storage", {}),
+                             "ok": c["cell"]["ok"], "rec": json.loads(line)})
     return rows
 
 
@@ -46,8 +55,11 @@ def main() -> None:
     if OUT.exists():
         raise SystemExit(f"refusing to overwrite {OUT}")
     rows = load()
-    R = {"n_records": len(rows)}
-    print(f"W24 sweep readback: {len(rows)} records\n")
+    R = {"n_records": len(rows), "roots": ROOTS,
+         "cells_by_root": {r: len({(x["victim"], x["cell"]) for x in rows if x["root"] == r}) for r in ROOTS},
+         "cells_ok": {v: sum(1 for c in {(x["victim"], x["cell"]): x for x in rows}.values() if c["ok"] and c["victim"] == v)
+                      for v in {x["victim"] for x in rows}}}
+    print(f"W24 sweep readback: {len(rows)} records; cells by root {R['cells_by_root']}; ok cells {R['cells_ok']}\n")
     # breach within k by victim × config × precondition × route (campaign = cell; any-breach over k)
     print("BREACH WITHIN k=5 (any-breach per cell) and per-trial breach rate — matrix arm")
     print(f"{'victim':<9} {'config':<14} {'arm':<13} {'route':<9} {'k':>2} {'breach trials':>13} {'any':>4} {'denials':>8} {'distinct':>8}")
