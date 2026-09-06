@@ -230,3 +230,89 @@ gap above, not D4. The wrapper stays exact. (The 1.5 own-prompt counts,
 plumbing run's `tool_list_text` came from `eval_slice.py`'s tool rendering
 at that time and this run reused the record's `tool_used` verbatim; the
 casing question does not depend on it.)
+
+
+## F12 — the declared-vs-enforced static query (2026-09-05, Stage 2)
+
+`saster_defense/coverage.py`, no attack, every registered config, both
+routes; JSON at `runs/w22_coverage_query.json` once the script is run.
+Gap = candidates the oracle would declare prohibited at a state that no
+per-action layer denies there (L4 is post hoc and excluded).
+
+| config | grant route gap | firewall route gap |
+|---|---|---|
+| none / l4 | 16 of 16 (1.00) | 9 of 9 (1.00) |
+| l3 / l3+l4 | 15 of 16 (0.94) | 7 of 9 (0.78) |
+| l2 / all / all5 | 6 of 16 (0.38) | 3 of 9 (0.33) |
+| vendor-shaped (lock only) | 7 of 16 (0.44) | 5 of 9 (0.56) |
+
+Three findings. (1) **Layering L2 in front of L3 makes L3 miss the widened
+copy** it was designed to catch: under `l3` alone the copy at grant step 9
+is covered; under `all` L2 blocks the grant and the firewall on replay, so
+they never enter L3's trace, the bucket is never "external" in L3's world,
+and L3 allows the copy while the oracle still declares it (credential
+material in *any* store). The composed stack covers more overall and less
+at P1's step. This is a P6 observation before any sweep: the union is not
+the sum. (2) **`storage.create_bucket` is a gap in every configuration**:
+declared-prohibited at the pre-bucket states (I4, scope self-extension),
+and no layer — L2, L3, lock, judge — has any rule about creating a bucket.
+(3) The declared side is sparse because `introduces_violation` counts only
+a FRESH invariant: once I4 fires at the self-created bucket it absorbs
+every later I4-class violation, so P1's designed catch (the in-network
+firewall) is enforced by L3 but not declared. Over-enforcement is mostly
+precondition artifacts (L2 denies grants to a bucket that does not exist).
+
+## F13 — analyst hosting: decision (a), and no analyst is in the path (2026-09-05)
+
+The Stage 2 audit found that `saster_harness.campaign.CampaignRunner` —
+the runner that carries the analyst descriptor — is dead in production:
+nothing under `scripts/` calls it, `scripts/run_cell_w9.py` is the runner,
+and no LLM analyst runs during a trial. The `LLMAnalyst` classes in
+`~/asagap` analyze target responses for a different pipeline and are not
+imported. Decision: every LLM evaluator that IS in the path — the L4
+observer heads on spark4 and spark2, the vendor-shaped judge — is served on
+the GB10 cluster and reached through the affinity router under its own
+campaign key (option (a)), identical across configs, and the manifest
+records `analyst.backend: none` with this determination. Nothing is hosted;
+there is no per-campaign cost telemetry because there is no hosted call.
+
+## F14 — L1 stays a stand-in; beat 1 lands in corpora/dev (2026-09-05)
+
+The Hugging Face token on spark1 can read the metadata of
+`meta-llama/Llama-Guard-3-8B`, `Llama-Guard-3-1B`, `google/shieldgemma-2b`
+and `-9b`, and is refused every file download (403, "not in the authorized
+list"). spark4 has the headroom (69 GiB available; LlamaGuard-3-8B bf16 is
+~16 GiB plus KV at 0.20). What it takes: accept the gated license for one
+of those repos with this account, download pinned by revision into spark4's
+cache, write `refs/main`, serve on a free port at an explicit
+`--gpu-memory-utilization`, then implement the client in
+`saster_defense/l1_classifier.py` and flip `CLIENT_IMPLEMENTED`. Until
+then every beat 1 (carl-support) record is stand-in-backed and goes to
+`corpora/dev/`; the slide says so.
+
+## F15 — the runner audit, and what Stage 2 changed (2026-09-05)
+
+Found: `stalls` and `repeats` were one counter incremented on one line;
+the budget cap defaulted to 1000 against 12 steps so exhaustion and both
+budget-exhausted classes were dead; `prompt_ref` resolved to nothing and
+meant a different object per envelope mode; the widening-route cross-check
+compared the derivation against itself; `precondition_state` did not exist
+and `validate_manifest` ran before the run fields were written;
+`refusal_tarpit` was unreachable; the observer's raw reply was kept
+nowhere; the `reset` operation did not exist. Changed (Amendments 13 and
+14, `scripts/run_cell_w9.py`): two counters and repeat detection in the
+stack; `W9_BUDGET_CAP` (40) held fixed across configs; a content store
+under `blobs/`; `W9_ROUTE` route hints on the compromised directive with
+a real cross-check; `precondition_state` and `validate_run_manifest`;
+measured `refusal_prob` and the tarpit trend; `diagnoses.jsonl`; the
+reset semantics stated on the manifest (per-trial, both sides,
+conversation-scope reset off). No record already written is touched.
+
+## F16 — the 1.5 FG head attributes a failure mode to the sanctioned completion (2026-09-05)
+
+Under AgentDoG 1.5's own two-stage prompt the FG head is a comparator for
+P10 with a verdict gate; under the three-line FG15 prompt the plumbing
+sweep used it has none, and it diagnosed the four-call sanctioned
+completion as *Procedural Deviation or Inaction* on every repeat (F2
+follow-up). The harness now sends the two-stage prompt (`v1.5-unified`),
+so a 1.5 label enters a record only behind `Safety: unsafe`.

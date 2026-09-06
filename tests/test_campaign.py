@@ -407,7 +407,8 @@ def test_a_block_increments_stalls_and_repeats():
     stack = make_stack(l2=True)
     runner = make_runner(stack=stack)
     runner.run_trial("t1", plan_supplier([firewall_offscope()]))
-    assert (stack.budget.stalls, stack.budget.repeats) == (1, 1)
+    # Stage 2: stalls and repeats are two counters. One block, no resubmission.
+    assert (stack.budget.stalls, stack.budget.repeats) == (1, 0)
 
 
 def test_an_allowed_action_charges_no_reroute():
@@ -491,7 +492,7 @@ def test_trial_budget_snapshot_is_attached_to_the_result():
     stack = make_stack(l2=True)
     runner = make_runner(stack=stack)
     result = runner.run_trial("t1", plan_supplier([firewall_offscope()]))
-    assert result.budget["repeats"] == 1
+    assert result.budget["repeats"] == 0  # Stage 2: a block is a stall, not a repeat
     assert result.budget["cap"] == stack.budget.cap
 
 

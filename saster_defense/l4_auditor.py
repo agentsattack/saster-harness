@@ -54,6 +54,7 @@ refused, filtered, truncated, or out-of-vocabulary — including a well-formed
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -65,8 +66,19 @@ from carl_ops_trajectory.schema import (
     AGENTDOG_RISK_SOURCES,
 )
 
-from .agentdog import binary_prompt, fine_grained_prompt, is_fine_grained_checkpoint
+from .agentdog import (
+    binary_prompt,
+    coarse_15_prompt,
+    fine_grained_prompt,
+    is_fine_grained_checkpoint,
+    unified_15_prompt,
+)
 from .types import LayerName, LayerOutcome, Verdict
+
+#: Which of AgentDoG's own prompts the audit sends (Stage 2). The 1.0 heads
+#: answer the v1.0 templates; the 1.5 heads answer these and answer the
+#: v1.0 templates in prose (docs/sweep-findings.md, F2 follow-up).
+PROMPT_STYLES = ("v1.0", "v1.5-coarse", "v1.5-unified")
 
 DEFAULT_OBSERVER_MODEL = "AgentDoG-1.0-4B"
 DEFAULT_CONTEXT_WINDOW = 8192
@@ -232,6 +244,64 @@ def read_fine_grained(content: str) -> FineGrainedParse:
     return FineGrainedParse(FineGrainedVerdict("unsafe", labels))
 
 
+# -- AgentDoG 1.5 parsers (Stage 2) ------------------------------------------
+
+_JUDGMENT = re.compile(r"<Judgment>\s*(\S+)\s*</Judgment>")
+_THINK = re.compile(r"<think>.*?</think>", re.S)
+_V15_LABEL_LINES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("Failure Mode:", "failure_mode", AGENTDOG_FAILURE_MODES),
+    ("Risk Consequence:", "real_world_harm", AGENTDOG_REAL_WORLD_HARMS),
+    ("Risk Source:", "risk_source", AGENTDOG_RISK_SOURCES),
+)
+
+
+def parse_v15_coarse(content: str) -> str | None:
+    """``<Judgment>safe</Judgment>`` or ``<Judgment>unsafe</Judgment>``,
+    exactly one, exact token (Stage 1 D4 rule); anything else is None."""
+    found = _JUDGMENT.findall(content)
+    if len(found) != 1:
+        return None
+    return found[0] if found[0] in ("safe", "unsafe") else None
+
+
+def read_v15_unified(content: str) -> FineGrainedParse:
+    """AgentDoG 1.5's two-stage answer: an optional ``<think>`` block, then
+    ``Safety: safe`` alone, or ``Safety: unsafe`` followed by exactly the
+    three label lines (Failure Mode / Risk Consequence / Risk Source). Same
+    whole-or-nothing discipline as :func:`read_fine_grained`; the labels
+    map onto the frozen v1.0 vocabulary keys (Risk Consequence is the 1.5
+    name of Real World Harm)."""
+    body = _THINK.sub("", content).strip()
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    if not lines:
+        return FineGrainedParse(None, "empty reply")
+    first = lines[0]
+    if not first.startswith("Safety:"):
+        return FineGrainedParse(None, f"first line is not a Safety judgment: {first[:80]!r}")
+    verdict = first[len("Safety:"):].strip().rstrip(".").strip()
+    if verdict not in ("safe", "unsafe"):
+        return FineGrainedParse(None, f"Safety value {verdict[:40]!r} is not safe/unsafe")
+    if verdict == "safe":
+        if len(lines) == 1:
+            return FineGrainedParse(FineGrainedVerdict("safe"))
+        return FineGrainedParse(None, "a safe judgment must carry no labels")
+    if len(lines) != 1 + len(_V15_LABEL_LINES):
+        return FineGrainedParse(
+            None, f"an unsafe judgment owes exactly {len(_V15_LABEL_LINES)} label lines; "
+                  f"got {len(lines) - 1}")
+    labels: dict[str, str] = {}
+    for line, (prefix, key, vocabulary) in zip(lines[1:], _V15_LABEL_LINES, strict=True):
+        if not line.startswith(prefix):
+            return FineGrainedParse(None, f"expected a line starting {prefix!r}; got {line[:80]!r}",
+                                    dimension=key)
+        value = line[len(prefix):].strip().rstrip(".").strip()
+        if value not in vocabulary:
+            return FineGrainedParse(None, f"{key}={value!r} is not an AgentDoG category",
+                                    dimension=key, value=value)
+        labels[key] = value
+    return FineGrainedParse(FineGrainedVerdict("unsafe", labels))
+
+
 def parse_binary(content: str) -> str | None:
     """Parse AgentDoG's binary reply — ``safe`` or ``unsafe`` and nothing else.
 
@@ -258,6 +328,13 @@ class TrajectoryAuditor:
     #: markers. Default on, because a run without labels cannot answer any of
     #: them and a corpus is expensive to regenerate.
     fine_grained: bool = True
+    #: Which of AgentDoG's prompts to send (Stage 2). ``v1.0`` picks the
+    #: binary or fine-grained template by ``fine_grained``; the 1.5 styles
+    #: are for the 1.5 heads. Recorded in the manifest.
+    prompt_style: str = "v1.0"
+    #: The tool list the 1.5 coarse prompt asks for; the driver supplies
+    #: the 13 schemas as JSON. Ignored by the other styles.
+    tool_list_text: str = ""
     max_tokens: int = DEFAULT_MAX_TOKENS
     #: Deliberate deviation from upstream's example script, which leaves
     #: sampling at the server default. A guard verdict that varies run to run
@@ -348,10 +425,22 @@ class TrajectoryAuditor:
         return json.dumps(list(event_records), ensure_ascii=False, indent=2)
 
     def prompt_for(self, serialized: str) -> str:
+        if self.prompt_style == "v1.5-coarse":
+            return coarse_15_prompt(serialized, self.tool_list_text)
+        if self.prompt_style == "v1.5-unified":
+            return unified_15_prompt(serialized)
+        if self.prompt_style != "v1.0":
+            raise ValueError(f"prompt_style {self.prompt_style!r} not in {PROMPT_STYLES}")
         return (
             fine_grained_prompt(serialized) if self.fine_grained
             else binary_prompt(serialized)
         )
+
+    @property
+    def effective_max_tokens(self) -> int:
+        """The 1.5 prompts answer with an analysis block before the verdict;
+        the v1.0 budget would truncate every one of them."""
+        return max(self.max_tokens, 1536) if self.prompt_style.startswith("v1.5") else self.max_tokens
 
     def audit(self, event_records: Sequence[dict]) -> LayerOutcome:
         if not self.available:
@@ -391,7 +480,7 @@ class TrajectoryAuditor:
                     "messages": [
                         {"role": "user", "content": self.prompt_for(serialized)},
                     ],
-                    "max_tokens": self.max_tokens,
+                    "max_tokens": self.effective_max_tokens,
                     "temperature": self.temperature,
                 },
                 timeout=self.timeout,
@@ -426,24 +515,50 @@ class TrajectoryAuditor:
         # trailing prose, a missing label line, or a label outside AgentDoG's
         # own taxonomy all map to unavailable — never to clean, a default, or
         # a WARN with a fabricated label.
+        if self.prompt_style == "v1.5-coarse":
+            verdict = parse_v15_coarse(content)
+            if verdict is None:
+                return self._unavailable(
+                    f"AgentDoG 1.5 reply carries no single <Judgment>: {content.strip()[-80:]!r}",
+                    raw=content)
+            if verdict == "unsafe":
+                return self._warn(detail="AgentDoG 1.5 judgment: 'unsafe'", raw=content)
+            return LayerOutcome(LayerName.L4_AUDITOR, Verdict.ALLOW, ran=True,
+                                detail="AgentDoG 1.5 judgment: 'safe'", raw_reply=content)
+        if self.prompt_style == "v1.5-unified":
+            read = read_v15_unified(content)
+            if read.verdict is None:
+                return self._unavailable(
+                    f"AgentDoG 1.5 reply not a conforming two-stage answer ({read.reason})",
+                    raw=content)
+            if read.verdict.verdict == "unsafe":
+                labels = read.verdict.labels or {}
+                return self._warn(
+                    detail="AgentDoG 1.5 Safety: 'unsafe'; "
+                           + "; ".join(f"{k}={v}" for k, v in sorted(labels.items())),
+                    fine_grained=labels, raw=content)
+            return LayerOutcome(LayerName.L4_AUDITOR, Verdict.ALLOW, ran=True,
+                                detail="AgentDoG 1.5 Safety: 'safe'", raw_reply=content)
         if not self.fine_grained:
             verdict = parse_binary(content)
             if verdict is None:
                 return self._unavailable(
-                    f"AgentDoG reply not a conforming verdict: {content.strip()[:80]!r}"
+                    f"AgentDoG reply not a conforming verdict: {content.strip()[:80]!r}",
+                    raw=content,
                 )
             if verdict == "unsafe":
-                return self._warn(detail="AgentDoG verdict: 'unsafe'")
+                return self._warn(detail="AgentDoG verdict: 'unsafe'", raw=content)
             return LayerOutcome(
                 LayerName.L4_AUDITOR, Verdict.ALLOW, ran=True,
-                detail="AgentDoG verdict: 'safe'",
+                detail="AgentDoG verdict: 'safe'", raw_reply=content,
             )
 
         read = read_fine_grained(content)
         if read.verdict is None:
             return self._unavailable(
                 f"AgentDoG reply not a conforming fine-grained diagnosis "
-                f"({read.reason}); reply: {content.strip()[:160]!r}"
+                f"({read.reason}); reply: {content.strip()[:160]!r}",
+                raw=content,
             )
         if read.verdict.verdict == "unsafe":
             labels = read.verdict.labels or {}
@@ -452,25 +567,28 @@ class TrajectoryAuditor:
                     "AgentDoG verdict: 'unsafe'; "
                     + "; ".join(f"{k}={v}" for k, v in sorted(labels.items()))
                 ),
-                fine_grained=labels,
+                fine_grained=labels, raw=content,
             )
         return LayerOutcome(
             LayerName.L4_AUDITOR, Verdict.ALLOW, ran=True,
-            detail="AgentDoG verdict: 'safe'",
+            detail="AgentDoG verdict: 'safe'", raw_reply=content,
         )
 
-    def _unavailable(self, detail: str) -> LayerOutcome:
-        return LayerOutcome(LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False, detail=detail)
+    def _unavailable(self, detail: str, raw: str | None = None) -> LayerOutcome:
+        return LayerOutcome(LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False, detail=detail,
+                            raw_reply=raw)
 
     def _warn(
         self,
         detail: str = "observer flagged suspicious cross-step activity",
         fine_grained: dict[str, str] | None = None,
+        raw: str | None = None,
     ) -> LayerOutcome:
         return LayerOutcome(
             LayerName.L4_AUDITOR, Verdict.WARN, ran=True,
             rule_id="agentdog.suspicious_flow", detail=detail,
             fine_grained=dict(fine_grained) if fine_grained else None,
+            raw_reply=raw,
         )
 
     def _suspicious(self, event_records: Sequence[dict]) -> bool:

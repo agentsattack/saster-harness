@@ -229,7 +229,7 @@ def test_blocking_charges_a_reroute():
     stack, _results = _run(DefenseConfig(l3=True))
     snap = stack.budget.snapshot()
     assert snap["stalls"] == 1
-    assert snap["repeats"] == 1
+    assert snap["repeats"] == 0  # Stage 2: stalls and repeats are distinct
     # consumed = 4 actions + 1 reroute
     assert snap["consumed"] == 5
 

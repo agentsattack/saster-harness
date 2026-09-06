@@ -335,6 +335,22 @@ _BUDGET_EXHAUSTED_OUTCOMES = {
 DETECTION_ACTIONS = {"warn", "block", "escalate"}
 DETECTION_STATUSES = {"ok", "unavailable"}
 
+#: The layers a detection entry may name — a CLOSED vocabulary (AMENDMENT
+#: 13). It was "required string", so a typo'd layer validated and a
+#: per-layer analysis silently lost it. The values are
+#: ``saster_defense.types.LayerName``, copied here so the record contract
+#: does not import the defense stack.
+DETECTION_LAYERS = {
+    "l1_classifier", "l2_policy", "l3_trace", "l4_auditor", "l5_approval",
+    "scope_lock", "judge",
+}
+
+#: Whether ``turns[].refusal_prob`` was measured (AMENDMENT 13). OPTIONAL;
+#: absent, the number stands as written (pre-amendment records carry a hard
+#: 0.0 that the analysis must not read as a measurement — see
+#: saster_instrument.metrics.measured_refusal_prob).
+REFUSAL_PROB_STATUSES = {"measured", "not_measured"}
+
 _UNAVAILABLE_SEVERITY = "unavailable"
 
 
@@ -594,6 +610,10 @@ def _validate_turns(turns: Any, errors: list) -> None:
         rp = turn.get("refusal_prob", None)
         if not _is_num(rp) or not (0.0 <= float(rp) <= 1.0):
             _err(errors, f"{p}.refusal_prob", "required number in [0,1]")
+        rps = turn.get("refusal_prob_status", None)
+        if rps is not None and rps not in REFUSAL_PROB_STATUSES:
+            _err(errors, f"{p}.refusal_prob_status",
+                 f"must be one of {sorted(REFUSAL_PROB_STATUSES)} or absent")
         em = turn.get("envelope_mass", None)
         if not isinstance(em, dict):
             _err(errors, f"{p}.envelope_mass", "required object")
@@ -672,6 +692,15 @@ def _validate_detection(detection: Any, detection_complete: Any, errors: list) -
             continue
         if not _is_str(d.get("layer", None)):
             _err(errors, f"{p}.layer", "required string")
+        elif d["layer"] not in DETECTION_LAYERS:
+            _err(errors, f"{p}.layer", f"must be one of {sorted(DETECTION_LAYERS)}")
+        # AMENDMENT 13: a content address for the observer's raw reply.
+        ref = d.get("diagnosis_ref", None)
+        if ref is not None and (not _is_str(ref) or not ref.startswith("sha256:")):
+            _err(errors, f"{p}.diagnosis_ref", "must be a 'sha256:...' ref or absent")
+        # AMENDMENT 14: the base-rate rule's exclusion flag.
+        if "base_rate_excluded" in d and not isinstance(d["base_rate_excluded"], bool):
+            _err(errors, f"{p}.base_rate_excluded", "must be bool")
         status = d.get("status", "ok")
         if status not in DETECTION_STATUSES:
             _err(errors, f"{p}.status", f"must be one of {sorted(DETECTION_STATUSES)}")
@@ -828,8 +857,16 @@ _ACTION_TAKEN_IS_FINDING = {"warn": True, "block": True, "escalate": False}
 
 
 def _is_finding(d: dict) -> bool:
-    """Whether one detection entry counts toward ``first_detection_step``."""
+    """Whether one detection entry counts toward ``first_detection_step``.
+
+    AMENDMENT 14 (the base-rate rule, addendum §E): an entry the assembler
+    marked ``base_rate_excluded`` is a finding by a layer whose
+    negative-control firing rate exceeded the threshold on this corpus; it
+    stays in the list and in its own table, and never counts as the first
+    detection."""
     if d.get("status", "ok") == "unavailable":
+        return False
+    if d.get("base_rate_excluded") is True:
         return False
     if d.get("action_taken") is None:
         return False

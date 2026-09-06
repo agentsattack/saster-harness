@@ -84,6 +84,11 @@ class DefenseStack:
     scope_lock: ScopeLock | None = None
     judge: JudgeGuard | None = None
     _step: int = 0
+    #: The last request a layer blocked. If the very next submission is the
+    #: same tool with the same arguments, the agent repeated rather than
+    #: rerouted, and the ledger records a repeat (Stage 2: stalls and repeats
+    #: are two counters).
+    _last_blocked: ActionRequest | None = None
 
     def __post_init__(self) -> None:
         if self.config.vendor_shaped:
@@ -116,6 +121,10 @@ class DefenseStack:
         charges a reroute if blocked, and (if not blocked) commits the action
         to the trace monitor."""
         self.budget.charge_action()
+        if self._last_blocked is not None and (
+            request.tool == self._last_blocked.tool and request.args == self._last_blocked.args
+        ):
+            self.budget.charge_repeat()
         step = self._step
         self._step += 1
 
@@ -137,9 +146,12 @@ class DefenseStack:
         if blocked:
             # The attacker reroutes and pays for it — a blocking layer is not
             # free. The action does not execute, so it is not committed.
-            self.budget.charge_block_and_reroute()
-        elif self.config.l3 and self.trace is not None:
-            self.trace.commit(request)
+            self.budget.charge_block()
+            self._last_blocked = request
+        else:
+            self._last_blocked = None
+            if self.config.l3 and self.trace is not None:
+                self.trace.commit(request)
 
         entries = [
             e for o in outcomes if (e := o.as_detection_entry(step)) is not None

@@ -100,6 +100,36 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         if not isinstance(value, str) or len(value) != 64:
             raise ManifestError(f"manifest missing required {field} ({description})")
 
+#: Run-level fields every cell manifest must carry (Stage 2). The hash
+#: check above ties a run to its pre-registrations; this ties it to its
+#: cell: which arm, which precondition, what budget, which analyst, what
+#: reset semantics, how the widening route was chosen. The cell driver
+#: calls it AFTER populating the fields (the Stage 2 audit found the hash
+#: check called before them, so they were never validated).
+_REQUIRED_RUN_FIELDS = {
+    "fixture_mode": ("compromised", "induced"),
+    "precondition_state": ("obstructed", "unobstructed"),
+    "widening_route_policy": ("agent", "grant", "firewall"),
+}
+_REQUIRED_RUN_BLOCKS = ("budget", "analyst", "reset", "victim_model", "k")
+
+
+def validate_run_manifest(manifest: dict[str, Any]) -> None:
+    """Reject a cell manifest missing a run field, after :func:`validate_manifest`."""
+    validate_manifest(manifest)
+    for field, allowed in _REQUIRED_RUN_FIELDS.items():
+        if manifest.get(field) not in allowed:
+            raise ManifestError(
+                f"manifest {field!r} must be one of {list(allowed)}; got {manifest.get(field)!r}"
+            )
+    for block in _REQUIRED_RUN_BLOCKS:
+        if block not in manifest:
+            raise ManifestError(f"manifest missing required run block {block!r}")
+    budget = manifest["budget"]
+    if not isinstance(budget, dict) or not isinstance(budget.get("cap"), int) or budget["cap"] <= 0:
+        raise ManifestError("manifest budget.cap must be a positive int (the attack budget)")
+
+
 #: Why each layer is real or a stand-in in THIS environment. Recorded so the
 #: corpus is self-describing.
 _STANDIN_REASONS = {
@@ -144,6 +174,18 @@ TRAFFIC_PLANE: dict[str, Any] = {
         "prefix-cache miss; held on the management plane by decision"
     ),
 }
+
+
+def _l4_prompt_path(a: Any) -> Path:
+    if a.prompt_style == "v1.5-coarse":
+        return agentdog.V15_COARSE_PATH
+    if a.prompt_style == "v1.5-unified":
+        return agentdog.V15_UNIFIED_PATH
+    return agentdog.TRAJECTORY_FINEGRAINED_PATH if a.fine_grained else agentdog.TRAJECTORY_BINARY_PATH
+
+
+def _l4_prompt_template(a: Any) -> str:
+    return "agentdog/" + str(_l4_prompt_path(a).relative_to(agentdog._HERE))
 
 
 def build_manifest(stack: DefenseStack) -> dict[str, Any]:
@@ -214,14 +256,10 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             # which version it ran cannot be read against AgentDoG's published
             # fine-grained accuracy, which is P10's entire baseline.
             "fine_grained": a.fine_grained,
-            "prompt_template": (
-                "agentdog/trajectory_finegrained.txt" if a.fine_grained
-                else "agentdog/trajectory_binary.txt"
-            ),
-            "prompt_sha256": agentdog.sha256(
-                agentdog.TRAJECTORY_FINEGRAINED_PATH if a.fine_grained
-                else agentdog.TRAJECTORY_BINARY_PATH
-            ),
+            "prompt_style": a.prompt_style,
+            "prompt_template": _l4_prompt_template(a),
+            "prompt_sha256": agentdog.sha256(_l4_prompt_path(a)),
+            "max_tokens_effective": a.effective_max_tokens,
             "taxonomy_sha256": (
                 agentdog.sha256(agentdog.TAXONOMY_FINEGRAINED_PATH)
                 if a.fine_grained else None

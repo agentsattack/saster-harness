@@ -34,3 +34,22 @@ These files are hashed into the run manifest as
 the record contract. `tests/test_agentdog_taxonomy.py` parses
 `taxonomy_finegrained.txt` and asserts the frozen vocabularies match it exactly,
 so an upstream taxonomy change cannot silently diverge from the corpus contract.
+
+## v1.5 prompts (vendored 2026-09-05, Stage 2)
+
+| file | upstream path |
+|---|---|
+| `v1.5/coarse_grained_moderation.txt` | `prompts/v1.5/coarse_grained_moderation.txt` |
+| `v1.5/unified_safety_classification.txt` | `prompts/v1.5/unified_safety_classification.txt` |
+
+- **Source:** the same checkout, HEAD `c8d803f267a43ec0e103a651265f50f1ff4456d5`;
+  `prompts/v1.5` last changed upstream at `ea174fe942c24b128312502239516777789cfed8` (2026-05-24).
+- Byte-for-byte; sha256 verified equal to the checkout at vendoring.
+- Why: the AgentDoG 1.5 heads (spark2 :8001 coarse, :8002 FG) answer these
+  prompts and not the v1.0 templates — under the v1.0 template both are
+  `unavailable` on every call (`docs/sweep-findings.md`, F2 follow-up). The
+  coarse prompt answers `<Judgment>safe|unsafe</Judgment>`; the unified
+  prompt answers `Safety: safe|unsafe` and, only when unsafe, `Failure
+  Mode:` / `Risk Consequence:` / `Risk Source:` from the same label lists
+  the v1.0 taxonomy freezes (`Risk Consequence` is the 1.5 name for the
+  v1.0 `Real World Harm` dimension).

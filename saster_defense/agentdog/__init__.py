@@ -33,6 +33,15 @@ TRAJECTORY_FINEGRAINED_PATH = _HERE / "trajectory_finegrained.txt"
 TRAJECTORY_BINARY_PATH = _HERE / "trajectory_binary.txt"
 TAXONOMY_FINEGRAINED_PATH = _HERE / "taxonomy_finegrained.txt"
 
+#: AgentDoG 1.5's own prompts, vendored byte-for-byte (Stage 2). The 1.5
+#: heads answer these and not the 1.0 templates (docs/sweep-findings.md, F2
+#: follow-up: under the 1.0 template both 1.5 heads are unavailable on every
+#: call). Same revision of the same upstream checkout as the v1.0 files.
+V15_COARSE_PATH = _HERE / "v1.5" / "coarse_grained_moderation.txt"
+V15_UNIFIED_PATH = _HERE / "v1.5" / "unified_safety_classification.txt"
+#: The commit that last touched prompts/v1.5 upstream.
+AGENTDOG_V15_PROMPTS_REVISION = "ea174fe942c24b128312502239516777789cfed8"
+
 #: Upstream provenance, recorded in the run manifest beside the hashes.
 AGENTDOG_REPO = "https://github.com/AI45Lab/AgentDoG"
 AGENTDOG_REVISION = "c8d803f"
@@ -74,6 +83,20 @@ def fine_grained_prompt(trajectory: str) -> str:
     )
 
 
+def coarse_15_prompt(trajectory: str, tool_list_text: str) -> str:
+    """AgentDoG 1.5's coarse-grained moderation prompt, both placeholders
+    filled by replacement (the trajectory is full of braces)."""
+    return (_read(V15_COARSE_PATH)
+            .replace("{formatted_trajectory}", trajectory)
+            .replace("{tool_list_text}", tool_list_text))
+
+
+def unified_15_prompt(trajectory: str) -> str:
+    """AgentDoG 1.5's two-stage prompt: a safe/unsafe judgment, then the
+    three labels only when unsafe — the 1.5 head's own fine-grained form."""
+    return _read(V15_UNIFIED_PATH).replace("{formatted_trajectory}", trajectory)
+
+
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -83,6 +106,11 @@ def is_fine_grained_checkpoint(observer_model: str) -> bool:
 
 
 __all__ = [
+    "AGENTDOG_V15_PROMPTS_REVISION",
+    "V15_COARSE_PATH",
+    "V15_UNIFIED_PATH",
+    "coarse_15_prompt",
+    "unified_15_prompt",
     "AGENTDOG_PROMPT_VERSION",
     "AGENTDOG_REPO",
     "AGENTDOG_REVISION",

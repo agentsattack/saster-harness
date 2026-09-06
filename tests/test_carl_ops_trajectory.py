@@ -67,7 +67,7 @@ def valid_trajectory_record() -> dict:
             {"step_index": 3, "policy_verdict": "allow", "surprisal": 2.5},
         ],
         "detection": [
-            {"layer": "policy", "step_index": 3, "severity": "high",
+            {"layer": "l2_policy", "step_index": 3, "severity": "high",
              "action_taken": "block", "finding": True, "status": "ok"},
         ],
         "detection_complete": True,
@@ -350,7 +350,7 @@ def test_detection_strictly_before_breach_is_accepted() -> None:
     latency is the observation and is not clamped."""
     rec = valid_trajectory_record()
     rec["detection"] = [
-        {"layer": "policy", "step_index": 1, "severity": "medium",
+        {"layer": "l2_policy", "step_index": 1, "severity": "medium",
          "action_taken": "warn", "finding": True, "status": "ok"},
     ]
     rec["markers"]["first_detection_step"] = 1  # before the breach at action 3
@@ -364,7 +364,7 @@ def test_detection_strictly_before_breach_is_accepted() -> None:
 def test_unavailable_layer_cannot_claim_detection_complete() -> None:
     rec = valid_trajectory_record()
     rec["detection"] = [
-        {"layer": "policy", "step_index": 5, "severity": "high", "action_taken": "block", "status": "ok"},
+        {"layer": "l2_policy", "step_index": 5, "severity": "high", "action_taken": "block", "status": "ok"},
         {"layer": "oracle", "step_index": 5, "severity": "unavailable", "action_taken": None, "status": "unavailable"},
     ]
     rec["detection_complete"] = True  # wrong: a layer is down
@@ -383,9 +383,9 @@ def test_unavailable_layer_encoded_as_clean_is_rejected() -> None:
 def test_unavailable_layer_recorded_honestly_is_accepted() -> None:
     rec = valid_trajectory_record()
     rec["detection"] = [
-        {"layer": "policy", "step_index": 3, "severity": "high",
+        {"layer": "l2_policy", "step_index": 3, "severity": "high",
          "action_taken": "block", "finding": True, "status": "ok"},
-        {"layer": "oracle", "step_index": 3, "severity": "unavailable", "action_taken": None, "status": "unavailable"},
+        {"layer": "l4_auditor", "step_index": 3, "severity": "unavailable", "action_taken": None, "status": "unavailable"},
     ]
     rec["detection_complete"] = False
     assert validate_record(rec) == []
@@ -1396,7 +1396,7 @@ def test_first_detection_step_may_not_undercount_a_finding() -> None:
     rec["detection"] = [
         {"layer": "l3_trace", "step_index": 1, "severity": "high",
          "action_taken": "block", "finding": True, "status": "ok"},
-        {"layer": "policy", "step_index": 3, "severity": "high",
+        {"layer": "l2_policy", "step_index": 3, "severity": "high",
          "action_taken": "block", "finding": True, "status": "ok"},
     ]
     rec["markers"]["first_detection_step"] = 3  # ignores the earlier block

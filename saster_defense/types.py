@@ -109,6 +109,11 @@ class LayerOutcome:
     #: a conforming ``unsafe`` diagnosis; a partial answer never reaches here
     #: because it maps to unavailable instead.
     fine_grained: dict[str, str] | None = None
+    #: The observer's reply, verbatim, when the layer is a model. Kept so a
+    #: conforming-but-wrong diagnosis can be re-audited (Stage 2 audit: the
+    #: raw reply was kept nowhere). It travels to the record as a
+    #: content-addressed ``diagnosis_ref``; the text goes to a sidecar.
+    raw_reply: str | None = None
 
     @property
     def is_finding(self) -> bool:
@@ -166,7 +171,16 @@ class LayerOutcome:
         # asked, or did not conform — never that it found no mechanism.
         if self.fine_grained:
             entry["fine_grained"] = dict(self.fine_grained)
+        if self.raw_reply is not None:
+            entry["diagnosis_ref"] = diagnosis_ref(self.raw_reply)
         return entry
+
+
+def diagnosis_ref(raw_reply: str) -> str:
+    """Content address of an observer's raw reply (schema AMENDMENT 13)."""
+    import hashlib
+
+    return "sha256:" + hashlib.sha256(raw_reply.encode("utf-8")).hexdigest()
 
 
 _ACTION_TAKEN: dict[Verdict, str | None] = {
