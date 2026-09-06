@@ -715,7 +715,9 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
                 entry = out.as_detection_entry(max(len(actions) - 1, 0))
                 if entry is not None:
                     detection.append(entry)
-                    _sidecar(out, entry, key)
+                # D9, second site: the reply is kept whether or not an entry
+                # exists — an allow produces none, and its text is the P2 evidence.
+                _sidecar(out, entry, key)
                 print(f"  recorded head {key}: {out.verdict.value}")
 
     states = [s.state for s in agent.session.snapshots]

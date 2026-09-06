@@ -1478,3 +1478,14 @@ in the route vocabulary; `widening_route_realized` a bool equal to
 than the configured one is a validation error (the assembler raises before
 that). Under the agent policy the two routes are equal; under a forced route
 a blocked widening reads configured `grant`, route `none`, realized false.
+
+
+## D9, second site — the recorded heads' allow replies were still dropped (2026-09-05)
+
+**Found by:** the W23 pilot sidecar: `binary` 30 replies, `15fg` 30,
+`15coarse` 12 (its warns only), `fg` none. The D9 fix moved the primary
+head's sidecar write outside the entry check; the recorded heads' write
+was a second copy of the same assumption. Fixed the same way. For the
+pilot corpus the 1.0 FG head's 30 `safe` replies and the 1.5 coarse
+head's 18 are known as verdicts (no entry, no unavailable) but their text
+is not kept; the sweep keeps every reply.
