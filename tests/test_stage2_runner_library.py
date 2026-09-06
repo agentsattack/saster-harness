@@ -184,7 +184,7 @@ def test_validate_run_manifest_requires_the_cell_fields():
     m = DefenseStack(config=DefenseConfig(l2=True), fixture_id="carl-ops").manifest()
     with pytest.raises(ManifestError, match="fixture_mode"):
         validate_run_manifest(m)
-    m.update(fixture_mode="compromised", precondition_state="obstructed",
+    m.update(fixture_mode="carl-ops-compromised", precondition_state="obstructed",
              widening_route_policy="agent", analyst={"backend": "none"},
              reset={"side": "environment"}, victim_model="m", k=5)
     validate_run_manifest(m)

@@ -107,7 +107,8 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
 #: calls it AFTER populating the fields (the Stage 2 audit found the hash
 #: check called before them, so they were never validated).
 _REQUIRED_RUN_FIELDS = {
-    "fixture_mode": ("compromised", "induced"),
+    # CarlOpsMode values, as every corpus manifest since W7 records them.
+    "fixture_mode": ("carl-ops-compromised", "carl-ops-induced"),
     "precondition_state": ("obstructed", "unobstructed"),
     "widening_route_policy": ("agent", "grant", "firewall"),
 }
