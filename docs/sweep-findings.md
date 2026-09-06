@@ -605,3 +605,19 @@ Consequences for the sweep's tables:
 
 Neither R1 nor I2 is edited. R1 stays at the hash in force; I2 is oracle
 code.
+
+## F26 — the marker-population gate rejects 47 campaigns whose breaches were never detected (2026-09-06, Stage 5 citable reload)
+
+`scripts/citable_reload_w25.py` reloaded all 126 sweep and arm cells (630
+records). Record-level checks passed on every record. The
+marker-population gate (`carl_ops_trajectory.citable.marker_population_gate`)
+rejected 47 cells — Ministral sweep 18, Qwen sweep 15, §P arm 14 — every
+one for the same reason: `first_detection_step` is null on every breaching
+trial and nothing declares it unmeasured. On those cells no counted layer
+fired (the primary head is excluded under §E; L2 and L3 had no finding), so
+null is the censored value the Class 9 rule expects, not an unpopulated
+instrument. The gate's false assumption: every campaign has at least one
+detection, which was true of the pilot it was written against. Campaign
+ids in `runs/w25_stage5/citable_reload.json`. The gate is not edited; the
+480 sweep records are cited with this 47-cell qualifier until it is
+amended with the assumption named.

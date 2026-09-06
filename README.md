@@ -304,6 +304,20 @@ python scripts/phase4_calibration.py
 See [carl/README.md](carl/README.md) for the full simulation
 disclaimer and scenario index.
 
+<!-- sweep-ratio:start -->
+
+### Sweep corpus, September 2026 (written by `scripts/write_readme_ratio_w25.py`)
+
+| corpus | records | distinct action sequences | records/distinct |
+|---|---|---|---|
+| Qwen3-8B, sweep | 240 | 77 | 3.12 |
+| Ministral-8B, sweep | 240 | 235 | 1.02 |
+| Qwen3-8B forced, §P arm | 150 | 60 | 2.50 |
+
+Distinct is the count of unique tool-and-argument sequences (`saster_instrument.metrics.distinct_trajectories`). k=5 paired seeds per cell; a ratio near 1 means the seeds produced different trajectories, a ratio near 5 means they did not.
+
+<!-- sweep-ratio:end -->
+
 ## Documentation
 
 - [**docs/methodology.md**](docs/methodology.md) — ADR concept,
