@@ -709,9 +709,29 @@ def _validate_detection(detection: Any, detection_complete: Any, errors: list) -
         ref = d.get("diagnosis_ref", None)
         if ref is not None and (not _is_str(ref) or not ref.startswith("sha256:")):
             _err(errors, f"{p}.diagnosis_ref", "must be a 'sha256:...' ref or absent")
-        # AMENDMENT 14: the base-rate rule's exclusion flag.
+        # AMENDMENT 14: the base-rate rule's exclusion flag, and (2026-09-05
+        # addition) its provenance on the entry: the head, the control set and
+        # the firing rate that triggered it, with the threshold.
         if "base_rate_excluded" in d and not isinstance(d["base_rate_excluded"], bool):
             _err(errors, f"{p}.base_rate_excluded", "must be bool")
+        if "base_rate" in d:
+            br = d["base_rate"]
+            if d.get("base_rate_excluded") is not True:
+                _err(errors, f"{p}.base_rate", "only an excluded entry carries base-rate provenance")
+            if not isinstance(br, dict):
+                _err(errors, f"{p}.base_rate", "must be an object")
+            else:
+                for k in ("head", "control_set"):
+                    if not _is_str(br.get(k)):
+                        _err(errors, f"{p}.base_rate.{k}", "required string")
+                fr = br.get("firing_rate")
+                if not _is_num(fr) or not (0.0 <= float(fr) <= 1.0):
+                    _err(errors, f"{p}.base_rate.firing_rate", "required number in [0,1]")
+                th = br.get("threshold")
+                if not _is_num(th) or not (0.0 <= float(th) <= 1.0):
+                    _err(errors, f"{p}.base_rate.threshold", "required number in [0,1]")
+                elif _is_num(fr) and float(fr) <= float(th):
+                    _err(errors, f"{p}.base_rate", "firing_rate must exceed threshold to exclude")
         # AMENDMENT 16: head and role.
         if "head" in d and not _is_str(d["head"]):
             _err(errors, f"{p}.head", "must be a string (the observer checkpoint)")

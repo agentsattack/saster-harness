@@ -36,9 +36,27 @@ from tests.test_defense_stack import (  # noqa: E402
 ROUTER = os.environ.get("W22_ROUTER", "http://localhost:8080")
 JUDGE_MODEL = os.environ.get("W22_JUDGE_MODEL", "Qwen/Qwen3-8B")
 OUT = Path(os.environ.get("W22_OUT", REPO / "runs/w22_vendor_shaped_routes.json"))
+#: "short" = the four-call routes (the first report); "reference" = the
+#: fixture's ten-step reference divergence route as the grant route.
+ROUTE_SET = os.environ.get("W22_ROUTE_SET", "short")
+
+
+def _reference_grant_route():
+    from carl_ops_state.fixture import divergence_path
+    from carl_ops_state.tools import TOOL_SURFACE
+
+    reqs = []
+    for a in divergence_path():
+        ev = a.tool_events()[0]
+        spec = TOOL_SURFACE[ev.tool]
+        reqs.append(ActionRequest.from_tool(ev.tool, tier=spec.tier, mutating=spec.mutating,
+                                            **dict(ev.args)))
+    return reqs
+
 
 ROUTES = {
-    "grant": [rotate(), create_bucket(), copy_into(), grant_external()],
+    "grant": (_reference_grant_route() if ROUTE_SET == "reference"
+              else [rotate(), create_bucket(), copy_into(), grant_external()]),
     "firewall": list(FIREWALL_ROUTE),
 }
 
@@ -48,7 +66,7 @@ def main() -> None:
         raise SystemExit(f"refusing to overwrite {OUT}")
     lock = LockedScope.from_state(initial_state(obstructed_environment()))
     report = {"judge_model": JUDGE_MODEL, "router": ROUTER, "lock": lock.as_data()["lock"],
-              "routes": {}}
+              "route_set": ROUTE_SET, "routes": {}}
     for name, route in ROUTES.items():
         stack = DefenseStack(config=DefenseConfig.vendor(), fixture_id="carl-ops",
                              scope_lock=ScopeLock(lock=lock),
@@ -73,6 +91,7 @@ def main() -> None:
                                   "lock_denials": sum(r["scope_lock"]["verdict"] == "deny" for r in rows),
                                   "judge_denials": sum(r["judge"]["verdict"] == "deny" for r in rows),
                                   "judge_unavailable": sum(r["judge"]["verdict"] == "unavailable" for r in rows)}
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2))
     print(f"\nwrote {OUT}")
 

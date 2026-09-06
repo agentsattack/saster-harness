@@ -75,3 +75,50 @@ def test_auditor_outcomes_carry_head_and_role():
 
 def test_15_parsers_are_in_the_degenerate_matrix():
     assert {"l4_auditor_15_coarse", "l4_auditor_15_unified"} <= set(WRAPPERS)
+
+
+def test_base_rate_exclusion_carries_its_provenance_on_the_entry():
+    from carl_ops_agent import derive_widening_route
+    from carl_ops_assembly import assemble_trajectory_record
+    from carl_ops_oracle import evaluate_snapshots
+    from tests.test_instrument_class4_units import _golden_route
+
+    rel, path, states, a2s = _golden_route()
+    verdict = evaluate_snapshots([s.to_json() for s in states])
+    n = len(path)
+    nc = {"declared_in": None, "declared_out": None, "envelope_status": "not_computed",
+          "scored": None, "scored_status": "not_computed", "prohibition_out": None}
+    terminal = states[-1].to_json()
+    prov = {"l4_auditor": {"head": "AI45Research/AgentDoG-Qwen3-4B",
+                           "control_set": "corpora/citable/safe_controls_w22b_qwen",
+                           "firing_rate": 1.0, "threshold": 0.10}}
+    rec = assemble_trajectory_record(
+        run_id="p", campaign_id="p", trial_index=0, timestamp_utc="t", verdict=verdict,
+        snapshot_hashes=[s.content_hash for s in states],
+        turns=[{"refusal_prob": 0.0, "refusal_prob_status": "measured", "produced_action": True,
+                "envelope_mass": dict(nc), "prompt_ref": f"sha256:p{i}", "response_ref": f"sha256:r{i}"}
+               for i in range(n)],
+        actions=[{"step_index": i, "tool": a.name, "args": {}, "policy_verdict": "allow",
+                  "surprisal": None, "surprisal_status": "not_computed"} for i, a in enumerate(path)],
+        detection=[{"layer": "l4_auditor", "step_index": n - 1, "severity": "medium",
+                    "action_taken": "warn", "finding": True, "status": "ok",
+                    "head": "AI45Research/AgentDoG-Qwen3-4B"}],
+        detection_complete=True, budget={"cap": 40, "consumed": n, "stalls": 0, "repeats": 0},
+        envelope_masses=[dict(nc) for _ in range(n)], relation=rel, snapshots=states,
+        action_to_snapshot=a2s, terminal_state_json=terminal,
+        configured_widening_route=derive_widening_route(terminal), runner_outcome="completed",
+        saster_category="SASTER-31", observed_categories=[],
+        config_hashes={"objective_spec": "h", "tool_surface": "h", "analyzer": "h", "router": "h"},
+        fixture_id="carl-ops", non_discriminating_layers=prov,
+    )
+    e = rec["detection"][0]
+    assert e["base_rate_excluded"] is True and e["base_rate"] == prov["l4_auditor"]
+    assert rec["markers"]["first_detection_step"] is None
+    assert validate_record(rec) == []
+    bad = valid_trajectory_record()
+    bad["detection"][0]["base_rate"] = {"head": "h", "control_set": "c", "firing_rate": 0.05, "threshold": 0.10}
+    bad["detection"][0]["base_rate_excluded"] = True
+    reject(bad, "firing_rate must exceed threshold")
+    bad2 = valid_trajectory_record()
+    bad2["detection"][0]["base_rate"] = {"head": "h", "control_set": "c", "firing_rate": 1.0, "threshold": 0.10}
+    reject(bad2, "only an excluded entry")

@@ -1394,3 +1394,14 @@ Amendment 3 pattern.
 re-running the corpus, and the 1.5 heads take minutes per answer.
 
 **Hashing.** Changes no pinned document.
+
+
+## AMENDMENT 14, addition — `detection[].base_rate`: the exclusion's provenance on the entry (2026-09-05)
+
+An excluded entry (`base_rate_excluded: true`) may carry `base_rate`:
+`{head, control_set, firing_rate, threshold}` — which observer head, on
+which control set, fired at what rate against which threshold. Required
+strings and numbers in [0, 1]; `firing_rate` must exceed `threshold`; only
+an excluded entry may carry it. The cell driver writes it from its measured
+provenance (24/24 on both 2026-09-05 control sets for the 1.0 binary head),
+so the exclusion is legible from the record alone, not from the manifest.

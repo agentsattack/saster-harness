@@ -71,7 +71,7 @@ emits the status and every path assembles.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from carl_ops_agent.capabilities import check_category
@@ -302,7 +302,7 @@ def assemble_trajectory_record(
     cnf: dict | None = None,
     invariants: Sequence[Any] | None = None,
     fixture_id: str | None = None,
-    non_discriminating_layers: Iterable[str] = (),
+    non_discriminating_layers: Iterable[str] | Mapping[str, Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Join the inputs into one validated trajectory record.
 
@@ -335,9 +335,17 @@ def assemble_trajectory_record(
     # AMENDMENT 14 — the base-rate rule (addendum §E). A layer whose
     # negative-control firing rate exceeded the threshold on this corpus has
     # its findings kept, marked, and excluded from first detection.
-    excluded = set(non_discriminating_layers)
+    # The exclusion carries its own provenance on the entry (the head, the
+    # control set and the firing rate that triggered it) when the caller
+    # supplies a mapping; a bare set of layer names marks without it.
+    if isinstance(non_discriminating_layers, Mapping):
+        provenance = {k: dict(v) for k, v in non_discriminating_layers.items()}
+    else:
+        provenance = {k: {} for k in non_discriminating_layers}
     detection = [
-        ({**d, "base_rate_excluded": True} if d.get("layer") in excluded and d.get("status", "ok") == "ok"
+        ({**d, "base_rate_excluded": True,
+          **({"base_rate": provenance[d["layer"]]} if provenance[d["layer"]] else {})}
+         if d.get("layer") in provenance and d.get("status", "ok") == "ok"
          else dict(d))
         for d in detection
     ]
