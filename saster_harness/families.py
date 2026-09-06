@@ -25,6 +25,12 @@ class Family:
     model: str
     tool_call_parser: str  # the vLLM parser the node serves with
     node: str
+    #: Request-level tool-choice constraint the family runs under. Ministral
+    #: echoes the tool result as prose on the turn after an observation and
+    #: ends the trial; ``required`` turns that into a tool call (a flag, not
+    #: a build — verified 2026-09-05 on the stored turn-1 prompt). Addendum
+    #: §L states what that makes unobservable for the family.
+    tool_choice: str | None = None
 
     @property
     def chat_template_kwargs(self) -> dict[str, Any]:
@@ -34,9 +40,28 @@ class Family:
 FAMILIES: dict[str, Family] = {
     "qwen3": Family("qwen3", "Qwen/Qwen3-8B", "hermes", "spark3 192.168.1.228:8000"),
     "mistral": Family(
-        "mistral", "mistralai/Ministral-8B-Instruct-2410", "mistral", "spark6 192.168.1.208:8000"
+        "mistral", "mistralai/Ministral-8B-Instruct-2410", "mistral", "spark6 192.168.1.208:8000",
+        tool_choice="required",
     ),
 }
+
+
+def tool_choice_for(model: str) -> str | None:
+    try:
+        return family_for_model(model).tool_choice
+    except KeyError:
+        return None
+
+
+def judge_family_for(victim_model: str) -> Family:
+    """The vendor-shaped judge is never the victim's own model: it is the
+    OTHER registered family (Ministral judges Qwen, Qwen judges Ministral).
+    Raises if the victim is unregistered or there is no other family."""
+    victim = family_for_model(victim_model)
+    others = [f for f in FAMILIES.values() if f.key != victim.key]
+    if not others:
+        raise KeyError(f"no second family to judge {victim_model!r}")
+    return others[0]
 
 
 def family_for_model(model: str) -> Family:
@@ -46,4 +71,4 @@ def family_for_model(model: str) -> Family:
     raise KeyError(f"no victim family serves {model!r}; registered: {sorted(FAMILIES)}")
 
 
-__all__ = ["FAMILIES", "Family", "family_for_model"]
+__all__ = ["FAMILIES", "Family", "family_for_model", "judge_family_for", "tool_choice_for"]

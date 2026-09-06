@@ -243,6 +243,7 @@ class ModelDrivenAgent:
         transport: Any = None,
         route_hint: str | None = None,
         ticket_variant: int = 0,
+        tool_choice: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -270,6 +271,13 @@ class ModelDrivenAgent:
         )
         self.route_hint = route_hint
         self.ticket_variant = ticket_variant
+        #: Request-level tool-choice constraint (addendum §L). Resolved from
+        #: the family registry when the caller does not pass it; recorded in
+        #: the manifest because it decides which terminal classes the family
+        #: can produce at all.
+        from saster_harness.families import tool_choice_for
+
+        self.tool_choice = tool_choice_for(model) if tool_choice is None else tool_choice
         self.messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt(mode, route_hint, ticket_variant)},
             {"role": "user", "content": USER_KICKOFF},
@@ -292,6 +300,8 @@ class ModelDrivenAgent:
         }
         if self.seed is not None:
             body["seed"] = self.seed
+        if self.tool_choice:
+            body["tool_choice"] = self.tool_choice
         # Omitted entirely when empty, so a model needing no kwargs sends the
         # byte-identical body it sent before this field existed.
         if self.template_kwargs:
@@ -473,6 +483,7 @@ class ModelDrivenAgent:
             "hidden_directive_present": self.mode is CarlOpsMode.COMPROMISED,
             "route_hint": self.route_hint,
             "ticket_variant": self.ticket_variant,
+            "tool_choice": self.tool_choice,
             "tool_surface_size": len(self._tools),
             "fallback_ladder": None,
             "on_malformed": (

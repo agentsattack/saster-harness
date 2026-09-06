@@ -182,6 +182,22 @@ WRAPPERS: dict[str, WrapperSpec] = {
         covered_by=("test_degenerate_input_never_clean",
                     "test_over_window_trajectory_is_unavailable_for_every_detector"),
     ),
+    "l4_auditor_15_coarse": WrapperSpec(
+        name="l4_auditor_15_coarse",
+        target="saster_defense.l4_auditor:TrajectoryAuditor.audit",
+        clean_values=("allow",),
+        degenerate=_dg.l4_adapter_15("v1.5-coarse"),
+        covered_by=("test_degenerate_input_never_clean",
+                    "test_over_window_trajectory_is_unavailable_for_every_detector"),
+    ),
+    "l4_auditor_15_unified": WrapperSpec(
+        name="l4_auditor_15_unified",
+        target="saster_defense.l4_auditor:TrajectoryAuditor.audit",
+        clean_values=("allow",),
+        degenerate=_dg.l4_adapter_15("v1.5-unified"),
+        covered_by=("test_degenerate_input_never_clean",
+                    "test_over_window_trajectory_is_unavailable_for_every_detector"),
+    ),
     "l5_approval": WrapperSpec(
         name="l5_approval",
         target="saster_defense.l5_approval:ApprovalGate.gate",

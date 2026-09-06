@@ -103,6 +103,55 @@ def _l4_rows(fine_grained: bool) -> dict[str, Any]:
     }
 
 
+def _l4_rows_15(style: str) -> dict[str, Any]:
+    coarse = style == "v1.5-coarse"
+    j = (lambda t: f"<Analysis>ok</Analysis>\n<Judgment>{t}</Judgment>")
+    u = (lambda t: f"reasoning\n</think>\n\nSafety: {t}")
+    return {
+        "empty_string": _Resp(_chat("")),
+        "whitespace_only": _Resp(_chat("  \n ")),
+        "none": _Resp(_chat(None)),
+        "http_4xx_5xx_body": _Resp({"error": {"message": "Internal Server Error"}}, status=500),
+        "timeout_exception": httpx.ReadTimeout("read timed out"),
+        "truncated_json": _Resp(bad_json=True),
+        "well_formed_wrong_schema": _Resp({"result": "ok"}),
+        "wrong_casing_of_token": _Resp(_chat(j("Safe") if coarse else u("Safe"))),
+        "wrong_language_of_token": _Resp(_chat(j("seguro") if coarse else u("seguro"))),
+        "header_only_group_header": _Resp(_chat("<Judgment></Judgment>" if coarse else "Safety:")),
+        "content_filter_refusal_string": _Resp(_chat("I'm sorry, but I can't help with that request.")),
+        "both_tokens": _Resp(_chat(j("safe") + j("unsafe") if coarse
+                                   else "</think>\nSafety: safe\nSafety: unsafe")),
+        "exceeds_max_tokens_length_capped": _Resp(_chat(
+            "<Analysis>1. The agent" if coarse else "reasoning that never ends", finish="length")),
+        "over_context_window_16384": "OVER_WINDOW",
+    }
+
+
+def l4_adapter_15(style: str) -> Callable[[str], tuple[Any, list[Patch]]]:
+    model = ("AI45Research/AgentDoG1.5-Qwen3.5-4B" if style == "v1.5-coarse"
+             else "AI45Research/AgentDoG1.5-FG-Qwen3.5-4b")
+
+    def build(row: str) -> tuple[Any, list[Patch]]:
+        shape = _l4_rows_15(style)[row]
+        records = OVER_WINDOW_RECORDS if shape == "OVER_WINDOW" else SMALL_RECORDS
+
+        def post(url: str, *_a: Any, **kw: Any) -> Any:
+            if url.endswith("/tokenize"):
+                return _Resp({"count": max(1, len(kw.get("json", {}).get("prompt", "")) // 4)})
+            if isinstance(shape, Exception):
+                raise shape
+            return _Resp(_chat("<Judgment>safe</Judgment>")) if shape == "OVER_WINDOW" else shape
+
+        def get(url: str, *_a: Any, **_kw: Any) -> Any:
+            return _Resp({"data": [{"id": model, "max_model_len": 16384}]})
+
+        auditor = l4.TrajectoryAuditor(observer_model=model, endpoint="http://[fd00:200::2]:8001",
+                                       fine_grained=(style != "v1.5-coarse"), prompt_style=style)
+        return (lambda: auditor.audit(records)), [(l4.httpx, "post", post), (l4.httpx, "get", get)]
+
+    return build
+
+
 def l4_adapter(fine_grained: bool) -> Callable[[str], tuple[Any, list[Patch]]]:
     model = "AI45Research/AgentDoG-FG-Qwen3-4B" if fine_grained else "AI45Research/AgentDoG-Qwen3-4B"
 
@@ -401,6 +450,7 @@ __all__ = [
     "l2_adapter",
     "l3_adapter",
     "l4_adapter",
+    "l4_adapter_15",
     "l5_adapter",
     "opa_client_adapter",
     "turn_classifier_adapter",

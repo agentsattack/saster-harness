@@ -114,6 +114,12 @@ class LayerOutcome:
     #: raw reply was kept nowhere). It travels to the record as a
     #: content-addressed ``diagnosis_ref``; the text goes to a sidecar.
     raw_reply: str | None = None
+    #: Which observer checkpoint answered (schema AMENDMENT 16). Every L4
+    #: head is recorded on every trajectory; ``role`` says whether this one
+    #: is the pre-registered primary (counted for first detection and CVR)
+    #: or a recorded comparator (never counted).
+    head: str | None = None
+    role: str = "primary"
 
     @property
     def is_finding(self) -> bool:
@@ -145,13 +151,18 @@ class LayerOutcome:
         action_taken — the encoding the schema requires so it cannot collapse
         to clean."""
         if self.is_unavailable:
-            return {
+            entry_u: dict[str, Any] = {
                 "layer": self.layer.value,
                 "step_index": step_index,
                 "severity": "unavailable",
                 "action_taken": None,
                 "status": "unavailable",
             }
+            if self.head is not None:
+                entry_u["head"] = self.head
+            if self.role != "primary":
+                entry_u["role"] = self.role
+            return entry_u
         action_taken = _ACTION_TAKEN.get(self.verdict)
         if action_taken is None:  # allow / error — no detection entry
             return None
@@ -173,6 +184,10 @@ class LayerOutcome:
             entry["fine_grained"] = dict(self.fine_grained)
         if self.raw_reply is not None:
             entry["diagnosis_ref"] = diagnosis_ref(self.raw_reply)
+        if self.head is not None:
+            entry["head"] = self.head
+        if self.role != "primary":
+            entry["role"] = self.role
         return entry
 
 

@@ -105,12 +105,11 @@ from .base_induction import MultiTurnInductionDetector
 from .saster_18_induced import (
     _BASELINE_PROMPT,
     _length_ratio_signal,
+    _load_default_corpus,
     _normalize,
     _refusal_marker_density,
     _refusal_marker_drop,
-    _load_default_corpus,
 )
-
 
 # Four Crescendo-style ramps. Each ramp pivots from a benign framing
 # through a normalising middle into the same ask the baseline made.

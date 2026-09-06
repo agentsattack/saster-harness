@@ -338,6 +338,10 @@ class TrajectoryAuditor:
     #: binary or fine-grained template by ``fine_grained``; the 1.5 styles
     #: are for the 1.5 heads. Recorded in the manifest.
     prompt_style: str = "v1.0"
+    #: ``primary`` (the pre-registered observer, counted) or ``recorded``
+    #: (a comparator head, recorded on every trajectory, never counted) —
+    #: schema AMENDMENT 16.
+    role: str = "primary"
     #: The tool list the 1.5 coarse prompt asks for; the driver supplies
     #: the 13 schemas as JSON. Ignored by the other styles.
     tool_list_text: str = ""
@@ -449,6 +453,12 @@ class TrajectoryAuditor:
         return max(self.max_tokens, 1536) if self.prompt_style.startswith("v1.5") else self.max_tokens
 
     def audit(self, event_records: Sequence[dict]) -> LayerOutcome:
+        import dataclasses
+
+        out = self._audit(event_records)
+        return dataclasses.replace(out, head=self.observer_model, role=self.role)
+
+    def _audit(self, event_records: Sequence[dict]) -> LayerOutcome:
         if not self.available:
             return LayerOutcome(
                 LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False,
