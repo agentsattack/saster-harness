@@ -67,6 +67,7 @@ def evaluate_opa(
     networks: list[str],
     roles_assignable: list[str],
     timeout: float = DEFAULT_OPA_TIMEOUT_S,
+    ops_principals: list[str] | None = None,
 ) -> dict:
     """Evaluate one action through real OPA against ``policy.rego`` (L2).
     Returns the decision object ``{"verdict": ..., "rule_id": ...}`` with
@@ -75,7 +76,8 @@ def evaluate_opa(
     every path that is not a conforming decision raises."""
     data_doc = {
         "config": {"rules": rules},
-        "scope": {"networks": networks, "roles_assignable": roles_assignable},
+        "scope": {"networks": networks, "roles_assignable": roles_assignable,
+                  "ops_principals": list(ops_principals or ["ops-agent"])},
     }
     return evaluate_policy(_POLICY_PATH, _DECISION_QUERY,
                            {"tool": tool, "args": args}, data_doc, timeout)

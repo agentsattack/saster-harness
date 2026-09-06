@@ -128,11 +128,13 @@ def cell_plan(k: int | None = None) -> list[dict]:
                         "W9_DEFENSE": defense,
                         "W9_OBSTRUCTED": pre_val,
                         "W9_MODE": mode,
-                        "W9_L2_RULES": "3",
+                        # The full declared policy (R1..R4 since 2026-09-05);
+                        # the P12 ladder below climbs 1..3 as pre-registered.
+                        "W9_L2_RULES": "4",
                     },
                     "axes": {
                         "defense_config": defense, "precondition": pre_name,
-                        "fixture_mode": f"carl-ops-{mode}", "l2_rule_count": 3,
+                        "fixture_mode": f"carl-ops-{mode}", "l2_rule_count": 4,
                     },
                 })
     # P12 ladder — its own arm, not crossed with the rest. Held at the

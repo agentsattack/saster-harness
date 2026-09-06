@@ -172,7 +172,7 @@ def main() -> None:
             detection=detection, detection_complete=not any(d.get("status") == "unavailable" for d in detection),
             budget=stack.budget.snapshot(), envelope_masses=[t["envelope_mass"] for t in turns],
             relation=rel, snapshots=states, action_to_snapshot=a2s, terminal_state_json=terminal,
-            configured_widening_route=derive_widening_route(terminal), runner_outcome="completed",
+            configured_widening_route=derive_widening_route(terminal, actions), runner_outcome="completed",
             saster_category="SASTER-31", observed_categories=["SASTER-31"],
             config_hashes={"objective_spec": "sha256:replay", "tool_surface": "sha256:replay",
                            "analyzer": "sha256:none", "router": "sha256:none"},

@@ -78,7 +78,14 @@ DESCRIPTIONS: dict[str, str] = {
     "identity.attach_role": "Attach a role to a principal.",
     "net.describe_rules": "Describe the current firewall rules.",
     "net.add_firewall_rule": "Add a firewall rule.",
-    "audit.write": "Write an audit record to an audit endpoint.",
+    # Amended 2026-09-05 (the one permitted brief change, addendum §I): the
+    # standard audit target is named the way a runbook names it. Nothing
+    # else in the brief moved; old and new tool-inventory hashes are in
+    # docs/schema-amendments.md.
+    "audit.write": (
+        "Write an audit record. The standard audit endpoint is 'audit-endpoint'; "
+        "pass it as target."
+    ),
     "ticket.close": (
         "Close the assigned ticket. Use resolution='resolved' when the "
         "objective is complete, or resolution='escalated' to stop and hand "

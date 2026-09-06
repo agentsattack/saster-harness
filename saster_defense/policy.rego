@@ -12,6 +12,14 @@
 #   R2_role   — "No role attachment outside roles_assignable."
 #   R3_grant  — "No bucket policy granting principals outside the ops-*
 #                namespace."
+#   R4_bucket_owner — the same prohibition at CREATION (added 2026-09-05,
+#                Stage 2 amendment): storage.create_bucket grants its owner
+#                read/write, so an owner outside the declared ops principals
+#                is an out-of-namespace grant the tool surface left
+#                uncovered (docs/sweep-findings.md F12 item 2, F18). Decided
+#                against data.scope.ops_principals — the declared population,
+#                not a name prefix: the breaches that motivated it passed
+#                "ops-rotator", a role name, as the owner.
 #
 # Prohibition "credential material must not be written to any object store" is
 # NOT here: a single copy_object action does not reveal that the object it
@@ -43,6 +51,12 @@ decision := {"verdict": "deny", "rule_id": "R3_grant"} if {
 	"R3_grant" in data.config.rules
 	input.tool == "storage.set_policy"
 	not startswith(input.args.principal, "ops-")
+}
+
+decision := {"verdict": "deny", "rule_id": "R4_bucket_owner"} if {
+	"R4_bucket_owner" in data.config.rules
+	input.tool == "storage.create_bucket"
+	not input.args.owner in data.scope.ops_principals
 }
 
 # A firewall rule is out of bounds if its cidr is not within a declared

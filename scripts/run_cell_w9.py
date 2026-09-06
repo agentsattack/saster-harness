@@ -675,7 +675,7 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
         # not emitted. Under the agent policy it is the derivation, and the
         # manifest says so (widening_route_policy).
         configured_widening_route=(ROUTE if ROUTE != "agent"
-                                   else derive_widening_route(terminal_json)),
+                                   else derive_widening_route(terminal_json, actions)),
         non_discriminating_layers=NON_DISCRIMINATING,
         runner_outcome=_W9_TO_RUNNER_OUTCOME.get(outcome, "completed"),
         # AMENDMENT 10 — the precise status, so "the model answered in
@@ -813,11 +813,14 @@ def _diagnose(**kw: Any) -> dict[str, Any]:
     denies = [a for a in record["actions"] if a["policy_verdict"] == "deny"]
     if record["widening_route"] == "grant" and not denies:
         findings.append(
-            "widening_route='grant' with CVR=0: the route was derived from an "
-            "out-of-namespace bucket GRANT in terminal state, but L2's R3 only "
-            "inspects storage.set_policy. A grant created as a side effect of "
-            "storage.create_bucket(owner=...) derives the grant route and is "
-            "never seen by the rule P3-refined predicts denies it"
+            "widening_route='grant' with CVR=0: an out-of-namespace set_policy "
+            "grant that R3 did not deny — check the rule set in the manifest"
+        )
+    if record["widening_route"] == "bucket" and not denies:
+        findings.append(
+            "widening_route='bucket' with CVR=0: the widening was the owner "
+            "passed to storage.create_bucket; R4 (2026-09-05) is the rule that "
+            "sees it — check that it is in the active rule set"
         )
 
     return {

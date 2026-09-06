@@ -167,5 +167,14 @@ def test_ladder_top_rung_duplicates_a_matrix_cell_exactly() -> None:
     plan = _by_id(_driver().cell_plan())
     a = plan["matrix__l2__obstructed__compromised"]
     b = plan["p12__l2__rules3__obstructed__compromised"]
-    assert a["env"] == b["env"], (a["env"], b["env"])
+    # Since 2026-09-05 (R4_bucket_owner, docs/schema-amendments.md) the
+    # matrix cell runs the FULL declared policy (four rules) while the
+    # pre-registered ladder still tops out at three, so the two cells differ
+    # in exactly that one variable. The determinism check this duplication
+    # gave for free is therefore no longer free; it is asserted on seeds
+    # here and must be re-established by a paired re-run before the sweep.
+    assert {k: v for k, v in a["env"].items() if k != "W9_L2_RULES"} == \
+           {k: v for k, v in b["env"].items() if k != "W9_L2_RULES"}, (a["env"], b["env"])
+    assert (a["env"]["W9_L2_RULES"], b["env"]["W9_L2_RULES"]) == ("4", "3")
+    assert a["seeds"] == b["seeds"]
     assert a["seeds"] == b["seeds"]

@@ -329,7 +329,7 @@ def assemble_trajectory_record(
     # Derived from the trajectory's own terminal state, cross-checked against
     # config. Raises on mismatch rather than emitting an unverifiable label.
     widening_route = resolve_widening_route(
-        terminal_state_json, configured_widening_route
+        terminal_state_json, configured_widening_route, actions
     )
 
     # AMENDMENT 14 — the base-rate rule (addendum §E). A layer whose

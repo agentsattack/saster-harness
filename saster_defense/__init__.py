@@ -15,7 +15,7 @@ from __future__ import annotations
 from .budget import BudgetLedger
 from .judge import JudgeGuard
 from .l1_classifier import ClassifierGuard
-from .l2_policy import DeclaredScope, PolicyEngine, ladder
+from .l2_policy import ALL_RULES, LADDER_RUNGS, DeclaredScope, PolicyEngine, ladder
 from .l3_trace import TraceMonitor, compile_count, compile_policy, reset_compile_cache
 from .l4_auditor import TrajectoryAuditor
 from .l5_approval import ApprovalGate, QueueApprover, auto_approve, auto_deny
@@ -32,6 +32,8 @@ __all__ = [
     "ClassifierGuard",
     "PolicyEngine",
     "DeclaredScope",
+    "ALL_RULES",
+    "LADDER_RUNGS",
     "ladder",
     "TraceMonitor",
     "compile_policy",
