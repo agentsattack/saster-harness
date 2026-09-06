@@ -218,6 +218,13 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             "note": "low agent-path recall is the anchored operating point, not a bug",
             **_status(not c.representative, "l1"),
         }
+        # A served classifier (2026-09-06, addendum §S): the model, endpoint,
+        # risk and pins beside the status; ``healthy`` is the health check.
+        manifest["l1"].update({
+            "model": c.model, "endpoint": c.endpoint, "family": getattr(c, "family", None),
+            "risk_name": getattr(c, "risk_name", None), "pins": dict(getattr(c, "pins", {}) or {}),
+            "healthy": bool(getattr(c, "healthy", False)), "rendering": "wire form (F27)",
+        })
     if cfg.l2 and stack.policy is not None:
         p = stack.policy
         manifest["l2"] = {

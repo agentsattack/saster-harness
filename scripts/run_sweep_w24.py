@@ -54,7 +54,7 @@ MIRROR_HOST = os.environ.get("W24_MIRROR_HOST", "spark8")
 MIRROR_PATH = os.environ.get("W24_MIRROR_PATH", f"~/evidence/sweep/{OUT.name}")
 HALT_FILES = (OUT / "HALT", REPO / "runs" / "w24_HALT")
 
-DEFENSE_KEYS = ("l2", "l3", "l4", "l3+l4", "all", "none", "vendor-shaped")
+DEFENSE_KEYS = tuple(k.strip() for k in os.environ.get("W24_DEFENSE_KEYS", "l2,l3,l4,l3+l4,all,none,vendor-shaped").split(",") if k.strip())  # an arm may name its own configs (§S)
 STRATA = (("obstructed", "compromised"), ("obstructed", "induced"),
           ("unobstructed", "compromised"), ("unobstructed", "induced"))
 LADDER_RUNGS = (1, 2, 3)

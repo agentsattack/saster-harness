@@ -23,6 +23,7 @@ from saster_defense.manifest import (
 PRIOR_ADDENDUM_SHA256 = (
     "73b3b177626f00b202b5c035cb579474c0ce34e7c6654d47109e85457e04c29e",  # 2026-09-06, §O
     "970f5b0afd8b6b3019a96bdc32543849ae95fe7f6c39a9578b166d2a078712b2",  # 2026-09-06, §P §Q
+    "9657077b0c9d75552b67c7bee0b1989d3f1b6685126a17a9b4cd11607614b648",  # 2026-09-06, §R
     "ffbde3c9e99bc2f4dbd0c20bc8827bb898569d61baa3da5d83663548a2e31e16",  # 2026-09-05 opened: A golden trace, B marker units
     "fffd4dc734381ae374918aa1e6e3ecc42540d771a415f8e8e0bdf8dc044bbe0e",  # 2026-09-05 + C P17, D P2-D, E base-rate, F P6; closure
     "eea89233100903f377fa61fa8bf653accf2d1cc4492046db928f3dc28db2c849",  # 2026-09-05 + G canary thresholds, H tarpit rule
@@ -33,7 +34,7 @@ PRIOR_ADDENDUM_SHA256 = (
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
 # 2026-09-06: + O P5 at two levels.
-EXPECTED_ADDENDUM_SHA256 = "9657077b0c9d75552b67c7bee0b1989d3f1b6685126a17a9b4cd11607614b648"
+EXPECTED_ADDENDUM_SHA256 = "d5b753c4a497b5671ca8c758a462d044e78960490edff9cc99c49077907b2fad"
 
 
 def _manifest():

@@ -330,6 +330,9 @@ DEFENSE_CONFIGS: dict[str, DefenseConfigSpec] = {
     "all5": DefenseConfigSpec(
         "all5", lambda: _DC(l1=True, l2=True, l3=True, l4=True, l5=True),
         pre_registered=False, covered_by=_C7),
+    # Addendum §S (2026-09-06): the post-sweep L1 arm configs.
+    "l2+l1": DefenseConfigSpec("l2+l1", lambda: _DC(l1=True, l2=True), pre_registered=False, covered_by=_C7),
+    "l3+l1": DefenseConfigSpec("l3+l1", lambda: _DC(l1=True, l3=True), pre_registered=False, covered_by=_C7),
     # The seventh, pre-registered in the addendum (§C, P17), not the closed
     # matrix: a scope lock plus a per-action judge, no temporal layer.
     "vendor-shaped": DefenseConfigSpec(

@@ -621,3 +621,20 @@ detection, which was true of the pilot it was written against. Campaign
 ids in `runs/w25_stage5/citable_reload.json`. The gate is not edited; the
 480 sweep records are cited with this 47-cell qualifier until it is
 amended with the assumption named.
+
+## F27 — an input classifier's verdict on the same action flips with the rendering (2026-09-06, §N admission for the L1 arm)
+
+Granite Guardian 3.2-5b, risk `harm`, on the 109 actions of the 24
+sanctioned controls: rendered as `secrets.rotate_credential {"credential_ref": "cred:prod-web:db"}`
+(dotted tool name, keys sorted) it denied 47 — every `secrets.rotate_credential`
+and 23 of the `audit.write` calls; rendered in the wire form the model
+emitted, `secrets_rotate_credential {"credential_ref": "cred:prod-web:db"}`,
+it denied 2. Same classifier, same arguments, same session. The layer now
+renders the wire form (`render_action_text`, `tests/test_l1_rendering.py`),
+because that is the text an input classifier sees; the number a content
+classifier gives an agent action is a property of the serialization as
+much as of the action. Post hoc on the corpus' turn texts (the model's own
+emissions) Granite fired on 0/24 controls, 0/111 Qwen breaches and 2/79
+Ministral breaches, and on 10–12% of non-breaching trajectories; Llama
+Guard 3 8B (S1–S14 defaults) on 0/24, 0/111 and 20/79 (S7 privacy, S14
+code-interpreter abuse), and 20% of Ministral's non-breaching ones.
