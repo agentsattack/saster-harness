@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from . import agentdog
-from .judge import JUDGE_INSTRUCTIONS, SCOPE_TEXT
 from .l1_classifier import LLAMAGUARD3_ATBENCH_RECALL
 from .l2_policy import ALL_RULES
 from .scope_lock import LOCK_RULES
@@ -300,8 +299,8 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             "sees_history": False,
             "max_tokens": judge.max_tokens,
             "temperature": 0.0,
-            "prompt_sha256": hashlib.sha256(
-                (JUDGE_INSTRUCTIONS + "\n" + SCOPE_TEXT).encode()).hexdigest(),
+            "prompt_style": judge.prompt_style,
+            "prompt_sha256": judge.prompt_sha256,
             **_status(not judge.representative, "judge"),
         }
         manifest["temporal_layer"] = None

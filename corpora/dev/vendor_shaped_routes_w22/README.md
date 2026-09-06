@@ -20,3 +20,9 @@ Result summary: F23 in docs/sweep-findings.md — the Ministral judge denies
 all fourteen calls on both routes, the benign reads included; the Qwen
 judge denies four of ten on the grant route and the copy on the firewall
 route. Raw replies verified as the single token `deny` at 8 and 64 tokens.
+
+`reference_route_ministral_judge_scoped.json` (2026-09-05): the Ministral
+judge under the SCOPED prompt (`saster_defense.judge.JUDGE_INSTRUCTIONS_SCOPED`,
+a config field), after it passed the §N gate on the 24 controls
+(`runs/w23_judge_gate_Ministral-8B-Instruct-2410_scoped.json`, 109/109
+allowed); the default prompt failed the gate at 0/109.

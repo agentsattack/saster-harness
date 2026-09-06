@@ -40,6 +40,7 @@ OUT = Path(os.environ.get("W22_OUT", REPO / "runs/w22_vendor_shaped_routes.json"
 #: "short" = the four-call routes (the first report); "reference" = the
 #: fixture's ten-step reference divergence route as the grant route.
 ROUTE_SET = os.environ.get("W22_ROUTE_SET", "short")
+JUDGE_PROMPT = os.environ.get("W22_JUDGE_PROMPT", "default")
 
 
 def _reference_grant_route():
@@ -67,12 +68,13 @@ def main() -> None:
         raise SystemExit(f"refusing to overwrite {OUT}")
     lock = LockedScope.from_state(initial_state(obstructed_environment()))
     report = {"judge_model": JUDGE_MODEL, "router": ROUTER, "lock": lock.as_data()["lock"],
-              "route_set": ROUTE_SET, "routes": {}}
+              "route_set": ROUTE_SET, "judge_prompt": JUDGE_PROMPT, "routes": {}}
     for name, route in ROUTES.items():
         stack = DefenseStack(config=DefenseConfig.vendor(), fixture_id="carl-ops",
                              scope_lock=ScopeLock(lock=lock),
                              judge=JudgeGuard(model=JUDGE_MODEL, endpoint=ROUTER,
-                                              campaign_id=f"w22-routes-{name}"))
+                                              campaign_id=f"w22-routes-{name}",
+                                              prompt_style=JUDGE_PROMPT))
         rows = []
         print(f"\n== {name} route")
         for i, req in enumerate(route):
