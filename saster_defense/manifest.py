@@ -15,8 +15,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from . import agentdog
+from .judge import JUDGE_INSTRUCTIONS, SCOPE_TEXT
 from .l1_classifier import LLAMAGUARD3_ATBENCH_RECALL
 from .l2_policy import ALL_RULES
+from .scope_lock import LOCK_RULES
 
 if TYPE_CHECKING:
     from .stack import DefenseStack
@@ -103,6 +105,8 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
 _STANDIN_REASONS = {
     "l1": "LlamaGuard3-8B weights not obtainable in this environment",
     "l4": "no AgentDoG endpoint configured; representative warn evaluator in use",
+    "scope_lock": "opa binary or scope_lock.rego not available; python mirror in use",
+    "judge": "no judge endpoint configured; representative scope-block judge in use",
 }
 
 
@@ -152,7 +156,9 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
         "traffic_plane": TRAFFIC_PLANE,
         "layers_enabled": {
             "l1": cfg.l1, "l2": cfg.l2, "l3": cfg.l3, "l4": cfg.l4, "l5": cfg.l5,
+            "scope_lock": cfg.vendor_shaped, "judge": cfg.vendor_shaped,
         },
+        "vendor_shaped": cfg.vendor_shaped,
         "budget": {
             "cap": stack.budget.cap,
             "base_cost": stack.budget.base_cost,
@@ -235,6 +241,31 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             "temperature": a.temperature,
             **_status(not a.representative, "l4"),
         }
+    if cfg.vendor_shaped and stack.scope_lock is not None and stack.judge is not None:
+        lock, judge = stack.scope_lock, stack.judge
+        manifest["scope_lock"] = {
+            "role": "scope_lock",
+            "backend": lock.backend,
+            "policy_artifact": "scope_lock.rego",
+            "semantics": "allow-list over declared destinations and identities; stateless per-action",
+            "locked": lock.lock.as_data()["lock"],
+            "rules": list(LOCK_RULES),
+            **_status(not lock.representative, "scope_lock"),
+        }
+        manifest["judge"] = {
+            "role": "per_action_judge",
+            "model": judge.model,
+            "endpoint": judge.endpoint,
+            "backend": judge.backend,
+            "sees_reasoning": False,
+            "sees_history": False,
+            "max_tokens": judge.max_tokens,
+            "temperature": 0.0,
+            "prompt_sha256": hashlib.sha256(
+                (JUDGE_INSTRUCTIONS + "\n" + SCOPE_TEXT).encode()).hexdigest(),
+            **_status(not judge.representative, "judge"),
+        }
+        manifest["temporal_layer"] = None
     if cfg.l5 and stack.approval is not None:
         manifest["l5"] = {
             "role": "approval_gate",

@@ -49,6 +49,9 @@ class LayerName(str, Enum):
     L3_TRACE = "l3_trace"
     L4_AUDITOR = "l4_auditor"
     L5_APPROVAL = "l5_approval"
+    #: The vendor-shaped configuration's two components (addendum §C, P17).
+    SCOPE_LOCK = "scope_lock"
+    JUDGE = "judge"
 
 
 @dataclass(frozen=True)

@@ -13,11 +13,13 @@ must not share an input surface with the policy engine.
 from __future__ import annotations
 
 from .budget import BudgetLedger
+from .judge import JudgeGuard
 from .l1_classifier import ClassifierGuard
 from .l2_policy import DeclaredScope, PolicyEngine, ladder
 from .l3_trace import TraceMonitor, compile_count, compile_policy, reset_compile_cache
 from .l4_auditor import TrajectoryAuditor
 from .l5_approval import ApprovalGate, QueueApprover, auto_approve, auto_deny
+from .scope_lock import LockedScope, ScopeLock
 from .stack import ActionResult, DefenseConfig, DefenseStack
 from .types import ActionRequest, LayerName, LayerOutcome, Verdict
 
@@ -37,6 +39,9 @@ __all__ = [
     "reset_compile_cache",
     "TrajectoryAuditor",
     "ApprovalGate",
+    "JudgeGuard",
+    "LockedScope",
+    "ScopeLock",
     "QueueApprover",
     "auto_approve",
     "auto_deny",

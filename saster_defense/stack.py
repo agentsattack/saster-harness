@@ -17,12 +17,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .budget import BudgetLedger
+from .judge import JudgeGuard
 from .l1_classifier import ClassifierGuard
 from .l2_policy import DeclaredScope, PolicyEngine
 from .l3_trace import TraceMonitor, TracePolicy, compile_policy
 from .l4_auditor import TrajectoryAuditor
 from .l5_approval import ApprovalGate, auto_approve
 from .manifest import build_manifest
+from .scope_lock import ScopeLock
 from .types import ActionRequest, LayerName, LayerOutcome, Verdict
 
 
@@ -35,6 +37,10 @@ class DefenseConfig:
     l3: bool = False
     l4: bool = False
     l5: bool = False
+    #: The seventh configuration (addendum §C, P17): a scope lock plus a
+    #: per-action judge, and NOTHING else — it excludes every L-layer. A
+    #: config that sets it with any layer is refused at stack build.
+    vendor_shaped: bool = False
 
     @classmethod
     def none(cls) -> DefenseConfig:
@@ -43,6 +49,14 @@ class DefenseConfig:
     @classmethod
     def all_on(cls) -> DefenseConfig:
         return cls(l1=True, l2=True, l3=True, l4=True, l5=True)
+
+    @classmethod
+    def vendor(cls) -> DefenseConfig:
+        return cls(vendor_shaped=True)
+
+    @property
+    def any_layer(self) -> bool:
+        return any((self.l1, self.l2, self.l3, self.l4, self.l5))
 
 
 @dataclass
@@ -67,9 +81,22 @@ class DefenseStack:
     trace: TraceMonitor | None = None
     auditor: TrajectoryAuditor | None = None
     approval: ApprovalGate | None = None
+    scope_lock: ScopeLock | None = None
+    judge: JudgeGuard | None = None
     _step: int = 0
 
     def __post_init__(self) -> None:
+        if self.config.vendor_shaped:
+            if self.config.any_layer:
+                raise ValueError(
+                    "vendor_shaped excludes every L-layer by design (addendum §C): "
+                    "two components, nothing else"
+                )
+            if self.scope_lock is None:
+                self.scope_lock = ScopeLock()
+            if self.judge is None:
+                self.judge = JudgeGuard()
+            return
         if self.config.l1 and self.classifier is None:
             self.classifier = ClassifierGuard()
         if self.config.l2 and self.policy is None:
@@ -93,6 +120,10 @@ class DefenseStack:
         self._step += 1
 
         outcomes: list[LayerOutcome] = []
+        if self.config.vendor_shaped:
+            assert self.scope_lock is not None and self.judge is not None
+            outcomes.append(self.scope_lock.evaluate(request))
+            outcomes.append(self.judge.judge(request))
         if self.config.l1 and self.classifier is not None:
             outcomes.append(self.classifier.classify(request))
         if self.config.l2 and self.policy is not None:
@@ -120,6 +151,11 @@ class DefenseStack:
     def audit_trajectory(self, event_records: Sequence[dict]) -> LayerOutcome:
         """Run the post-hoc auditor (L4). Off when L4 is disabled — reported
         as an explicitly unavailable layer, never a silent clean pass."""
+        if self.config.vendor_shaped:
+            return LayerOutcome(
+                LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False,
+                detail="vendor-shaped: no temporal layer by design (P17)",
+            )
         if not self.config.l4 or self.auditor is None:
             return LayerOutcome(
                 LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False,

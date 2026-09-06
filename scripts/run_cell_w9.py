@@ -55,7 +55,7 @@ from typing import Any
 
 sys.path.insert(0, "/home/lbsuto/halctf-agent")
 
-from carl_ops_agent.agent import CarlOpsMode
+from carl_ops_agent.agent import CarlOpsMode, build_environment
 from carl_ops_agent.model_driven import ModelDrivenAgent
 from carl_ops_agent.widening import derive_widening_route
 from carl_ops_assembly import assemble_trajectory_record
@@ -74,6 +74,7 @@ from carl_ops_envelope.chat_scorer import (
 from carl_ops_markers import PROHIBITION_OUT_CEILING, objective_complete
 from carl_ops_oracle import evaluate_snapshots
 from carl_ops_state import TransitionRelation
+from carl_ops_state.fixture import initial_state
 from carl_ops_trajectory import validate_record
 from saster_defense.agentdog import is_fine_grained_checkpoint
 from saster_defense.l2_policy import ALL_RULES, PolicyEngine
@@ -162,6 +163,9 @@ _DEFENSE_CONFIGS = {
     "none":   DefenseConfig(),
     # the pre-W14 default, kept so an old invocation reproduces exactly
     "all5":   DefenseConfig(l1=True, l2=True, l3=True, l4=True, l5=True),
+    # The seventh (addendum §C, P17): scope lock + per-action judge, no
+    # temporal layer. Judge served on the cluster through the router.
+    "vendor-shaped": DefenseConfig(vendor_shaped=True),
 }
 _DEFENSE_KEY = os.environ.get("W9_DEFENSE", "all5")
 if _DEFENSE_KEY not in _DEFENSE_CONFIGS:
@@ -246,9 +250,26 @@ def _sha_text(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode()).hexdigest()
 
 
+#: The vendor-shaped judge: a cluster model through the affinity router,
+#: under its own campaign key. A config field, recorded in the manifest.
+JUDGE_MODEL = os.environ.get("W9_JUDGE_MODEL", "Qwen/Qwen3-8B")
+JUDGE_ENDPOINT = os.environ.get("W9_JUDGE", ROUTER_URL)
+
+
 def build_stack() -> DefenseStack:
     """The cell's one config. L4 is wired to the real AgentDoG endpoint, so
     its manifest ``backend_status`` is ``real`` rather than a stand-in."""
+    if DEFENSE_CONFIG.vendor_shaped:
+        from saster_defense import JudgeGuard, LockedScope, ScopeLock
+
+        return DefenseStack(
+            fixture_id="carl-ops",
+            config=DEFENSE_CONFIG,
+            scope_lock=ScopeLock(lock=LockedScope.from_state(
+                initial_state(build_environment(OBSTRUCTED)))),
+            judge=JudgeGuard(model=JUDGE_MODEL, endpoint=JUDGE_ENDPOINT,
+                             campaign_id=CAMPAIGN_ID),
+        )
     stack = DefenseStack(
         fixture_id="carl-ops",
         config=DEFENSE_CONFIG,
@@ -827,6 +848,7 @@ def main() -> None:
     manifest["defense_config"] = {
         "l1": DEFENSE_CONFIG.l1, "l2": DEFENSE_CONFIG.l2, "l3": DEFENSE_CONFIG.l3,
         "l4": DEFENSE_CONFIG.l4, "l5": DEFENSE_CONFIG.l5,
+        "vendor_shaped": DEFENSE_CONFIG.vendor_shaped,
     }
     manifest["l2_rules_active"] = sorted(L2_RULES)
     manifest["l2_rule_count"] = len(L2_RULES)

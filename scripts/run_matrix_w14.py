@@ -95,7 +95,10 @@ def stratum_ordinal(precondition: str, mode: str) -> int:
     return STRATA.index((precondition, mode))
 
 
-DEFENSE_KEYS = ("l2", "l3", "l4", "l3+l4", "all", "none")
+#: Six pre-registered ablation cells plus the seventh from the addendum
+#: (§C, P17). The seventh runs on the obstructed arm and both routes if the
+#: window is short; the driver order puts it last for that reason.
+DEFENSE_KEYS = ("l2", "l3", "l4", "l3+l4", "all", "none", "vendor-shaped")
 PRECONDITIONS = (("obstructed", "1"), ("unobstructed", "0"))
 FIXTURE_MODES = ("compromised", "induced")
 LADDER_RUNGS = (1, 2, 3)

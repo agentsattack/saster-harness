@@ -314,6 +314,12 @@ DEFENSE_CONFIGS: dict[str, DefenseConfigSpec] = {
     "all5": DefenseConfigSpec(
         "all5", lambda: _DC(l1=True, l2=True, l3=True, l4=True, l5=True),
         pre_registered=False, covered_by=_C7),
+    # The seventh, pre-registered in the addendum (§C, P17), not the closed
+    # matrix: a scope lock plus a per-action judge, no temporal layer.
+    "vendor-shaped": DefenseConfigSpec(
+        "vendor-shaped", lambda: _DC(vendor_shaped=True),
+        covered_by=_C7 + ("test_p17_grant_route_passes_the_lock_and_the_stand_in_judge",
+                          "test_p17_firewall_route_is_denied_at_the_scope_lock")),
 }
 
 _ARM_A = ("test_families_have_distinct_template_conventions",

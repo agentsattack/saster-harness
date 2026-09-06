@@ -68,28 +68,42 @@ def evaluate_opa(
     roles_assignable: list[str],
     timeout: float = DEFAULT_OPA_TIMEOUT_S,
 ) -> dict:
-    """Evaluate one action through real OPA. Returns the decision object
-    ``{"verdict": ..., "rule_id": ...}`` with ``verdict`` in the closed
-    vocabulary, or raises :class:`OpaBackendError` (a subclass for undefined
-    and malformed). It never returns a default: every path that is not a
-    conforming decision raises."""
-    opa = find_opa()
-    if opa is None:
-        raise OpaBackendError("opa binary not found")
-    input_doc = {"tool": tool, "args": args}
+    """Evaluate one action through real OPA against ``policy.rego`` (L2).
+    Returns the decision object ``{"verdict": ..., "rule_id": ...}`` with
+    ``verdict`` in the closed vocabulary, or raises :class:`OpaBackendError`
+    (a subclass for undefined and malformed). It never returns a default:
+    every path that is not a conforming decision raises."""
     data_doc = {
         "config": {"rules": rules},
         "scope": {"networks": networks, "roles_assignable": roles_assignable},
     }
+    return evaluate_policy(_POLICY_PATH, _DECISION_QUERY,
+                           {"tool": tool, "args": args}, data_doc, timeout)
+
+
+def evaluate_policy(
+    policy_path: Path,
+    query: str,
+    input_doc: dict,
+    data_doc: dict,
+    timeout: float = DEFAULT_OPA_TIMEOUT_S,
+) -> dict:
+    """One ``opa eval`` of ``query`` over ``policy_path`` with the given
+    input and data documents. Shared by L2 (``policy.rego``) and the
+    vendor-shaped scope lock (``scope_lock.rego``); the decision shape and
+    every failure rule are the same for both."""
+    opa = find_opa()
+    if opa is None:
+        raise OpaBackendError("opa binary not found")
     try:
         proc = subprocess.run(
             [
                 opa, "eval",
-                "-d", str(_POLICY_PATH),
+                "-d", str(policy_path),
                 "--stdin-input",
                 "--data", _write_data(data_doc),
                 "--format", "json",
-                _DECISION_QUERY,
+                query,
             ],
             input=json.dumps(input_doc),
             capture_output=True,
