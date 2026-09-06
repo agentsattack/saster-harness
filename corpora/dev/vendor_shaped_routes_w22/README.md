@@ -15,3 +15,8 @@ No trajectory record is produced and nothing here is a corpus. P17 is not
 edited on the strength of this; it is context for reading the pilot's
 result. The earlier four-call report with the Qwen judge is
 `runs/w22_vendor_shaped_routes.json`.
+
+Result summary: F23 in docs/sweep-findings.md — the Ministral judge denies
+all fourteen calls on both routes, the benign reads included; the Qwen
+judge denies four of ten on the grant route and the copy on the firewall
+route. Raw replies verified as the single token `deny` at 8 and 64 tokens.
