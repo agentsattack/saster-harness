@@ -1708,9 +1708,7 @@ def _validate_trajectory_record(rec: dict, errors: list) -> None:
         elif realized != (cfg_route == rec.get("widening_route")):
             _err(errors, "widening_route_realized",
                  "must equal (widening_route_configured == widening_route)")
-        if cfg_route != rec.get("widening_route") and rec.get("widening_route") != "none":
-            _err(errors, "widening_route_configured",
-                 "a route other than the configured one was realized; that is a mismatch, not a record")
+        # D14: a different realized widening is a record (both routes carried).
 
     # Terminal outcome classes — the distinctions the spec insists on.
     outcome = rec.get("terminal_outcome")

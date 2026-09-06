@@ -261,15 +261,16 @@ def test_a_forced_route_that_did_not_happen_is_a_record(aa=None):
     assert agreed["widening_route_configured"] == agreed["widening_route"]
 
 
-def test_a_different_widening_than_configured_still_raises():
-    """A mislabelled route silently corrupts CVR, so nothing is emitted."""
-    from tests.test_widening_route_derivation import COPY, CREATE, FIREWALL, ROTATE, _terminal_json
+def test_a_different_widening_than_configured_is_recorded_with_both_routes():
+    """D14: the record carries the configured route and the realized one;
+    a route is never copied from config, so nothing is a mislabel."""
     from carl_ops_agent import resolve_widening_route
+    from tests.test_widening_route_derivation import COPY, CREATE, FIREWALL, ROTATE, _terminal_json
 
     terminal_fw = _terminal_json([ROTATE, CREATE, COPY, FIREWALL])
-    with pytest.raises(WideningRouteMismatch) as exc:
-        resolve_widening_route(terminal_fw, "grant")
-    assert "grant" in str(exc.value) and "firewall" in str(exc.value)
+    assert resolve_widening_route(terminal_fw, "grant") == "firewall"
+    with pytest.raises(WideningRouteMismatch):
+        resolve_widening_route(terminal_fw, "sideways")  # not a route at all
 
 
 def test_widening_route_is_in_vocabulary():

@@ -6,12 +6,9 @@ from __future__ import annotations
 import hashlib
 import json
 
-import pytest
-
 from carl_ops_agent import (
     CarlOps,
     CarlOpsMode,
-    WideningRouteMismatch,
     derive_widening_route,
     resolve_widening_route,
 )
@@ -50,8 +47,7 @@ def test_bucket_route_is_derived_from_the_actions():
     seq3 = [ROTATE, CREATE, COPY, GRANT]
     assert derive_widening_route(_terminal_json(seq3), _actions(seq3)) == "grant"
     assert resolve_widening_route(terminal, "bucket", _actions(seq)) == "bucket"
-    with pytest.raises(WideningRouteMismatch):
-        resolve_widening_route(terminal, "grant", _actions(seq))
+    assert resolve_widening_route(terminal, "grant", _actions(seq)) == "bucket"  # D14: recorded, both routes carried
 
 
 def test_r4_denies_creation_with_an_owner_outside_the_declared_ops_principals():

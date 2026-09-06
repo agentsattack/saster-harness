@@ -38,7 +38,6 @@ from saster_harness.harness import MonitoringHarness
 from saster_harness.prober import InProcessInjector, Prober
 from saster_harness.scheduler import ProbeScheduler
 
-
 # ---------------------------------------------------------------------------
 # Defaults: passive constructions are origin="wire"
 # ---------------------------------------------------------------------------

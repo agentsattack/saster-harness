@@ -15,14 +15,12 @@ the right kwargs is sufficient.
 from __future__ import annotations
 
 import sys
-import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from saster_harness import MonitoringConfig, MonitoringHarness
 from saster_harness.proxy import HarnessAddon
-
 
 # ---------------------------------------------------------------------------
 # Config validation

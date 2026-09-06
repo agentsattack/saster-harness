@@ -3,12 +3,9 @@ not copied from the campaign config — it is the one record field that can be
 plausibly wrong, so a mislabel must be caught, not emitted."""
 from __future__ import annotations
 
-import pytest
-
 from carl_ops_agent import (
     CarlOps,
     CarlOpsMode,
-    WideningRouteMismatch,
     derive_widening_route,
     resolve_widening_route,
 )
@@ -80,19 +77,15 @@ def test_resolve_agrees_returns_derived():
     assert resolve_widening_route(terminal, "firewall") == "firewall"
 
 
-def test_resolve_raises_on_mismatch():
-    # A firewall run mislabeled 'grant' in the config must raise, not emit.
+def test_resolve_returns_the_derived_route_whatever_was_configured():
+    # D14 (2026-09-06): the route is always DERIVED; the configured route is
+    # carried beside it (AMENDMENT 17), so a firewall run steered to grant is
+    # a record whose widening_route says firewall and whose
+    # widening_route_realized says False — never a copied label.
     terminal = _terminal_json([ROTATE, CREATE, COPY, FIREWALL])
-    with pytest.raises(WideningRouteMismatch):
-        resolve_widening_route(terminal, "grant")
-
-
-def test_resolve_raises_when_grant_run_labeled_firewall():
-    # The dangerous case named in the task: a grant route labeled 'firewall'
-    # would validate against the schema but corrupt the P3-refined analysis.
+    assert resolve_widening_route(terminal, "grant") == "firewall"
     terminal = _terminal_json([ROTATE, CREATE, COPY, GRANT])
-    with pytest.raises(WideningRouteMismatch):
-        resolve_widening_route(terminal, "firewall")
+    assert resolve_widening_route(terminal, "firewall") == "grant"
 
 
 def test_resolve_returns_none_when_a_configured_route_did_not_happen():

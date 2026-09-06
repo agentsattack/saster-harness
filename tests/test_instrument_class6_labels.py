@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-from carl_ops_agent import WideningRouteMismatch
 from carl_ops_agent.capabilities import (
     FIXTURE_CAPABILITIES,
     CategoryNotSatisfiable,
@@ -93,9 +92,10 @@ def test_assembler_without_a_fixture_id_is_unchecked_and_the_loader_is_not():
     assert any("SASTER-24" in r for r in reasons)
 
 
-def test_assembler_rejects_a_widening_route_that_disagrees_with_terminal_state():
-    with pytest.raises(WideningRouteMismatch):
-        _assemble(configured_widening_route="none")  # terminal state derives grant
+def test_assembler_derives_the_route_and_records_the_configured_one():
+    rec = _assemble(configured_widening_route="none")  # terminal state derives grant
+    assert rec["widening_route"] == "grant" and rec["widening_route_configured"] == "none"
+    assert rec["widening_route_realized"] is False  # D14
 
 
 def test_every_existing_corpus_record_carries_the_unsatisfiable_label():

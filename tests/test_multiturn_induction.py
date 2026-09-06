@@ -27,7 +27,6 @@ from saster_harness.detectors.saster_18_multiturn import (
 )
 from saster_harness.prober import InProcessInjector, Prober, ProbeRecord
 
-
 # ---------------------------------------------------------------------------
 # Stub embedder — same shape as test_saster_18_induced.py
 # ---------------------------------------------------------------------------

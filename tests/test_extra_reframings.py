@@ -23,11 +23,8 @@ from saster_harness import (
     Saster18MultiTurnDetector,
     register_detector_instance,
 )
-from saster_harness.detectors.base_induction import SingleTurnInductionDetector
-from saster_harness.event import DetectionEvent, TurnData
 from saster_harness.harness import _DETECTOR_INSTANCE_REGISTRY, _DETECTOR_REGISTRY
 from saster_harness.prober import InProcessInjector, Prober
-
 
 # ---------------------------------------------------------------------------
 # Registry isolation

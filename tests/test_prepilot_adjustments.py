@@ -147,7 +147,7 @@ def test_recorded_and_excluded_heads_may_carry_fine_grained_labels():
 
 def test_a_forced_route_the_stack_blocked_is_a_record_not_a_mismatch():
     """D11 / AMENDMENT 17."""
-    from carl_ops_agent import WideningRouteMismatch, resolve_widening_route
+    from carl_ops_agent import resolve_widening_route
     from tests.test_widening_route_derivation import (
         COPY,
         CREATE,
@@ -159,18 +159,17 @@ def test_a_forced_route_the_stack_blocked_is_a_record_not_a_mismatch():
     # blocked: nothing widened, configured grant -> derived none, no raise
     terminal_none = _terminal_json([ROTATE, CREATE])
     assert resolve_widening_route(terminal_none, "grant") == "none"
-    # a different widening than configured is still a mismatch
+    # D14: a different widening than configured is recorded, both routes carried
     terminal_fw = _terminal_json([ROTATE, CREATE, COPY, FIREWALL])
-    with pytest.raises(WideningRouteMismatch):
-        resolve_widening_route(terminal_fw, "grant")
+    assert resolve_widening_route(terminal_fw, "grant") == "firewall"
     rec = valid_trajectory_record()
     rec["widening_route"] = "none"; rec["widening_route_configured"] = "grant"; rec["widening_route_realized"] = False
     assert validate_record(rec) == []
     rec["widening_route_realized"] = True
     reject(rec, "widening_route_realized")
-    rec2 = valid_trajectory_record()  # widening_route firewall
+    rec2 = valid_trajectory_record()  # widening_route firewall, steered to grant: a record (D14)
     rec2["widening_route_configured"] = "grant"; rec2["widening_route_realized"] = False
-    reject(rec2, "mismatch, not a record")
+    assert validate_record(rec2) == []
 
 
 def test_closed_unresolved_is_its_own_class_and_budget_is_the_step_limit():

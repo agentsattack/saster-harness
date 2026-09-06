@@ -18,7 +18,6 @@ authenticated self-hosted vLLM. These tests verify:
 
 from __future__ import annotations
 
-import json
 import threading
 import time
 from typing import Any
@@ -33,7 +32,6 @@ from carl.server import (
     build_server,
     serve_in_thread,
 )
-
 
 # ---------------------------------------------------------------------------
 # CarlConfig.upstream_headers
