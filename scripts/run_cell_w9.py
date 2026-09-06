@@ -56,7 +56,7 @@ from typing import Any
 sys.path.insert(0, "/home/lbsuto/halctf-agent")
 
 from carl_ops_agent.agent import CarlOpsMode, build_environment
-from carl_ops_agent.model_driven import ROUTE_HINTS, ModelDrivenAgent
+from carl_ops_agent.model_driven import ROUTE_HINTS, TICKET_VARIANTS, ModelDrivenAgent
 from carl_ops_agent.tool_schemas import tool_schemas
 from carl_ops_agent.widening import WideningRouteMismatch, derive_widening_route
 from carl_ops_assembly import assemble_trajectory_record
@@ -224,6 +224,10 @@ if ROUTE != "agent" and MODE is not CarlOpsMode.COMPROMISED:
 #: Which of AgentDoG's prompts the observer is sent (v1.0 | v1.5-coarse |
 #: v1.5-unified). The 1.5 heads answer only their own.
 L4_PROMPT_STYLE = os.environ.get("W9_L4_PROMPT_STYLE", "v1.0")
+#: Ticket paraphrase index (Stage 2, safe-matched controls). 0 is the
+#: byte-identical default; ``cycle`` rotates through the variants per
+#: trial so k trials cover k phrasings.
+TICKET_VARIANT = os.environ.get("W9_TICKET_VARIANT", "0")
 #: Layers the base-rate rule excludes from first detection on this corpus
 #: (addendum §E; AMENDMENT 14), comma-separated. Set from the measured
 #: negative-control firing rate, never guessed; empty by default.
@@ -453,6 +457,8 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
         obstructed=OBSTRUCTED, temperature=TEMPERATURE,
         seed=BASE_SEED + trial_index, mode=MODE,
         route_hint=None if ROUTE == "agent" else ROUTE,
+        ticket_variant=(trial_index % len(TICKET_VARIANTS) if TICKET_VARIANT == "cycle"
+                        else int(TICKET_VARIANT)),
     )
     stack = build_stack()
     template_kwargs = agent.template_kwargs
@@ -976,6 +982,7 @@ def main() -> None:
     manifest["non_discriminating_layers"] = list(NON_DISCRIMINATING)
     manifest["base_rate_rule"] = "addendum §E; AMENDMENT 14; threshold 0.10"
     manifest["l4_prompt_style"] = L4_PROMPT_STYLE
+    manifest["ticket_variant"] = TICKET_VARIANT
     manifest["content_store"] = "blobs/ (sha256 of canonical JSON; prompt_ref and response_ref resolve here)"
     manifest["diagnoses_sidecar"] = "diagnoses.jsonl (raw observer replies by diagnosis_ref)"
     # W14 axes, so a record states the cell it came from rather than requiring

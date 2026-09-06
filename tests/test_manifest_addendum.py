@@ -22,10 +22,12 @@ from saster_defense.manifest import (
 # Prior pins, in order, each in the addendum's own hash-history table:
 PRIOR_ADDENDUM_SHA256 = (
     "ffbde3c9e99bc2f4dbd0c20bc8827bb898569d61baa3da5d83663548a2e31e16",  # 2026-09-05 opened: A golden trace, B marker units
+    "fffd4dc734381ae374918aa1e6e3ecc42540d771a415f8e8e0bdf8dc044bbe0e",  # 2026-09-05 + C P17, D P2-D, E base-rate, F P6; closure
 )
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
-EXPECTED_ADDENDUM_SHA256 = "fffd4dc734381ae374918aa1e6e3ecc42540d771a415f8e8e0bdf8dc044bbe0e"
+# 2026-09-05: + G canary thresholds, H the tarpit rule.
+EXPECTED_ADDENDUM_SHA256 = "eea89233100903f377fa61fa8bf653accf2d1cc4492046db928f3dc28db2c849"
 
 
 def _manifest():
