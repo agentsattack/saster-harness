@@ -6,3 +6,9 @@ Written 2026-09-06T01:23:33.479966+00:00 by scripts/build_safe_controls_replay_w
 
 records: 24, distinct action sequences: 24
 marker report: {}
+
+## Provenance
+
+`action_plane: fixture_replay` — harness-authored sanctioned completions
+with varied read prefixes; retained as the second control set beside the
+model-driven set in `corpora/citable/safe_controls_w22b_qwen/` (2026-09-05).
