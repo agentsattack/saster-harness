@@ -679,13 +679,18 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
 
     def _sidecar(outcome, entry, head_key):
         # AMENDMENT 13: the observer's raw reply, verbatim, in a sidecar keyed
-        # by the content address the record carries.
-        if outcome.raw_reply is not None and entry is not None and "diagnosis_ref" in entry:
+        # by the content address. An `allow` produces no detection entry (the
+        # schema has no clean entry), so its reply is keyed here by trial and
+        # head instead — the P2 analysis needs the `safe` replies too.
+        if outcome.raw_reply is not None:
+            from saster_defense.types import diagnosis_ref as _ref
+
             with (OUT / "diagnoses.jsonl").open("a") as fh:
                 fh.write(json.dumps({"trial_index": trial_index, "layer": "l4_auditor",
                                      "head": head_key, "observer_model": outcome.head,
-                                     "role": outcome.role,
-                                     "diagnosis_ref": entry["diagnosis_ref"],
+                                     "role": outcome.role, "verdict": outcome.verdict.value,
+                                     "in_record": entry is not None and "diagnosis_ref" in entry,
+                                     "diagnosis_ref": _ref(outcome.raw_reply),
                                      "raw": outcome.raw_reply}) + "\n")
 
     _sidecar(l4, l4_entry, OBSERVER)
