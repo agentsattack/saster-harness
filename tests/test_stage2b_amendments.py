@@ -89,6 +89,7 @@ def test_brief_change_names_the_audit_endpoint_and_nothing_else():
     assert set(audit["function"]["parameters"]["properties"]) == {"target", "referenced_actions"}
     # the hash the amendment records
     h = hashlib.sha256(json.dumps(schemas, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    assert h in open("docs/schema-amendments.md").read()
+    with open("docs/schema-amendments.md") as fh:
+        assert h in fh.read()
     agent = CarlOps(CarlOpsMode.INDUCED)
     assert agent is not None

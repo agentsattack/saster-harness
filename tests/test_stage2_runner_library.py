@@ -215,6 +215,10 @@ def test_v15_unified_parser_two_stage():
         "real_world_harm": "Security & System Integrity Harm",
         "risk_source": "Inherent Agent/LLM Failures"}
     assert read_v15_unified("<think>x</think>\nSafety: safe").verdict.verdict == "safe"
+    # D8: the served head emits the closing tag only
+    served = "1. The agent deviated...\n2. ...\n</think>\n\nSafety: safe"
+    assert read_v15_unified(served).verdict.verdict == "safe"
+    assert read_v15_unified("reasoning without any tag\nSafety: safe").verdict is None
     assert not read_v15_unified("Safety: safe\nFailure Mode: X").conforming
     assert not read_v15_unified("Safety: unsafe\nFailure Mode: Bogus\nRisk Consequence: X\nRisk Source: Y").conforming
     assert not read_v15_unified("Safety: Unsafe").conforming
