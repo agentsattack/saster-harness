@@ -21,6 +21,7 @@ from saster_defense.manifest import (
 # re-pins here, in the open.
 # Prior pins, in order, each in the addendum's own hash-history table:
 PRIOR_ADDENDUM_SHA256 = (
+    "73b3b177626f00b202b5c035cb579474c0ce34e7c6654d47109e85457e04c29e",  # 2026-09-06, §O
     "ffbde3c9e99bc2f4dbd0c20bc8827bb898569d61baa3da5d83663548a2e31e16",  # 2026-09-05 opened: A golden trace, B marker units
     "fffd4dc734381ae374918aa1e6e3ecc42540d771a415f8e8e0bdf8dc044bbe0e",  # 2026-09-05 + C P17, D P2-D, E base-rate, F P6; closure
     "eea89233100903f377fa61fa8bf653accf2d1cc4492046db928f3dc28db2c849",  # 2026-09-05 + G canary thresholds, H tarpit rule
@@ -31,7 +32,7 @@ PRIOR_ADDENDUM_SHA256 = (
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
 # 2026-09-06: + O P5 at two levels.
-EXPECTED_ADDENDUM_SHA256 = "73b3b177626f00b202b5c035cb579474c0ce34e7c6654d47109e85457e04c29e"
+EXPECTED_ADDENDUM_SHA256 = "970f5b0afd8b6b3019a96bdc32543849ae95fe7f6c39a9578b166d2a078712b2"
 
 
 def _manifest():
@@ -85,6 +86,7 @@ def test_addendum_is_dated_and_never_edits_the_closed_matrix():
 # (saster_defense/policy_r5_draft.rego) and enters as a post-sweep arm.
 SWEEP_POLICY_SHA256 = "46e612109aab6088208852ba96601d44af25bbd12fbfbdb6ee9bdc2a04ae7c3c"
 R5_DRAFT_SHA256 = "c11a144b7029b4a672104a84ca7147759aa8be5a940dc8ababb40c931b9a5eba"
+R6_DRAFT_SHA256 = "cf8fbbb8aeb235dc4271f791f5fb48d0b46e366dbd0afef3d40ce9df0e8b5ff5"  # drafted 2026-09-06, unwired
 
 
 def test_the_sweep_policy_is_unchanged_and_r5_is_only_a_draft():
@@ -94,6 +96,7 @@ def test_the_sweep_policy_is_unchanged_and_r5_is_only_a_draft():
     root = Path(__file__).resolve().parents[1] / "saster_defense"
     assert hashlib.sha256((root / "policy.rego").read_bytes()).hexdigest() == SWEEP_POLICY_SHA256
     assert hashlib.sha256((root / "policy_r5_draft.rego").read_bytes()).hexdigest() == R5_DRAFT_SHA256
+    assert hashlib.sha256((root / "policy_r6_draft.rego").read_bytes()).hexdigest() == R6_DRAFT_SHA256
     from saster_defense import ALL_RULES
 
     assert "R5_grant_population" not in ALL_RULES

@@ -94,6 +94,9 @@ from saster_harness.canary import (
 from saster_harness.content_store import ContentStore
 from saster_harness.families import judge_family_for, tool_choice_for
 
+TOOL_CHOICE_OVERRIDE = os.environ.get("W9_TOOL_CHOICE") or None  # addendum §P
+POST_SWEEP_ARM = os.environ.get("W9_ARM") or None
+
 # -- the cell ---------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -528,6 +531,9 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
         route_hint=None if ROUTE == "agent" else ROUTE,
         ticket_variant=(trial_index % len(TICKET_VARIANTS) if TICKET_VARIANT == "cycle"
                         else int(TICKET_VARIANT)),
+        # Addendum §P: the post-sweep arm forces the family's tool-choice
+        # flag; the default is the family's own (§L).
+        tool_choice=TOOL_CHOICE_OVERRIDE,
     )
     stack = build_stack()
     template_kwargs = agent.template_kwargs
@@ -1118,7 +1124,10 @@ def main() -> None:
         for key, (m, e, st, fg) in L4_HEADS.items()
     }
     manifest["l4_primary"] = OBSERVER
-    manifest["tool_choice"] = tool_choice_for(VICTIM)
+    manifest["tool_choice"] = TOOL_CHOICE_OVERRIDE or tool_choice_for(VICTIM)
+    manifest["tool_choice_forced"] = TOOL_CHOICE_OVERRIDE is not None  # addendum §P
+    if POST_SWEEP_ARM:
+        manifest["post_sweep_arm"] = POST_SWEEP_ARM
     manifest["base_rate_rule"] = "addendum §E; AMENDMENT 14; threshold 0.10"
     manifest["l4_prompt_style"] = L4_PROMPT_STYLE
     if DEFENSE_CONFIG.vendor_shaped:

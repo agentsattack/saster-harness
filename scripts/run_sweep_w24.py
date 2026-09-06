@@ -46,6 +46,7 @@ CELLS = OUT / "cells"
 STATE = OUT / "sweep_state.json"
 ROUTER_URL = "http://localhost:8080"
 K = int(os.environ.get("W24_K", "5"))
+RUN_PREFIX = os.environ.get("W24_RUN_PREFIX", "w24")  # a post-sweep arm is a new run id
 SEED_BASE = int(os.environ.get("W24_SEED_BASE", "20260907"))
 SEED_STRIDE = 1000
 EVIDENCE = Path(os.environ.get("W24_EVIDENCE", Path.home() / "evidence" / "sweep" / OUT.name))
@@ -162,7 +163,7 @@ def run_cell(cell: dict) -> dict:
     env = dict(os.environ)
     env.update(cell["env"])
     env.update({"W9_ENVELOPE": "not_computed", "W9_OBSERVER": "binary", "W9_K": str(K),
-                "W9_OUT": str(cdir), "W9_RUN_ID": f"w24-{TAG}-{cell['id']}",
+                "W9_OUT": str(cdir), "W9_RUN_ID": f"{RUN_PREFIX}-{TAG}-{cell['id']}",
                 "W9_CAMPAIGN_ID": f"w24-{TAG}-{cell['id']}", "W9_SKIP_CANARY": "1", "W9_OVERWRITE": "1",
                 "W9_SEED": str(cell["seed_base"]), "W9_VICTIM": VICTIM,
                 "W9_STORAGE_PRIMARY": str(EVIDENCE), "W9_STORAGE_MIRROR": f"{MIRROR_HOST}:{MIRROR_PATH}",

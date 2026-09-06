@@ -1569,3 +1569,56 @@ route is always derived. **Fix:** `resolve_widening_route` never raises
 on a realized route; the schema's residual "mismatch, not a record" rule
 is removed; `widening_route_realized` says whether hint and outcome
 agree. The lost trials re-run under a new run id (w24c); w24b is kept.
+
+## D15 — the static coverage query enumerated one value per argument (2026-09-06, renumbered from F24)
+
+**Found by:** the F24 check during the sweep. **False assumption:** that
+covering a tool covers its arguments. The query's candidate set is the
+thirteen fixed bindings plus the route's own actions, so it saw one
+`owner`, one grant `principal`, one `perms`, and reported R4 as closing
+the bucket hole while R3's prefix hole at `set_policy` and R2's
+principal-blind `attach_role` were never in its candidate set.
+**Direction:** toward "defense held" — coverage overstated. **Fix:** not
+applied mid-sweep; the query is re-run over an argument-enumerated
+candidate set (population-in and population-out principals, the owner,
+perms) beside R5 in the §Q arm.
+
+## Canonical defect list (2026-09-06)
+
+| id | what | direction relative to "defense held" |
+|---|---|---|
+| D1 | L2: undefined OPA decision defaulted to allow; backend failures crashed the cell | toward held |
+| D2 | L3: non-decision read as no breach; z3 unknown as no breach | toward held |
+| D3 | L5: approver failure decided by truthiness | mixed (deny on falsy) |
+| D4 | L4: case-folded verdict token made SAFE the clean class | toward held |
+| D5 | L1: endpoint string labelled a stand-in as real | toward held (citability) |
+| D6 | canary: uncounted router exceptions; error body as ok | toward held (gate passed a broken path) |
+| D7 | envelope metric accepted an exactly uniform distribution | neutral (numbers without meaning) |
+| D8 | 1.5 unified parser stripped a paired think block the head never emits | away from held (conforming safe/unsafe both unavailable) |
+| D9 | an allow wrote no raw reply (two sites) | toward held (a wrong safe unauditable) |
+| D10 | a recorded head's labels rejected as "not a finding" | neutral (records refused) |
+| D11 | a blocked forced route dropped as a mismatch | toward held (held-trajectories lost… and away: no record either way) — records lost |
+| D12 | false completion and step limit classified as harness error | erased from every denominator |
+| D13 | a breach that then stopped in prose carried a forbidden detail; cell aborted | toward held (breaches lost) |
+| D14 | a different realized widening dropped as a mismatch | toward held (breaches lost) |
+| D15 | the static query enumerated one value per argument | toward held (coverage overstated) |
+
+Fifteen. Twelve of fifteen leaned toward "defense held" or erased a
+trajectory from the analysis; none manufactured a breach.
+
+## Policy draft R6 (2026-09-06, unwired)
+
+Drafted after the Stage 5 readback for F25: R1 allows a hostname-like
+`reaches` that invariant I2 fires on. `saster_defense/policy_r6_draft.rego`,
+sha256 `cf8fbbb8aeb235dc4271f791f5fb48d0b46e366dbd0afef3d40ce9df0e8b5ff5`,
+pinned beside R5 in `tests/test_manifest_addendum.py`. The sweep policy
+in force is unchanged at `46e61210…`. Not an amendment: nothing replaces a
+value.
+
+## Runner: post-sweep arm fields (2026-09-06)
+
+`scripts/run_cell_w9.py` reads `W9_TOOL_CHOICE` (addendum §P) and
+`W9_ARM`; the manifest gains `tool_choice_forced` (bool) and, when set,
+`post_sweep_arm`. `scripts/run_sweep_w24.py` reads `W24_RUN_PREFIX`
+(default `w24`) so an arm is a new run id. No existing field changes
+meaning; sweep manifests without the new fields read as unforced, no arm.
