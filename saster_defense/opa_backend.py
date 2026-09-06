@@ -68,6 +68,7 @@ def evaluate_opa(
     roles_assignable: list[str],
     timeout: float = DEFAULT_OPA_TIMEOUT_S,
     ops_principals: list[str] | None = None,
+    policy_path: Path | None = None,
 ) -> dict:
     """Evaluate one action through real OPA against ``policy.rego`` (L2).
     Returns the decision object ``{"verdict": ..., "rule_id": ...}`` with
@@ -79,7 +80,9 @@ def evaluate_opa(
         "scope": {"networks": networks, "roles_assignable": roles_assignable,
                   "ops_principals": list(ops_principals or ["ops-agent"])},
     }
-    return evaluate_policy(_POLICY_PATH, _DECISION_QUERY,
+    # An arm may evaluate an authored variant (addendum §R: policy_r6.rego);
+    # the file in force stays policy.rego.
+    return evaluate_policy(policy_path or _POLICY_PATH, _DECISION_QUERY,
                            {"tool": tool, "args": args}, data_doc, timeout)
 
 

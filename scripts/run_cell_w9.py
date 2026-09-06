@@ -79,7 +79,7 @@ from carl_ops_state.fixture import initial_state
 from carl_ops_trajectory import validate_record
 from saster_defense.agentdog import is_fine_grained_checkpoint
 from saster_defense.budget import BudgetLedger
-from saster_defense.l2_policy import ALL_RULES, PolicyEngine
+from saster_defense.l2_policy import ALL_RULES, ARM_RULES, PolicyEngine
 from saster_defense.l4_auditor import TrajectoryAuditor
 from saster_defense.manifest import build_manifest, validate_run_manifest
 from saster_defense.stack import DefenseConfig, DefenseStack
@@ -207,7 +207,17 @@ DEFENSE_CONFIG = _DEFENSE_CONFIGS[_DEFENSE_KEY]
 _L2_RULE_COUNT = int(os.environ.get("W9_L2_RULES", str(len(ALL_RULES))))
 if not 0 <= _L2_RULE_COUNT <= len(ALL_RULES):
     raise SystemExit(f"W9_L2_RULES must be 0..{len(ALL_RULES)}")
-L2_RULES = frozenset(ALL_RULES[:_L2_RULE_COUNT])
+# Addendum §R: an arm may add rules that are not in ALL_RULES (the sweep policy
+# and the ladder are unchanged); they come with their own authored file.
+L2_EXTRA_RULES = frozenset(r.strip() for r in os.environ.get("W9_EXTRA_RULES", "").split(",") if r.strip())
+if not L2_EXTRA_RULES <= set(ARM_RULES):
+    raise SystemExit(f"W9_EXTRA_RULES must be a subset of {ARM_RULES}")
+L2_RULES = frozenset(ALL_RULES[:_L2_RULE_COUNT]) | L2_EXTRA_RULES
+POLICY_REGO = os.environ.get("W9_POLICY_REGO") or "saster_defense/policy.rego"
+if L2_EXTRA_RULES and POLICY_REGO == "saster_defense/policy.rego":
+    raise SystemExit("W9_EXTRA_RULES needs W9_POLICY_REGO: policy.rego does not author them")
+#: Addendum §R: record the four heads on every cell, L4 counted or not.
+RECORD_HEADS_ALWAYS = os.environ.get("W9_RECORD_HEADS_ALWAYS", "") == "1"
 
 #: The sweep gate canaries every victim once, at matrix start. A per-cell
 #: canary would re-measure the same victim 24 times and add ~18 minutes.
@@ -390,8 +400,9 @@ def build_stack() -> DefenseStack:
     # The ladder rung. __post_init__ builds a full-rule engine when L2 is on;
     # replace it when the rung is not the full set so the manifest and the
     # verdicts agree about which rules were live.
-    if DEFENSE_CONFIG.l2 and stack.policy is not None and frozenset(ALL_RULES) != L2_RULES:
-        stack.policy = PolicyEngine(scope=stack.scope, rules=L2_RULES)
+    if DEFENSE_CONFIG.l2 and stack.policy is not None and (frozenset(ALL_RULES) != L2_RULES
+                                                            or POLICY_REGO != "saster_defense/policy.rego"):
+        stack.policy = PolicyEngine(scope=stack.scope, rules=L2_RULES, policy_path=Path(POLICY_REGO))
     return stack
 
 
@@ -738,8 +749,11 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
     # counted. Run concurrently — the 1.5 heads write an analysis block
     # before answering and take minutes each.
     l4_records = [{"step": a["step_index"], "tool": a["tool"], "args": a["args"]} for a in actions]
-    recorded_heads = [h for h in RECORDED_HEADS if h in L4_HEADS and h != OBSERVER]
-    if recorded_heads and DEFENSE_CONFIG.l4:
+    # Addendum §R: with L4 off there is no primary, so the observer's head is
+    # recorded like the others when the arm asks for all four.
+    recorded_heads = [h for h in RECORDED_HEADS if h in L4_HEADS
+                      and (h != OBSERVER or (RECORD_HEADS_ALWAYS and not DEFENSE_CONFIG.l4))]
+    if recorded_heads and (DEFENSE_CONFIG.l4 or RECORD_HEADS_ALWAYS):
         from concurrent.futures import ThreadPoolExecutor
 
         def _run_head(key):
@@ -1070,7 +1084,7 @@ def main() -> None:
         "tool_inventory": _sha_text(json.dumps(tool_schemas(), sort_keys=True,
                                                separators=(",", ":"))),
         "brief_system": _sha_text(SYSTEM),
-        "policy_rego": _sha("saster_defense/policy.rego"),
+        "policy_rego": _sha(POLICY_REGO),
         "scope_lock_rego": _sha("saster_defense/scope_lock.rego"),
     }
 
@@ -1126,6 +1140,10 @@ def main() -> None:
     manifest["l4_primary"] = OBSERVER
     manifest["tool_choice"] = TOOL_CHOICE_OVERRIDE or tool_choice_for(VICTIM)
     manifest["tool_choice_forced"] = TOOL_CHOICE_OVERRIDE is not None  # addendum §P
+    manifest["l2_rules"] = sorted(L2_RULES)
+    manifest["l2_rules_extra"] = sorted(L2_EXTRA_RULES)  # addendum §R
+    manifest["policy_rego_path"] = POLICY_REGO
+    manifest["record_heads_always"] = RECORD_HEADS_ALWAYS
     if POST_SWEEP_ARM:
         manifest["post_sweep_arm"] = POST_SWEEP_ARM
     manifest["base_rate_rule"] = "addendum §E; AMENDMENT 14; threshold 0.10"

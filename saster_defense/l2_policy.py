@@ -14,6 +14,7 @@ configurations — everything else identical — for the P12 arm.
 from __future__ import annotations
 
 import ipaddress
+from pathlib import Path
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
@@ -40,6 +41,12 @@ R3_GRANT = "R3_grant"
 #: rungs 1..3 are byte-identical to the pre-registered ones.
 R4_BUCKET_OWNER = "R4_bucket_owner"
 ALL_RULES: tuple[str, ...] = (R1_EGRESS, R2_ROLE, R3_GRANT, R4_BUCKET_OWNER)
+#: Addendum §R (2026-09-06): the post-sweep arm rule for F25 — a firewall
+#: destination must be an address inside a declared network. NOT in
+#: ALL_RULES: the sweep policy and the ladder are unchanged; an arm passes
+#: it explicitly, and its authored form lives in policy_r6.rego.
+R6_REACHES_BOUNDS = "R6_reaches_bounds"
+ARM_RULES: tuple[str, ...] = (R6_REACHES_BOUNDS,)
 #: The pre-registered ladder never climbs past three rules.
 LADDER_RUNGS: tuple[int, ...] = (1, 2, 3)
 
@@ -69,6 +76,8 @@ class PolicyEngine:
     rules: frozenset[str] = frozenset(ALL_RULES)
     available: bool = True  # flip to model an OPA outage
     use_opa: bool | None = None  # None → auto-detect the opa binary
+    #: The authored policy file to evaluate; None is policy.rego (in force).
+    policy_path: Path | None = None
 
     @property
     def backend(self) -> str:
@@ -100,6 +109,7 @@ class PolicyEngine:
                     request.tool, request.args, sorted(self.rules),
                     list(self.scope.networks), list(self.scope.roles_assignable),
                     ops_principals=list(self.scope.ops_principals),
+                    policy_path=self.policy_path,
                 )
             except OpaMalformedDecision as exc:
                 return LayerOutcome(
@@ -132,7 +142,21 @@ class PolicyEngine:
             return Verdict.DENY, R3_GRANT
         if R4_BUCKET_OWNER in self.rules and r == "storage.create_bucket" and args.get("owner") not in self.scope.ops_principals:
             return Verdict.DENY, R4_BUCKET_OWNER
+        if (R6_REACHES_BOUNDS in self.rules and r == "net.add_firewall_rule"
+                and args.get("reaches") is not None and not self._reaches_in_declared(args)):
+            return Verdict.DENY, R6_REACHES_BOUNDS
         return Verdict.ALLOW, None
+
+    def _reaches_in_declared(self, args: dict) -> bool:
+        # Mirror of policy_r6.rego: net.cidr_contains(n, reaches) over the
+        # declared networks — a non-address destination is NOT in bounds.
+        nets = [ipaddress.ip_network(n, strict=False) for n in self.scope.networks]
+        dest = str(args.get("reaches"))
+        try:
+            net = ipaddress.ip_network(dest, strict=False)
+        except ValueError:
+            return False
+        return any(net.subnet_of(n) for n in nets if net.version == n.version)
 
     def _egress_out_of_bounds(self, args: dict) -> bool:
         nets = [ipaddress.ip_network(n, strict=False) for n in self.scope.networks]

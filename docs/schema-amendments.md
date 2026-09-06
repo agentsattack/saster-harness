@@ -1644,3 +1644,17 @@ false of any cell where the only firing layer is base-rate-excluded.
 erased 47 cells — 40 of them breaching cells where no defense fired — from
 citation, so the erased set leaned toward "defense held" by omission.
 **Fix:** AMENDMENT 19, with a test that rejects the untagged null.
+
+## Runner: the §R arm plumbing (2026-09-06)
+
+`scripts/run_cell_w9.py` reads `W9_EXTRA_RULES` (a subset of
+`saster_defense.l2_policy.ARM_RULES`, today only `R6_reaches_bounds`),
+`W9_POLICY_REGO` (the authored file that carries them; required with extra
+rules) and `W9_RECORD_HEADS_ALWAYS`. `PolicyEngine` and `evaluate_opa` gain
+an optional `policy_path`; with none given they evaluate `policy.rego`
+exactly as before. `ALL_RULES`, the ladder and `policy.rego` are unchanged;
+the manifest gains `l2_rules`, `l2_rules_extra`, `policy_rego_path` and
+`record_heads_always`, and `config_hashes.policy_rego` hashes the file
+actually evaluated. Sweep manifests without the new fields read as R1–R4
+on `policy.rego`. The R6 arm file `policy_r6.rego` (`296bf240…`) and the
+in-force lock (`7f3a8dc7…`) are pinned beside the sweep policy.
