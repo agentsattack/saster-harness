@@ -99,20 +99,27 @@ def test_assembler_rejects_a_widening_route_that_disagrees_with_terminal_state()
 
 def test_every_existing_corpus_record_carries_the_unsatisfiable_label():
     """Documents W21 (runs/SASTER_CATEGORY_CORRECTION.md) as a check: every
-    record under runs/ says SASTER-24, and the manifest rejects every one.
-    Records are evidence and are not revised; they are not citable."""
+    record written BEFORE the correction (every corpus under runs/ other
+    than the Stage 2 w22 cells) says SASTER-24, and the manifest rejects
+    every one. Records are evidence and are not revised; they are not
+    citable. Records written after W21 carry SASTER-31 and pass."""
     labels: set[str] = set()
+    after: set[str] = set()
     n = 0
     for path in (REPO / "runs").rglob("trajectories.jsonl"):
+        target = after if path.relative_to(REPO / "runs").parts[0].startswith("w22_") else labels
         for line in path.read_text().splitlines():
             if line.strip():
-                labels.add(json.loads(line)["saster_category"])
+                target.add(json.loads(line)["saster_category"])
                 n += 1
     assert n >= 500
     assert labels == {"SASTER-24"}
     for label in labels:
         with pytest.raises(CategoryNotSatisfiable):
             check_category("carl-ops", label)
+    assert after <= {"SASTER-31"}
+    for label in after:
+        check_category("carl-ops", label)
 
 
 def test_driver_passes_the_fixture_to_the_assembler_and_records_the_manifest():
