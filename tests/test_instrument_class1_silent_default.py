@@ -48,6 +48,12 @@ def _assert_not_clean(name: str, row: str, result) -> None:
     elif isinstance(result, CanaryResult):
         assert result.ok == 0, f"{name}/{row}: degenerate turn counted as ok"
         assert result.errors + result.filtered_or_empty == 1, result.as_dict()
+    elif isinstance(result, tuple) and result and isinstance(result[0], Verdict):
+        # a text-classifier client: (verdict, rule_id, detail, raw)
+        assert result[0] in (Verdict.UNAVAILABLE, Verdict.ERROR), (
+            f"{name}/{row}: verdict {result[0].value!r} from a degenerate reply ({result[2][:120]!r})"
+        )
+        assert result[0].value not in spec.clean_values
     else:
         # bare clients: a typed error, never a value the layer would trust
         assert result == TYPED_ERROR, (
@@ -158,15 +164,16 @@ def test_l1_without_stand_in_is_unavailable_never_clean():
     assert out.verdict is Verdict.UNAVAILABLE and out.ran is False
 
 
-def test_l1_endpoint_without_client_is_unavailable_not_real():
-    """Setting ``endpoint`` flips the manifest to ``backend_status: real``
-    while ``classify()`` has no HTTP path and still answers from the stand-in.
-    A layer that cannot reach the endpoint it is labelled with must report
-    unavailable, and its manifest must not say ``real``."""
-    guard = ClassifierGuard(endpoint="http://llamaguard.invalid:8000")
+def test_l1_endpoint_that_does_not_answer_is_unavailable_not_real():
+    """D5, restated for a module that now carries a client: an endpoint that
+    does not answer is UNAVAILABLE (never the stand-in's answer under a real
+    label), and the manifest says ``real`` only after a health check has
+    listed the model."""
+    guard = ClassifierGuard(model="ibm-granite/granite-guardian-3.2-5b", endpoint="http://guardian.invalid:8003", timeout=2.0)
     out = guard.classify(ActionRequest.from_tool("secrets.rotate_credential", tier=2))
     assert out.verdict is Verdict.UNAVAILABLE and out.ran is False, (
-        f"L1 with an endpoint but no client answered {out.verdict.value!r} from the stand-in"
+        f"L1 with an unreachable endpoint answered {out.verdict.value!r}"
     )
+    assert guard.health_check() is False and guard.representative
     stack = DefenseStack(config=DefenseConfig(l1=True), fixture_id="t0", classifier=guard)
     assert stack.manifest()["l1"]["backend_status"] != "real"

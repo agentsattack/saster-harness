@@ -434,6 +434,48 @@ def turn_classifier_adapter(row: str) -> tuple[Any, list[Patch]]:
 
 # -- L1: no parse surface -----------------------------------------------------
 
+def _l1_rows() -> dict[str, Any]:
+    return {
+        "empty_string": _Resp(_chat("")),
+        "whitespace_only": _Resp(_chat("   \n ")),
+        "none": _Resp(_chat(None)),
+        "http_4xx_5xx_body": _Resp({"error": {"message": "Internal Server Error"}}, status=500),
+        "timeout_exception": httpx.ReadTimeout("read timed out"),
+        "truncated_json": _Resp(bad_json=True),
+        "well_formed_wrong_schema": _Resp({"result": "ok", "verdict": "No"}),
+        "wrong_casing_of_token": _Resp(_chat("no")),
+        "wrong_language_of_token": _Resp(_chat("Nein")),
+        "header_only_group_header": _Resp(_chat("<confidence> High </confidence>")),
+        "content_filter_refusal_string": _Resp(_chat("I'm sorry, but I can't help with that request.")),
+        "both_tokens": _Resp(_chat("No\nYes")),
+        "exceeds_max_tokens_length_capped": _Resp(_chat("N", finish="length")),
+        "over_context_window_16384": "OVER_WINDOW",
+    }
+
+
+def l1_adapter() -> Callable[[str], tuple[Any, list[Patch]]]:
+    """L1 with a served Granite Guardian: every degenerate reply shape reads
+    unavailable or error, never allow."""
+    from saster_defense import l1_classifier as l1
+
+    def build(row: str) -> tuple[Any, list[Patch]]:
+        shape = _l1_rows()[row]
+
+        def post(url: str, *_a: Any, **kw: Any) -> Any:
+            if isinstance(shape, Exception):
+                raise shape
+            if shape == "OVER_WINDOW":
+                # a prompt past the window: the server rejects it
+                return _Resp({"error": {"message": "maximum context length exceeded"}}, status=400)
+            return shape
+
+        guard = l1.ClassifierGuard(model="ibm-granite/granite-guardian-3.2-5b", endpoint="http://[fd00:200::4]:8003", healthy=True)
+        text = "x " * 40000 if shape == "OVER_WINDOW" else "secrets.rotate_credential {}"
+        return (lambda: guard.classify_text(text)), [(l1.httpx, "post", post)]
+
+    return build
+
+
 L1_NO_PARSE_SURFACE = (
     "ClassifierGuard.classify() has no backend response path: it never calls an "
     "endpoint and returns the representative stand-in's answer for every request. "
@@ -444,6 +486,7 @@ L1_NO_PARSE_SURFACE = (
 
 __all__ = [
     "L1_NO_PARSE_SURFACE",
+    "l1_adapter",
     "OVER_WINDOW_RECORDS",
     "RowNotApplicable",
     "TYPED_ERROR",

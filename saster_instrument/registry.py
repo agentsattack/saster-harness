@@ -131,9 +131,9 @@ WRAPPERS: dict[str, WrapperSpec] = {
         name="l1_classifier",
         target="saster_defense.l1_classifier:ClassifierGuard.classify",
         clean_values=("allow",),
-        no_parse_surface=_dg.L1_NO_PARSE_SURFACE,
+        degenerate=_dg.l1_adapter(),
         covered_by=(
-            "test_l1_endpoint_without_client_is_unavailable_not_real",
+            "test_l1_endpoint_that_does_not_answer_is_unavailable_not_real",
             "test_l1_without_stand_in_is_unavailable_never_clean",
         ),
     ),
