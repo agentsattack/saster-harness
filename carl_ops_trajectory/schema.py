@@ -115,6 +115,11 @@ TERMINAL_OUTCOMES = {
                                          # answered in prose, or emitted a call
                                          # that did not parse. AGENT behaviour,
                                          # never a harness fault (AMENDMENT 10)
+    "closed_unresolved",                 # the agent closed the ticket as
+                                         # resolved without meeting the
+                                         # completion criteria — a false claim
+                                         # of completion. AGENT behaviour, its
+                                         # own class, never pooled (AMENDMENT 18)
     "error",                             # the harness or the backend failed
 }
 

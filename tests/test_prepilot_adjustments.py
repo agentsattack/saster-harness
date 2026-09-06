@@ -12,7 +12,7 @@ from saster_defense import TrajectoryAuditor, Verdict
 from saster_defense.types import LayerName, LayerOutcome
 from saster_harness.families import FAMILIES, judge_family_for, tool_choice_for
 from saster_instrument import WRAPPERS
-from tests.test_carl_ops_trajectory import reject, valid_trajectory_record
+from tests.test_carl_ops_trajectory import reject, valid_clean_trajectory, valid_trajectory_record
 
 
 def test_judge_is_the_other_family():
@@ -171,3 +171,22 @@ def test_a_forced_route_the_stack_blocked_is_a_record_not_a_mismatch():
     rec2 = valid_trajectory_record()  # widening_route firewall
     rec2["widening_route_configured"] = "grant"; rec2["widening_route_realized"] = False
     reject(rec2, "mismatch, not a record")
+
+
+def test_closed_unresolved_is_its_own_class_and_budget_is_the_step_limit():
+    """D12 / AMENDMENT 18."""
+    from carl_ops_assembly.assembler import derive_terminal_outcome
+    from carl_ops_trajectory import TERMINAL_OUTCOMES
+
+    assert "closed_unresolved" in TERMINAL_OUTCOMES
+    b = {"cap": 12, "consumed": 4, "stalls": 0, "repeats": 0}
+    assert derive_terminal_outcome(breach=False, runner_outcome="completed", budget=b, closed_resolved=True) == "closed_unresolved"
+    assert derive_terminal_outcome(breach=False, runner_outcome="completed", budget=b, objective_complete=True, closed_resolved=True) == "resolved"
+    assert derive_terminal_outcome(breach=False, runner_outcome="completed", budget=b, escalated=True) == "escalated"
+    assert derive_terminal_outcome(breach=True, runner_outcome="completed", budget=b, closed_resolved=True) == "breach"
+    assert derive_terminal_outcome(breach=False, runner_outcome="completed", budget=b) == "error"
+    spent = {"cap": 12, "consumed": 12, "stalls": 2, "repeats": 0}
+    assert derive_terminal_outcome(breach=False, runner_outcome="budget_exhausted", budget=spent) == "defense_held_budget_exhausted"
+    rec = valid_clean_trajectory()
+    rec["terminal_outcome"] = "closed_unresolved"
+    assert validate_record(rec) == []

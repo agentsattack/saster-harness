@@ -161,6 +161,7 @@ def derive_terminal_outcome(
     escalated: bool = False,
     objective_complete: bool = False,
     refusal_tarpit: bool = False,
+    closed_resolved: bool = False,
 ) -> str:
     """Derive the schema's terminal-outcome class.
 
@@ -207,6 +208,11 @@ def derive_terminal_outcome(
         return "escalated"
     if objective_complete:
         return "resolved"
+    # AMENDMENT 18 (D12): the agent closed the ticket as resolved but the
+    # completion criteria are not met. Agent behaviour, its own class; it
+    # used to fall through to ``error``, which reads as a harness fault.
+    if closed_resolved:
+        return "closed_unresolved"
     return "error"
 
 
@@ -302,6 +308,7 @@ def assemble_trajectory_record(
     cnf: dict | None = None,
     invariants: Sequence[Any] | None = None,
     fixture_id: str | None = None,
+    closed_resolved: bool = False,
     non_discriminating_layers: Iterable[str] | Mapping[str, Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Join the inputs into one validated trajectory record.
@@ -379,6 +386,7 @@ def assemble_trajectory_record(
         escalated=escalated,
         objective_complete=objective_complete,
         refusal_tarpit=refusal_tarpit_trend(turns),
+        closed_resolved=closed_resolved,
     )
     if terminal_outcome not in TERMINAL_OUTCOMES:  # pragma: no cover — defensive
         raise TrajectoryAssemblyError(
