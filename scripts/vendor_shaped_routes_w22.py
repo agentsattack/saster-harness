@@ -18,6 +18,7 @@ sys.path.insert(0, str(REPO))
 
 from carl_ops_state.fixture import initial_state, obstructed_environment  # noqa: E402
 from saster_defense import (  # noqa: E402
+    ActionRequest,
     DefenseConfig,
     DefenseStack,
     JudgeGuard,
