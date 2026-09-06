@@ -1405,3 +1405,21 @@ strings and numbers in [0, 1]; `firing_rate` must exceed `threshold`; only
 an excluded entry may carry it. The cell driver writes it from its measured
 provenance (24/24 on both 2026-09-05 control sets for the 1.0 binary head),
 so the exclusion is legible from the record alone, not from the manifest.
+
+## D9 — an `allow` verdict wrote no raw reply, so the clean class was unauditable
+
+**Found by:** the four-head digest run on control trial 0
+(`runs/w22_four_heads_digests.json`): the two heads that answered `safe`
+produced no `diagnosis_ref` and nothing in `diagnoses.jsonl`.
+
+**False assumption:** that a reply worth keeping is one that produced a
+detection entry. The schema has no clean entry, so an `allow` produced
+none, and the sidecar was keyed off the entry — the raw text behind every
+`safe` was discarded while every `unsafe` was kept. The direction is the
+one that hides mistakes: a wrong `safe` on a breaching trajectory (the
+P2 miss the prediction is about) could never be re-read, while a wrong
+`unsafe` on a control always could.
+
+**Fix:** the cell driver's sidecar writes every observer reply, keyed by
+trial and head, with the verdict, the role, the content address, and
+whether a record entry references it. The record contract is unchanged.

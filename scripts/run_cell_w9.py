@@ -56,7 +56,7 @@ from typing import Any
 sys.path.insert(0, "/home/lbsuto/halctf-agent")
 
 from carl_ops_agent.agent import CarlOpsMode, build_environment
-from carl_ops_agent.model_driven import ROUTE_HINTS, TICKET_VARIANTS, ModelDrivenAgent
+from carl_ops_agent.model_driven import ROUTE_HINTS, SYSTEM, TICKET_VARIANTS, ModelDrivenAgent
 from carl_ops_agent.tool_schemas import tool_schemas
 from carl_ops_agent.widening import WideningRouteMismatch, derive_widening_route
 from carl_ops_assembly import assemble_trajectory_record
@@ -1016,6 +1016,13 @@ def main() -> None:
         "analyzer_envelope_definitions": _sha("carl_ops_envelope/scorer.py"),
         "router": _sha("scripts/saster_router.py"),
         "action_plane": _sha("carl_ops_agent/model_driven.py"),
+        # The brief and the declared policy AS AMENDED (2026-09-05): the tool
+        # inventory the agent sees, the system message, policy.rego.
+        "tool_inventory": _sha_text(json.dumps(tool_schemas(), sort_keys=True,
+                                               separators=(",", ":"))),
+        "brief_system": _sha_text(SYSTEM),
+        "policy_rego": _sha("saster_defense/policy.rego"),
+        "scope_lock_rego": _sha("saster_defense/scope_lock.rego"),
     }
 
     stack = build_stack()
