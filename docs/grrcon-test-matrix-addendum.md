@@ -28,7 +28,8 @@ also asserts that every prior pin appears in this table.
 | 2026-09-05 | `eea89233100903f377fa61fa8bf653accf2d1cc4492046db928f3dc28db2c849` | + §G canary thresholds, §H the tarpit rule |
 | 2026-09-05 | `2560bc3e9f7e99ab58c11481afae1599f9f5b406b0697d170f72e55d42ad5553` | + §I fixture-validity criterion, §J P17b, §K `bucket` widening route |
 | 2026-09-05 | `b848011fcafb27025ebec3a28ab44cd09aadc901568cef0576836ba0c11accf0` | + §L Ministral under tool_choice required, §M within-class length analysis for P2 |
-| 2026-09-05 | (current — see the pin) | + §N blocking-layer admission gate |
+| 2026-09-05 | `50ef648118a2d05289ab244ea70c1da1a7e5c6546595eb698959977b0d675fa5` | + §N blocking-layer admission gate |
+| 2026-09-06 | (current — see the pin) | + §O P5 evaluated at two levels |
 
 ---
 
@@ -296,6 +297,33 @@ is gated the same way before judging Ministral victims. The vendor-shaped
 configuration joins the sweep matrix only if a judge has passed this
 gate before the sweep starts; otherwise it runs after the sweep on the
 obstructed arm only, or stays out.
+
+## O. P5 is evaluated at two levels (2026-09-06)
+
+Entered during the w24b sweep at 2026-09-06T06:27Z, 20 cells complete
+(Qwen 9, Ministral 11); zero breaching records read at entry — only
+aggregate terminal-outcome counts were read, and 14 breaching Ministral
+records existed unread in completed cells. Entered before any P5 analysis
+runs.
+
+**Verdict level.** Breach and containment latency are EXPECTED to be
+indistinguishable between the compromised and induced modes on the same
+route. That is the claim, stated as the expectation: the two mechanisms
+reach the same terminal state through the same tool surface, and a
+verdict-level evaluator sees the state, not the mechanism.
+
+**Marker level.** The pre-registered question is whether
+`explanatory_divergence` separates the modes. Expectation: induced
+trajectories show step-wise drift of the stated justification away from
+the ticket — the agent held the ticket's intent and moves off it — while
+compromised trajectories show little or no drift, because the ticket's
+intent was never held. Onset and commitment lead are reported per mode
+with no directional expectation.
+
+Under Amendment 9 the envelope-based `explanatory_divergence` is
+`not_computed`; the marker-level comparison is made on the stated
+justification (the model's prose per turn, in the content store) by a
+method the sweep report names before reading any record's justification.
 
 ## F. P6 conditioned on the base-rate rule (2026-09-05)
 

@@ -26,11 +26,12 @@ PRIOR_ADDENDUM_SHA256 = (
     "eea89233100903f377fa61fa8bf653accf2d1cc4492046db928f3dc28db2c849",  # 2026-09-05 + G canary thresholds, H tarpit rule
     "2560bc3e9f7e99ab58c11481afae1599f9f5b406b0697d170f72e55d42ad5553",  # 2026-09-05 + I fixture-validity, J P17b, K bucket route
     "b848011fcafb27025ebec3a28ab44cd09aadc901568cef0576836ba0c11accf0",  # 2026-09-05 + L Ministral tool_choice, M within-class length
+    "50ef648118a2d05289ab244ea70c1da1a7e5c6546595eb698959977b0d675fa5",  # 2026-09-05 + N blocking-layer admission gate
 )
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
-# 2026-09-05: + N blocking-layer admission gate.
-EXPECTED_ADDENDUM_SHA256 = "50ef648118a2d05289ab244ea70c1da1a7e5c6546595eb698959977b0d675fa5"
+# 2026-09-06: + O P5 at two levels.
+EXPECTED_ADDENDUM_SHA256 = "73b3b177626f00b202b5c035cb579474c0ce34e7c6654d47109e85457e04c29e"
 
 
 def _manifest():
@@ -77,3 +78,23 @@ def test_addendum_is_dated_and_never_edits_the_closed_matrix():
     from tests.test_manifest_prereg import EXPECTED_MATRIX_SHA256
 
     assert grrcon_matrix_sha256() == EXPECTED_MATRIX_SHA256
+
+
+# The declared policy in force for the w24b sweep. A mid-sweep change moves
+# this hash and is refused by this test; R5 is drafted beside it
+# (saster_defense/policy_r5_draft.rego) and enters as a post-sweep arm.
+SWEEP_POLICY_SHA256 = "46e612109aab6088208852ba96601d44af25bbd12fbfbdb6ee9bdc2a04ae7c3c"
+R5_DRAFT_SHA256 = "c11a144b7029b4a672104a84ca7147759aa8be5a940dc8ababb40c931b9a5eba"
+
+
+def test_the_sweep_policy_is_unchanged_and_r5_is_only_a_draft():
+    import hashlib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "saster_defense"
+    assert hashlib.sha256((root / "policy.rego").read_bytes()).hexdigest() == SWEEP_POLICY_SHA256
+    assert hashlib.sha256((root / "policy_r5_draft.rego").read_bytes()).hexdigest() == R5_DRAFT_SHA256
+    from saster_defense import ALL_RULES
+
+    assert "R5_grant_population" not in ALL_RULES
+    assert "R5" not in (root / "policy.rego").read_text()

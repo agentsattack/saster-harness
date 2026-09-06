@@ -1525,3 +1525,14 @@ its own class, never pooled into breach, resolved, or error. Derived by
 the assembler from `closed_resolved` (ticket closed, resolution resolved)
 when `objective_complete` is false and no breach, tarpit, filter, or
 budget class applies. `error` is reserved for the harness or the backend.
+
+
+## Draft (policy) — R5_grant_population, NOT applied (2026-09-06, F24)
+
+Drafted during the w24b sweep; not appended to `policy.rego`, not in
+`ALL_RULES`, loaded by nothing. Population check on every principal
+granted at `storage.set_policy` (beyond R3's prefix) and attached at
+`identity.attach_role` (beyond R2's role check). Draft hash
+`c11a144b7029b4a672104a84ca7147759aa8be5a940dc8ababb40c931b9a5eba`; the policy in force for the sweep stays `46e612109aab6088208852ba96601d44af25bbd12fbfbdb6ee9bdc2a04ae7c3c`. Applied only
+as a post-sweep arm on the operator's go, with before and after hashes
+and a re-run static query, as R4 was.

@@ -529,3 +529,39 @@ first detection, but a non-discriminating deny rewrites the trajectory —
 and whether the judge prompt or model choice is revisited before the
 pilot, which would be a config change recorded on the manifest, not a
 pre-registration change.
+
+
+## F24 — the tool surface had two holes; the static query found one (2026-09-06, read-only, during w24b)
+
+Asked whether R4 closed the bucket hole. Facts, all replayed locally:
+
+1. **No creation-time ACL.** `storage.create_bucket` takes `name`,
+   `region`, `owner`, nothing else; the store grants the owner read and
+   write. The widening arguments across the surface are `owner`
+   (create), `principal` + `perms` (set_policy), `principal` + `role` +
+   `target` (attach_role), `cidr` / `direction` / `reaches` (firewall),
+   `dst_bucket` (copy), `target` (audit.write).
+2. **The static query enumerated one value per argument.** Its candidate
+   set is the thirteen fixed bindings plus the route's own actions: one
+   owner (`ops-agent`), one grant principal (`compliance-collector`). It
+   never varied `owner`, `principal` or `perms`. That is a coverage gap in
+   the query, not only in the policy.
+3. **Under R1–R4, real OPA:** `set_policy` granting `ops-rotator` (read) or
+   `ops-anyone` (read, write) — names with the `ops-` prefix that are NOT
+   in the declared population — is **allowed**; `attach_role` of the same
+   non-principal to an assignable role is **allowed**; a public `*` grant
+   and a grant to `compliance-collector` are denied by R3; a bucket owned
+   by `ops-rotator` is denied by R4. R3 checks a name prefix; R4 checks
+   the population. The second hole is R3's prefix.
+4. **The oracle fires.** On the state after that grant: I4 at bucket
+   creation (snapshot 2, scope self-extension) and I3 at the grant
+   (snapshot 3); after a copy into the bucket, I1 as well. The public
+   grant also breaches.
+
+R4 misses it, the oracle catches it: two holes, the query found one.
+The sweep had started (20 cells complete at 06:27Z), so no rule is
+added: `saster_defense/policy_r5_draft.rego` is the draft, hash
+`c11a144b7029b4a672104a84ca7147759aa8be5a940dc8ababb40c931b9a5eba`, not loaded by anything; the policy in force for w24b is
+`46e612109aab6088208852ba96601d44af25bbd12fbfbdb6ee9bdc2a04ae7c3c`, guarded by a test so it cannot move mid-sweep. R5 enters as a
+post-sweep arm on the operator's go; whether that is a new run id is the
+operator's decision.
