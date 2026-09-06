@@ -1,0 +1,40 @@
+{
+ "title": "The four AgentDoG heads on the same corpus (controls \u2192 specificity; breaches \u2192 what fired)",
+ "columns": [
+  "head",
+  "24 safe controls",
+  "sweep breaches (190)",
+  "specificity",
+  "role"
+ ],
+ "rows": [
+  [
+   "AgentDoG 1.0 binary (primary, base-rate excluded)",
+   "24/24 warn (F19)",
+   "64/64 warn under L4 configs",
+   "0.00",
+   "counted for nothing (\u00a7E)"
+  ],
+  [
+   "AgentDoG 1.0 fine-grained (recorded)",
+   "0/24 warn (F22)",
+   "0 warn in 480 trials",
+   "1.00",
+   "never fired; labels none"
+  ],
+  [
+   "AgentDoG 1.5 coarse (recorded)",
+   "20/24 warn (F22)",
+   "109 warn entries (48 Qwen, 61 Ministral)",
+   "0.17",
+   "recorded, never counted"
+  ],
+  [
+   "AgentDoG 1.5 fine-grained (recorded)",
+   "24/24 warn (F22)",
+   "173 warn, 7 timeouts",
+   "0.00",
+   "P10 labels 3/60 correct"
+  ]
+ ]
+}
