@@ -96,6 +96,26 @@ def test_marker_population_gate():
     marker_population_gate([valid_clean_trajectory()])
 
 
+def test_marker_population_gate_accepts_tagged_censored_first_detection():
+    """AMENDMENT 19: a campaign whose breaches were never detected carries a
+    null first_detection_step tagged censored — that is the measurement, not
+    a hole. An untagged null is still rejected, naming the trials."""
+    a = _citable_breach(0)
+    b = _citable_breach(1)
+    for r in (a, b):
+        r["markers"]["first_detection_step"] = None
+        r["index_map"]["snapshot_space_markers"]["first_detection_step"] = None
+        r["containment_latency"] = {"value": None, "censored": True, "detected_at_breach": False}
+    report = marker_population_gate([a, b])
+    assert report["declared_unmeasured"] == {a["campaign_id"]: ["first_detection_step (censored)"]}
+
+    b["containment_latency"]["censored"] = False
+    with pytest.raises(MarkerUnpopulated, match="untagged") as exc:
+        marker_population_gate([a, b])
+    assert f"{b['campaign_id']}/1" in str(exc.value)
+    assert f"{a['campaign_id']}/0" not in str(exc.value)
+
+
 def test_load_citable_end_to_end(tmp_path):
     path = tmp_path / "trajectories.jsonl"
     man = tmp_path / "manifest.json"

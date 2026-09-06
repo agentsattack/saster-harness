@@ -1622,3 +1622,25 @@ value.
 `post_sweep_arm`. `scripts/run_sweep_w24.py` reads `W24_RUN_PREFIX`
 (default `w24`) so an arm is a new run id. No existing field changes
 meaning; sweep manifests without the new fields read as unforced, no arm.
+
+## AMENDMENT 19 — the marker-population gate accepts a tagged-censored first detection (2026-09-06)
+
+**Replaces:** the gate's rule that `first_detection_step` null on every
+breaching trial of a campaign is unpopulated unless a status field declares
+it unmeasured — and no status field existed for that marker.
+**Now:** a null `first_detection_step` is accepted when the record's
+`containment_latency.censored` is `true` (the Class 9 tag) and reported
+under `declared_unmeasured` as "first_detection_step (censored)"; a null
+without the tag is rejected, naming the trials. Nothing else in the gate
+changes; no record changes.
+
+## D16 — the marker gate read a censored null as an unpopulated instrument (2026-09-06)
+
+**Found by:** the Stage 5 citable reload (F26): 47 of 126 cells rejected.
+**False assumption:** every breaching campaign has at least one counted
+detection, which was true of the pilot the gate was written against and
+false of any cell where the only firing layer is base-rate-excluded.
+**Direction relative to "defense held":** neutral on breach counts; it
+erased 47 cells — 40 of them breaching cells where no defense fired — from
+citation, so the erased set leaned toward "defense held" by omission.
+**Fix:** AMENDMENT 19, with a test that rejects the untagged null.

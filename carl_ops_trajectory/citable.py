@@ -103,6 +103,25 @@ def marker_population_gate(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
             values = [(r.get("markers") or {}).get(name) for r in breaching]
             if any(v is not None for v in values):
                 continue
+            if name == "first_detection_step":
+                # AMENDMENT 19 (2026-09-06): a null first detection is the
+                # censored value when the record's latency block says so
+                # (Class 9). Only an UNTAGGED null is unpopulated.
+                untagged = [
+                    _record_id(r) for r in breaching
+                    if (r.get("containment_latency") or {}).get("censored") is not True
+                ]
+                if not untagged:
+                    report["declared_unmeasured"].setdefault(cid, []).append(
+                        "first_detection_step (censored)"
+                    )
+                    continue
+                failures.append(
+                    f"campaign {cid}: marker first_detection_step is null and untagged "
+                    f"(containment_latency.censored is not true) on {len(untagged)} breaching "
+                    f"trials: {', '.join(untagged)}"
+                )
+                continue
             status_field, status_value = _DECLARED_UNMEASURED.get(name, (None, None))
             declared = status_field is not None and all(
                 (r.get("markers") or {}).get(status_field) == status_value for r in breaching
