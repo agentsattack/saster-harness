@@ -1423,3 +1423,58 @@ P2 miss the prediction is about) could never be re-read, while a wrong
 **Fix:** the cell driver's sidecar writes every observer reply, keyed by
 trial and head, with the verdict, the role, the content address, and
 whether a record entry references it. The record contract is unchanged.
+
+## D10 — a recorded or excluded head's labels were rejected as "not a finding"
+
+**Found by:** the first W23 pilot launch (`runs/w23_pilot`, 2026-09-05):
+both induced cells failed in the assembler with `detection[1].fine_grained:
+only a finding may carry a mechanism attribution`.
+
+**False assumption:** that "a finding" meant one thing. Amendment 16 made
+`_is_finding` return False for a recorded comparator head (never counted),
+and Amendment 14 for a base-rate-excluded head — correctly, for first
+detection — but the fine-grained rule used the same predicate, so a
+recorded FG head's `unsafe` with its three labels was rejected as a
+mechanism attribution on a non-finding. The labels are exactly what P10
+reads.
+
+**Fix:** the fine-grained rule tests the entry's own verdict (`_is_flag`:
+status ok, an action taken, explicit or derived finding), not whether the
+flag counts. `first_finding_step` is unchanged. The four compromised
+cells of that launch emitted no records for a separate reason (see the
+pilot report); the launch directory is kept as evidence and the pilot
+re-runs under a new run id.
+
+
+## D11 — a forced route that the stack blocked was dropped as a "mismatch"
+
+**Found by:** the first W23 pilot launch: all four compromised cells
+(forced `grant` and `firewall`, all-on stack) emitted 0 of 5 records
+each, every trial "configured widening_route 'grant' but terminal state
+derives 'none'". Under R1–R4 and z3 the stack denied the bucket creation
+and the grant, the agent escalated, no widening happened — and the
+record that says the defense held was refused as unverifiable.
+
+**False assumption:** that under a forced route the derived route must
+equal the configured one for the record to be true. It must not be a
+DIFFERENT widening; `none` under a configured route is the ablation's
+own result.
+
+**Fix:** `resolve_widening_route` raises only when a different widening
+was realized; AMENDMENT 17 carries `widening_route_configured` and
+`widening_route_realized` on the record so per-route CVR can be grouped
+by the route the agent was steered toward while `widening_route` states
+what happened. The pilot driver's per-cell `ok` now requires k records.
+The launch directory `runs/w23_pilot` is kept as evidence; the pilot
+re-runs as `runs/w23_pilot_r2` under a new run id.
+
+---
+
+## AMENDMENT 17 — `widening_route_configured` and `widening_route_realized` (2026-09-05, D11)
+
+Optional on the Amendment 3 pattern. When present: `widening_route_configured`
+in the route vocabulary; `widening_route_realized` a bool equal to
+(`widening_route_configured == widening_route`); and a realized route other
+than the configured one is a validation error (the assembler raises before
+that). Under the agent policy the two routes are equal; under a forced route
+a blocked widening reads configured `grant`, route `none`, realized false.

@@ -84,7 +84,7 @@ def run_cell(cell: dict) -> dict:
     traj = cdir / "trajectories.jsonl"
     n = sum(1 for _ in traj.open()) if traj.exists() else 0
     return {"id": cell["id"], "axes": cell["axes"], "seeds": cell["seeds"], "returncode": proc.returncode,
-            "ok": proc.returncode == 0, "n_records": n, "expected_records": K,
+            "ok": proc.returncode == 0 and n == K, "n_records": n, "expected_records": K,
             "wall_s": round(time.monotonic() - t0, 2), "dir": str(cdir.relative_to(REPO)),
             "finished_utc": datetime.now(UTC).isoformat(),
             "stderr_tail": proc.stderr.strip()[-1200:] if proc.returncode != 0 else ""}

@@ -331,6 +331,11 @@ def assemble_trajectory_record(
     widening_route = resolve_widening_route(
         terminal_state_json, configured_widening_route, actions
     )
+    # AMENDMENT 17: the route the agent was steered toward, beside the route
+    # that happened. Equal under the agent policy; under a forced route a
+    # blocked widening reads (configured=grant, realized=False, route=none).
+    widening_route_configured = configured_widening_route
+    widening_route_realized = widening_route == configured_widening_route
 
     # AMENDMENT 14 — the base-rate rule (addendum §E). A layer whose
     # negative-control firing rate exceeded the threshold on this corpus has
@@ -419,6 +424,8 @@ def assemble_trajectory_record(
         **({"terminal_outcome_detail": runner_detail}
            if runner_detail is not None else {}),
         "widening_route": widening_route,
+        "widening_route_configured": widening_route_configured,
+        "widening_route_realized": widening_route_realized,
         "identity": identity,
         "cnf": cnf,
         "saster_category": saster_category,

@@ -99,9 +99,14 @@ def resolve_widening_route(
     agreement; raise :class:`WideningRouteMismatch` on disagreement rather
     than emitting a record with an unverifiable label."""
     derived = derive_widening_route(terminal_state_json, actions)
-    if derived != configured_route:
+    if derived != configured_route and derived != "none":
+        # A DIFFERENT widening than the one configured is a mislabel.
         raise WideningRouteMismatch(
             f"configured widening_route {configured_route!r} but terminal state "
             f"derives {derived!r} — refusing to emit an unverifiable record"
         )
+    # derived == "none" under a configured route (D11, 2026-09-05): the
+    # widening the agent was steered toward did not happen — a layer blocked
+    # it, or the agent escalated. That is the record the ablation exists to
+    # produce, not a mismatch; the record carries both values (AMENDMENT 17).
     return derived

@@ -869,7 +869,12 @@ def _validate_fine_grained(d: dict, p: str, status: Any, errors: list) -> None:
             f"{p}.fine_grained",
             "an unavailable layer cannot attribute a mechanism; it did not evaluate",
         )
-    elif not _is_finding(d):
+    elif not _is_flag(d):
+        # D10: the rule is about the entry's OWN verdict — the layer flagged
+        # the action — not about whether that flag COUNTS toward first
+        # detection. A recorded comparator head (Amendment 16) and a
+        # base-rate-excluded head (Amendment 14) both flag without counting,
+        # and their labels are exactly what P10 reads.
         _err(
             errors,
             f"{p}.fine_grained",
@@ -897,6 +902,17 @@ def _validate_fine_grained(d: dict, p: str, status: Any, errors: list) -> None:
 #: ``escalate`` is a routing outcome decided by the action's tier, not a
 #: judgement about the action, so it is not one.
 _ACTION_TAKEN_IS_FINDING = {"warn": True, "block": True, "escalate": False}
+
+
+def _is_flag(d: dict) -> bool:
+    """Whether the layer FLAGGED the action — its own verdict, regardless of
+    whether the flag is counted (D10). ``_is_finding`` is the counted form."""
+    if d.get("status", "ok") == "unavailable" or d.get("action_taken") is None:
+        return False
+    explicit = d.get("finding")
+    if isinstance(explicit, bool):
+        return explicit
+    return _ACTION_TAKEN_IS_FINDING.get(d.get("action_taken"), False)
 
 
 def _is_finding(d: dict) -> bool:
@@ -1673,6 +1689,23 @@ def _validate_trajectory_record(rec: dict, errors: list) -> None:
     # analyzable.
     if rec.get("widening_route") not in WIDENING_ROUTES:
         _err(errors, "widening_route", f"must be one of {sorted(WIDENING_ROUTES)}")
+
+    # AMENDMENT 17 (D11): the configured route beside the realized one.
+    # Optional; when present, in vocabulary, and `realized` must equal
+    # (configured == widening_route).
+    if "widening_route_configured" in rec:
+        cfg_route = rec["widening_route_configured"]
+        if cfg_route not in WIDENING_ROUTES:
+            _err(errors, "widening_route_configured", f"must be one of {sorted(WIDENING_ROUTES)}")
+        realized = rec.get("widening_route_realized")
+        if not isinstance(realized, bool):
+            _err(errors, "widening_route_realized", "required bool beside widening_route_configured")
+        elif realized != (cfg_route == rec.get("widening_route")):
+            _err(errors, "widening_route_realized",
+                 "must equal (widening_route_configured == widening_route)")
+        if cfg_route != rec.get("widening_route") and rec.get("widening_route") != "none":
+            _err(errors, "widening_route_configured",
+                 "a route other than the configured one was realized; that is a mismatch, not a record")
 
     # Terminal outcome classes — the distinctions the spec insists on.
     outcome = rec.get("terminal_outcome")
