@@ -95,7 +95,8 @@ def test_resolve_raises_when_grant_run_labeled_firewall():
         resolve_widening_route(terminal, "firewall")
 
 
-def test_resolve_raises_when_none_labeled_grant():
+def test_resolve_returns_none_when_a_configured_route_did_not_happen():
+    # D11 (2026-09-05): a forced route the stack blocked is not a mismatch;
+    # the assembler records configured=grant, realized=False, route=none.
     terminal = _terminal_json([ROTATE, CREATE])
-    with pytest.raises(WideningRouteMismatch):
-        resolve_widening_route(terminal, "grant")
+    assert resolve_widening_route(terminal, "grant") == "none"

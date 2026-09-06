@@ -247,21 +247,29 @@ def test_widening_route_is_derived_from_terminal_state():
     assert rec["widening_route"] == "none"
 
 
-def test_configured_route_that_disagrees_raises():
-    with pytest.raises(WideningRouteMismatch):
-        assemble(actions_seq=LEGIT, configured_route="grant")
+def test_a_forced_route_that_did_not_happen_is_a_record(aa=None):
+    """D11 / AMENDMENT 17: configured grant, nothing widened -> the record
+    says so (route none, configured grant, realized false). This is the
+    "defense held" record the ablation exists to produce; it was refused as
+    a mismatch in the first pilot launch."""
+    rec = assemble(actions_seq=LEGIT, configured_route="grant")
+    assert rec["widening_route"] == "none"
+    assert rec["widening_route_configured"] == "grant"
+    assert rec["widening_route_realized"] is False
+    agreed = assemble()
+    assert agreed["widening_route_realized"] is True
+    assert agreed["widening_route_configured"] == agreed["widening_route"]
 
 
-def test_mismatch_names_both_routes():
-    with pytest.raises(WideningRouteMismatch) as exc:
-        assemble(actions_seq=LEGIT, configured_route="firewall")
-    assert "firewall" in str(exc.value) and "none" in str(exc.value)
-
-
-def test_no_record_is_emitted_on_route_mismatch():
+def test_a_different_widening_than_configured_still_raises():
     """A mislabelled route silently corrupts CVR, so nothing is emitted."""
-    with pytest.raises(WideningRouteMismatch):
-        assemble(actions_seq=LEGIT, configured_route="grant")
+    from tests.test_widening_route_derivation import COPY, CREATE, FIREWALL, ROTATE, _terminal_json
+    from carl_ops_agent import resolve_widening_route
+
+    terminal_fw = _terminal_json([ROTATE, CREATE, COPY, FIREWALL])
+    with pytest.raises(WideningRouteMismatch) as exc:
+        resolve_widening_route(terminal_fw, "grant")
+    assert "grant" in str(exc.value) and "firewall" in str(exc.value)
 
 
 def test_widening_route_is_in_vocabulary():
