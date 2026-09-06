@@ -70,8 +70,12 @@ def test_capability_manifest_declares_carl_ops_as_saster_31_only():
     assert caps.satisfiable_categories == ("SASTER-31",)
     assert len(caps.sha256) == 64
     assert caps.sha256 == capabilities_for("carl-ops").sha256  # stable
+    # 2026-09-06 (beat 1): carl-support is declared too — SASTER-14 only, a
+    # capability fact, not a matrix category. carl-ops is unchanged.
+    support = capabilities_for("carl-support")
+    assert support.satisfiable_categories == ("SASTER-14",)
     with pytest.raises(UnknownFixture):
-        capabilities_for("carl-support")
+        capabilities_for("carl-nonexistent")
 
 
 def test_assembler_rejects_a_category_the_fixture_cannot_satisfy():
@@ -105,12 +109,21 @@ def test_every_existing_corpus_record_carries_the_unsatisfiable_label():
     every one. Records are evidence and are not revised; they are not
     citable. Records written after W21 carry SASTER-31 and pass."""
     labels: set[str] = set()
-    after: set[str] = set()
+    after: dict[str, set[str]] = {}  # fixture -> labels, for corpora written after W21
     n = 0
     for path in (REPO / "runs").rglob("trajectories.jsonl"):
         top = path.relative_to(REPO / "runs").parts[0]
-        # every corpus written after W21 (W22 onward) carries the corrected label
-        target = after if re.match(r"^w(2[2-9]|[3-9]\d)[a-z]?_", top) else labels
+        # every corpus written after W21 (W22 onward) carries a label its own
+        # fixture declares: carl-ops records SASTER-31; beat-1 (2026-09-06)
+        # carl-support records SASTER-14. The fixture is the run's manifest.
+        if re.match(r"^w(2[2-9]|[3-9]\d)[a-z]?_", top):
+            man = path.with_name("manifest.json")
+            fixture = "carl-ops"
+            if man.exists():
+                fixture = json.loads(man.read_text()).get("fixture_id", "carl-ops")
+            target = after.setdefault(fixture, set())
+        else:
+            target = labels
         for line in path.read_text().splitlines():
             if line.strip():
                 target.add(json.loads(line)["saster_category"])
@@ -120,9 +133,11 @@ def test_every_existing_corpus_record_carries_the_unsatisfiable_label():
     for label in labels:
         with pytest.raises(CategoryNotSatisfiable):
             check_category("carl-ops", label)
-    assert after <= {"SASTER-31"}
-    for label in after:
-        check_category("carl-ops", label)
+    assert after.get("carl-ops", set()) <= {"SASTER-31"}
+    assert after.get("carl-support", set()) <= {"SASTER-14"}
+    for fixture, found in after.items():
+        for label in found:
+            check_category(fixture, label)
 
 
 def test_driver_passes_the_fixture_to_the_assembler_and_records_the_manifest():
