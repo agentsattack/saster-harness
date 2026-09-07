@@ -1,0 +1,440 @@
+{
+ "baseline_tag": "68a308521252a9213c7a7c2705cb2141c2cbb3eb",
+ "head": "b67eb63ee691ae495a4464f9714f67751293b421",
+ "control": {
+  "baseline_prefailing": [
+   "tests/test_campaign.py::test_a_block_increments_stalls_and_repeats",
+   "tests/test_campaign.py::test_trial_budget_snapshot_is_attached_to_the_result",
+   "tests/test_carl_ops_trajectory.py::test_a_clean_run_may_carry_an_empty_mapping",
+   "tests/test_carl_ops_trajectory.py::test_absent_divergence_status_keeps_the_pre_amendment_meaning",
+   "tests/test_carl_ops_trajectory.py::test_agent_stopped_acting_carries_an_agent_detail",
+   "tests/test_carl_ops_trajectory.py::test_agent_stopped_acting_is_a_terminal_outcome",
+   "tests/test_carl_ops_trajectory.py::test_breach_index_zero_still_rejected_but_ponr_zero_ok",
+   "tests/test_carl_ops_trajectory.py::test_breach_marker_zero_is_legal_in_action_space",
+   "tests/test_carl_ops_trajectory.py::test_budget_exhausted_classes_are_distinct_and_accepted",
+   "tests/test_carl_ops_trajectory.py::test_clean_trajectory_round_trips_clean",
+   "tests/test_carl_ops_trajectory.py::test_computed_accepts_a_real_fraction",
+   "tests/test_carl_ops_trajectory.py::test_computed_still_admits_a_null_meaning_never_crossed",
+   "tests/test_carl_ops_trajectory.py::test_detection_strictly_before_breach_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_error_carries_a_backend_detail",
+   "tests/test_carl_ops_trajectory.py::test_error_is_still_a_legal_outcome",
+   "tests/test_carl_ops_trajectory.py::test_escalated_is_sanctioned_non_breach",
+   "tests/test_carl_ops_trajectory.py::test_explanatory_divergence_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_filtered_or_empty_is_its_own_class",
+   "tests/test_carl_ops_trajectory.py::test_first_firing_accepts_a_well_formed_mapping",
+   "tests/test_carl_ops_trajectory.py::test_first_firing_may_be_absent_pre_amendment_record",
+   "tests/test_carl_ops_trajectory.py::test_identity_and_cnf_accept_object_values",
+   "tests/test_carl_ops_trajectory.py::test_mixed_jsonl_validates",
+   "tests/test_carl_ops_trajectory.py::test_not_estimated_and_estimated_are_not_interchangeable",
+   "tests/test_carl_ops_trajectory.py::test_null_onset_clean_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_null_onset_on_a_breach_is_accepted_when_not_estimated",
+   "tests/test_carl_ops_trajectory.py::test_omitting_the_status_keeps_the_pre_amendment_rule",
+   "tests/test_carl_ops_trajectory.py::test_optional_rule_id_accepted_and_typechecked",
+   "tests/test_carl_ops_trajectory.py::test_policy_verdict_full_vocabulary_accepted",
+   "tests/test_carl_ops_trajectory.py::test_ponr_null_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_ponr_zero_is_accepted_distinct_from_null",
+   "tests/test_carl_ops_trajectory.py::test_refusal_tarpit_clean_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_scored_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_surprisal_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_the_detail_is_optional",
+   "tests/test_carl_ops_trajectory.py::test_three_envelopes_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_trajectory_record_round_trips_clean",
+   "tests/test_carl_ops_trajectory.py::test_unavailable_layer_recorded_honestly_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_widening_route_full_vocabulary_accepted",
+   "tests/test_carl_ops_trajectory.py::test_zero_surprisal_is_accepted",
+   "tests/test_chat_scorer.py::test_envelopes_consume_the_chat_distribution_unchanged",
+   "tests/test_chat_scorer.py::test_every_candidate_is_rendered_under_one_chosen_variant",
+   "tests/test_chat_scorer.py::test_no_template_kwargs_sends_the_byte_identical_body_as_before",
+   "tests/test_chat_scorer.py::test_only_the_suffix_is_scored",
+   "tests/test_chat_scorer.py::test_prefix_token_ids_are_reported_for_audit",
+   "tests/test_chat_scorer.py::test_probabilities_are_a_distribution_over_the_candidate_set",
+   "tests/test_chat_scorer.py::test_scoring_is_deterministic_prompt_only_echo",
+   "tests/test_chat_scorer.py::test_surprisal_is_read_off_the_same_distribution",
+   "tests/test_chat_scorer.py::test_template_kwargs_reach_every_render",
+   "tests/test_chat_scorer.py::test_the_prefix_is_rendered_with_a_generation_prompt",
+   "tests/test_chat_scorer.py::test_the_render_variant_is_probed_not_assumed",
+   "tests/test_chat_scorer.py::test_the_tools_array_is_sent_on_every_render",
+   "tests/test_chat_scorer.py::test_the_variant_cache_is_keyed_by_template_kwargs",
+   "tests/test_defense_stack.py::test_blocking_charges_a_reroute",
+   "tests/test_l4_robustness.py::test_binary_mode_parses_agentdogs_own_tokens",
+   "tests/test_matrix_seeds.py::test_cell_ids_are_unique",
+   "tests/test_matrix_seeds.py::test_cells_differing_in_fixture_mode_do_not_share_seeds",
+   "tests/test_matrix_seeds.py::test_cells_differing_in_precondition_do_not_share_seeds",
+   "tests/test_matrix_seeds.py::test_cells_differing_only_in_defense_config_share_seeds",
+   "tests/test_matrix_seeds.py::test_distinct_seed_count_is_strata_times_k",
+   "tests/test_matrix_seeds.py::test_each_cell_has_k_distinct_seeds",
+   "tests/test_matrix_seeds.py::test_every_cell_carries_its_stratum",
+   "tests/test_matrix_seeds.py::test_k_beyond_the_stride_is_refused_not_silently_collided",
+   "tests/test_matrix_seeds.py::test_ladder_top_rung_duplicates_a_matrix_cell_exactly",
+   "tests/test_matrix_seeds.py::test_spent_seeds_are_not_reused",
+   "tests/test_matrix_seeds.py::test_strata_seed_blocks_are_pairwise_disjoint",
+   "tests/test_taxonomy_sync.py::test_readme_counts_match_shipped_detectors",
+   "tests/test_trajectory_assembly.py::test_configured_route_that_disagrees_raises",
+   "tests/test_trajectory_assembly.py::test_mismatch_names_both_routes",
+   "tests/test_trajectory_assembly.py::test_no_record_is_emitted_on_route_mismatch",
+   "tests/test_widening_route_derivation.py::test_resolve_raises_on_mismatch",
+   "tests/test_widening_route_derivation.py::test_resolve_raises_when_grant_run_labeled_firewall",
+   "tests/test_widening_route_derivation.py::test_resolve_raises_when_none_labeled_grant"
+  ],
+  "baseline_collection_errors": [
+   "tests/test_router_affinity.py"
+  ],
+  "current_prefailing": []
+ },
+ "mutants": {
+  "C1": {
+   "commit": "47a9b56eaf97350f23bfacc7c36e6a2ce07abefb",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.1,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 49.5,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "c367b14",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.7,
+    "prefailing_on_head": 56
+   },
+   "readme": "# Mutant C1\n\nHand-reintroduced in the same function (a clean revert of fix `c367b14` conflicts with code that moved on).\n\n**What:** the auditor's prompt mode does not follow the checkpoint \u2014 every head is asked the fine-grained question, so the binary head answers with a taxonomy group header and the layer records unavailable on every trajectory; the manifest label is untouched.\n**Wrong number:** L4 rendered no verdict anywhere (W14: unavailable on every L4-enabled trajectory).\n**Right number:** a verdict on 60 of 60 L4-enabled trajectories.\n**Fix commit:** `c367b14`.\n**Diff size:**  1 file changed, 1 insertion(+), 1 deletion(-)\n"
+  },
+  "C2": {
+   "commit": "16b8157897de7c5b2e4f27a45fc95178cf3ad7e4",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.5,
+    "collection_errors": [
+     "tests/test_agentdog_taxonomy.py",
+     "tests/test_campaign.py",
+     "tests/test_canary.py",
+     "tests/test_defense_stack.py",
+     "tests/test_l4_robustness.py",
+     "tests/test_manifest_prereg.py",
+     "tests/test_manifest_traffic_plane.py",
+     "tests/test_model_driven.py"
+    ]
+   },
+   "current": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.6,
+    "collection_errors": [
+     "tests/test_agentdog_taxonomy.py",
+     "tests/test_campaign.py",
+     "tests/test_canary.py",
+     "tests/test_coverage_query.py",
+     "tests/test_defense_stack.py",
+     "tests/test_instrument_arm_a_roundtrip.py",
+     "tests/test_instrument_class1_silent_default.py",
+     "tests/test_instrument_class2_degenerate_metric.py",
+     "tests/test_instrument_class4_units.py",
+     "tests/test_instrument_class7_scope.py",
+     "tests/test_instrument_registry.py",
+     "tests/test_l4_robustness.py",
+     "tests/test_manifest_addendum.py",
+     "tests/test_manifest_prereg.py",
+     "tests/test_manifest_traffic_plane.py",
+     "tests/test_model_driven.py",
+     "tests/test_prepilot_adjustments.py",
+     "tests/test_r6_arm.py",
+     "tests/test_stage2_canary_and_tickets.py",
+     "tests/test_stage2_runner_library.py",
+     "tests/test_stage2b_amendments.py",
+     "tests/test_vendor_shaped.py"
+    ]
+   },
+   "suite_before_fix": {
+    "fix": "6281260",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 8.8,
+    "prefailing_on_head": 51
+   },
+   "readme": "# Mutant C2\n\nHand-reintroduced in the same function (a clean revert of fix `6281260` conflicts with code that moved on).\n\n**What:** a length-capped (truncated) reply is read as the clean class instead of unavailable.\n**Wrong number:** FG head `safe` 5/5 on the reference breach; every truncated reply counted clean (W11/W12).\n**Right number:** a truncated reply is unavailable, ran=False.\n**Fix commit:** `6281260`.\n**Diff size:**  1 file changed, 1 insertion(+), 1 deletion(-).\n"
+  },
+  "C3": {
+   "commit": "ce532256387a2e760900155e24a52f53678407d3",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.2,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 45.5,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "479fe5a",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.6,
+    "prefailing_on_head": 52
+   },
+   "readme": "# Mutant C3\n\nHand-reintroduced in the same function (a clean revert of fix `479fe5a` conflicts with code that moved on).\n\n**What:** summed per-token logprob instead of the mean: short candidates win.\n**Wrong number:** SUM saturates Qwen to entropy 0.000 (W13).\n**Right number:** mean per-token logprob, the pre-registered method.\n**Fix commit:** `479fe5a`.\n**Diff size:**  1 file changed, 1 insertion(+), 1 deletion(-).\n"
+  },
+  "C4": {
+   "commit": "d04c68a5121a106d5aad8d4a9e6c743d66237ccf",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.7,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_chat_scorer.py::test_no_template_kwargs_sends_the_byte_identical_body_as_before",
+     "tests/test_chat_scorer.py::test_template_kwargs_reach_every_render",
+     "tests/test_chat_scorer.py::test_the_variant_cache_is_keyed_by_template_kwargs",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[net.add_firewall_rule-mistral]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[net.add_firewall_rule-qwen3]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[secrets.rotate_credential-mistral]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[secrets.rotate_credential-qwen3]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[storage.copy_object-mistral]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[storage.copy_object-qwen3]"
+    ],
+    "wall_s": 43.5,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "562ac77",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.4,
+    "prefailing_on_head": 103
+   },
+   "readme": "# Mutant C4 \u2014 W9: the scorer must render the prompt the agent sampled\n\nReintroduces the defect of catalogue row C4 by reverting ONLY the code side of fix commit `562ac77` (tests, docs and runs left at HEAD).\n\nFiles: carl_ops_envelope/chat_scorer.py \nDiff size:  1 file changed, 12 insertions(+), 35 deletions(-)\n\nWrong number, right number and direction: docs/catalogue-provenance.md row C4.\n"
+  },
+  "C5": {
+   "commit": "27978c22693f748dbb16017027dfb8e43ace53eb",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.2,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_sweep_w24.py::test_plan_shape_and_pairing"
+    ],
+    "wall_s": 45.0,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "385329e",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.1,
+    "prefailing_on_head": 61
+   },
+   "readme": "# Mutant C5\n\nHand-reintroduced in the same function (a clean revert of fix `385329e` conflicts with code that moved on).\n\n**What:** every cell of every stratum replays the same base seed.\n**Wrong number:** 0/60 induced divergence reported where the corpus held 5 distinct trajectories: really 0/5 (W15/W16).\n**Right number:** paired seeds per stratum, disjoint across strata.\n**Fix commit:** `385329e`.\n**Diff size:**  1 file changed, 2 insertions(+), 2 deletions(-).\n"
+  },
+  "C6": {
+   "commit": "5b7968f8d1db1e7655b755bb8ddaeaf02deb97b7",
+   "baseline": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_trajectory_assembly.py::test_an_approval_escalation_does_not_set_first_detection_step",
+     "tests/test_trajectory_assembly.py::test_an_escalation_that_is_a_finding_is_counted",
+     "tests/test_trajectory_assembly.py::test_containment_latency_is_the_difference_of_two_action_indices"
+    ],
+    "wall_s": 10.3,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class4_units.py::test_assembled_golden_record_carries_latency_6_and_units",
+     "tests/test_instrument_class7_scope.py::test_assembler_sets_detected_at_breach_from_marker_equality",
+     "tests/test_stage2_runner_library.py::test_assembler_marks_non_discriminating_layers",
+     "tests/test_trajectory_assembly.py::test_an_approval_escalation_does_not_set_first_detection_step",
+     "tests/test_trajectory_assembly.py::test_an_escalation_that_is_a_finding_is_counted",
+     "tests/test_trajectory_assembly.py::test_containment_latency_is_the_difference_of_two_action_indices"
+    ],
+    "wall_s": 44.9,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "951a7d6",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.8,
+    "prefailing_on_head": 106
+   },
+   "readme": "# Mutant C6\n\nHand-reintroduced in the same function (a clean revert of fix `951a7d6` conflicts with code that moved on).\n\n**What:** containment latency subtracts an action-space first detection from a snapshot-space breach index.\n**Wrong number:** latency 0 on the reference route where 6 holds; an integer every rule accepted (W10, Amendment 6).\n**Right number:** both operands in action space via action_to_snapshot.\n**Fix commit:** `951a7d6`.\n**Diff size:**  1 file changed, 1 insertion(+), 1 deletion(-).\n"
+  },
+  "C7": {
+   "commit": "e36dadd642f5bc8162ecc7bd7c68f9b266a08b7f",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.2,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_chat_scorer.py::test_the_tools_array_is_sent_on_every_render",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[net.add_firewall_rule-mistral]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[net.add_firewall_rule-qwen3]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[secrets.rotate_credential-mistral]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[secrets.rotate_credential-qwen3]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[storage.copy_object-mistral]",
+     "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[storage.copy_object-qwen3]"
+    ],
+    "wall_s": 44.1,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "eb4c84f",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.1,
+    "prefailing_on_head": 90
+   },
+   "readme": "# Mutant C7\n\nHand-reintroduced in the same function (a clean revert of fix `eb4c84f` conflicts with code that moved on).\n\n**What:** the scorer renders the prefix without the tools array the agent sampled with.\n**Wrong number:** every envelope conditioned on a prefix the agent never held (W7b/W9).\n**Right number:** the rendered prefix is the agent's, tools and template kwargs included.\n**Fix commit:** `eb4c84f`.\n**Diff size:**  1 file changed, 1 insertion(+), 1 deletion(-).\n"
+  },
+  "C8": {
+   "commit": "8643fd9002a3a41f3cda3594cd0c2ac08f9d9950",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.1,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 44.6,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "479fe5a",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.1,
+    "prefailing_on_head": 52
+   },
+   "readme": "# Mutant C8\n\nHand-reintroduced in the same function (a clean revert of fix `479fe5a` conflicts with code that moved on).\n\n**What:** the not-computed envelope block reports numbers under status computed: a near-uniform teacher-forced ranking presented as the agent's action distribution.\n**Wrong number:** declared_in/out and scored carried numbers describing a distribution the agent does not draw from (W13, 99.0% of uniform entropy vs the agent's 1.3%).\n**Right number:** three nulls under envelope_status not_computed (Amendment 9).\n**Fix commit:** `479fe5a`.\n**Diff size:**  1 file changed, 4 insertions(+), 23 deletions(-).\n"
+  },
+  "C9": {
+   "commit": "f31dc52b1abdae3bc84d70bf4957ae1251a52b66",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.6,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 45.4,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "68a3085",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.1,
+    "prefailing_on_head": 72
+   },
+   "readme": "# Mutant C9 \u2014 W21: carl-ops is SASTER-31, not SASTER-24 \u2014 corrected at the source, records a\n\nReintroduces the defect of catalogue row C9 by reverting ONLY the code side of fix commit `68a3085` (tests, docs and runs left at HEAD).\n\nFiles: scripts/run_cell_w9.py scripts/run_pilot_w6c.py \nDiff size:  2 files changed, 3 insertions(+), 30 deletions(-)\n\nWrong number, right number and direction: docs/catalogue-provenance.md row C9.\n"
+  },
+  "C10": {
+   "commit": "7d2c03ee964ca90af5cc3a3f487865e3516b199f",
+   "baseline": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_trajectory_assembly.py::test_an_approval_escalation_does_not_set_first_detection_step",
+     "tests/test_trajectory_assembly.py::test_an_escalation_without_a_finding_flag_is_not_a_detection",
+     "tests/test_trajectory_assembly.py::test_escalations_alone_leave_a_breach_right_censored"
+    ],
+    "wall_s": 10.3,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_prepilot_adjustments.py::test_base_rate_exclusion_carries_its_provenance_on_the_entry",
+     "tests/test_stage2_runner_library.py::test_assembler_marks_non_discriminating_layers",
+     "tests/test_trajectory_assembly.py::test_an_approval_escalation_does_not_set_first_detection_step",
+     "tests/test_trajectory_assembly.py::test_an_escalation_without_a_finding_flag_is_not_a_detection",
+     "tests/test_trajectory_assembly.py::test_escalations_alone_leave_a_breach_right_censored"
+    ],
+    "wall_s": 44.8,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "951a7d6",
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.3,
+    "prefailing_on_head": 106
+   },
+   "readme": "# Mutant C10\n\nHand-reintroduced in the same function (a clean revert of fix `951a7d6` conflicts with code that moved on).\n\n**What:** first_detection_step counts any layer action, so an L5 escalation of the authorized rotate reads as a detection.\n**Wrong number:** a detection two actions before the breach and latency 0 on every W9 trial; nothing was contained (W10, Amendment 7).\n**Right number:** findings only (first_finding_step).\n**Fix commit:** `951a7d6`.\n**Diff size:**  1 file changed, 2 insertions(+), 1 deletion(-).\n"
+  },
+  "C11": {
+   "commit": "0aed9fdb861091280d1191ccdf22c5fb4b203bb4",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 8.8,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/both_tokens]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/content_filter_refusal_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/empty_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/exceeds_max_tokens_length_capped]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/header_only_group_header]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/http_4xx_5xx_body]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/none]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/timeout_exception]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/truncated_json]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/well_formed_wrong_schema]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/whitespace_only]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/wrong_casing_of_token]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/wrong_language_of_token]"
+    ],
+    "wall_s": 19.4,
+    "collection_errors": []
+   },
+   "suite_before_fix": {
+    "fix": "0e5cd4b",
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/both_tokens]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/content_filter_refusal_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/empty_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/exceeds_max_tokens_length_capped]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/header_only_group_header]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/http_4xx_5xx_body]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/none]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/timeout_exception]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/truncated_json]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/well_formed_wrong_schema]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/whitespace_only]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/wrong_casing_of_token]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l2_policy/wrong_language_of_token]"
+    ],
+    "wall_s": 9.3,
+    "prefailing_on_head": 88
+   },
+   "readme": "# Mutant C11\n\nHand-reintroduced in the same function (a clean revert of fix `0e5cd4b` conflicts with code that moved on).\n\n**What:** the Python Rego mirror answers under an OPA/real label.\n**Wrong number:** every L2 verdict in a corpus labelled real came from the mirror; the P16 OPA/mirror divergence is invisible.\n**Right number:** OPA is the backend when present; the mirror is a test oracle and is labelled representative.\n**Fix commit:** `0e5cd4b`.\n**Diff size:**  1 file changed, 3 insertions(+), 5 deletions(-).\n"
+  }
+ }
+}
