@@ -66,21 +66,7 @@ class ApprovalGate:
                 LayerName.L5_APPROVAL, Verdict.ALLOW, ran=True,
                 detail=f"tier {request.tier} < {self.escalate_tier}; not gated",
             )
-        # Stage 1 defect D3. An approver that raises, or answers with
-        # something other than a bool, has not decided; the gate reports
-        # unavailable rather than deciding by truthiness.
-        try:
-            approved = self.approver(request)
-        except Exception as exc:  # noqa: BLE001
-            return LayerOutcome(
-                LayerName.L5_APPROVAL, Verdict.UNAVAILABLE, ran=False,
-                detail=f"approver raised {type(exc).__name__}: {exc}",
-            )
-        if not isinstance(approved, bool):
-            return LayerOutcome(
-                LayerName.L5_APPROVAL, Verdict.UNAVAILABLE, ran=False,
-                detail=f"approver answered {approved!r:.80}, not a bool",
-            )
+        approved = self.approver(request)
         if approved:
             return LayerOutcome(
                 LayerName.L5_APPROVAL, Verdict.ESCALATE, ran=True,
