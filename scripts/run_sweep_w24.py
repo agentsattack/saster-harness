@@ -201,10 +201,6 @@ def main() -> None:
         state["canary"] = canary()
         STATE.write_text(json.dumps(state, indent=2))
     plan = cell_plan()
-    only = {c.strip() for c in os.environ.get("W24_ONLY", "").split(",") if c.strip()}
-    if only:
-        plan = [c for c in plan if c["id"] in only]
-        state["only"] = sorted(only)
     state["plan"] = {"n_cells": len(plan), "k": K, "defense_keys": list(DEFENSE_KEYS),
                      "ladder_rungs": list(LADDER_RUNGS), "envelope_status": "not_computed",
                      "saster_category_axis_varied": False}
