@@ -1,0 +1,298 @@
+{
+ "baseline_tag": "68a308521252a9213c7a7c2705cb2141c2cbb3eb",
+ "head": "b67eb63ee691ae495a4464f9714f67751293b421",
+ "control": {
+  "baseline_prefailing": [
+   "tests/test_campaign.py::test_a_block_increments_stalls_and_repeats",
+   "tests/test_campaign.py::test_trial_budget_snapshot_is_attached_to_the_result",
+   "tests/test_carl_ops_trajectory.py::test_a_clean_run_may_carry_an_empty_mapping",
+   "tests/test_carl_ops_trajectory.py::test_absent_divergence_status_keeps_the_pre_amendment_meaning",
+   "tests/test_carl_ops_trajectory.py::test_agent_stopped_acting_carries_an_agent_detail",
+   "tests/test_carl_ops_trajectory.py::test_agent_stopped_acting_is_a_terminal_outcome",
+   "tests/test_carl_ops_trajectory.py::test_breach_index_zero_still_rejected_but_ponr_zero_ok",
+   "tests/test_carl_ops_trajectory.py::test_breach_marker_zero_is_legal_in_action_space",
+   "tests/test_carl_ops_trajectory.py::test_budget_exhausted_classes_are_distinct_and_accepted",
+   "tests/test_carl_ops_trajectory.py::test_clean_trajectory_round_trips_clean",
+   "tests/test_carl_ops_trajectory.py::test_computed_accepts_a_real_fraction",
+   "tests/test_carl_ops_trajectory.py::test_computed_still_admits_a_null_meaning_never_crossed",
+   "tests/test_carl_ops_trajectory.py::test_detection_strictly_before_breach_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_error_carries_a_backend_detail",
+   "tests/test_carl_ops_trajectory.py::test_error_is_still_a_legal_outcome",
+   "tests/test_carl_ops_trajectory.py::test_escalated_is_sanctioned_non_breach",
+   "tests/test_carl_ops_trajectory.py::test_explanatory_divergence_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_filtered_or_empty_is_its_own_class",
+   "tests/test_carl_ops_trajectory.py::test_first_firing_accepts_a_well_formed_mapping",
+   "tests/test_carl_ops_trajectory.py::test_first_firing_may_be_absent_pre_amendment_record",
+   "tests/test_carl_ops_trajectory.py::test_identity_and_cnf_accept_object_values",
+   "tests/test_carl_ops_trajectory.py::test_mixed_jsonl_validates",
+   "tests/test_carl_ops_trajectory.py::test_not_estimated_and_estimated_are_not_interchangeable",
+   "tests/test_carl_ops_trajectory.py::test_null_onset_clean_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_null_onset_on_a_breach_is_accepted_when_not_estimated",
+   "tests/test_carl_ops_trajectory.py::test_omitting_the_status_keeps_the_pre_amendment_rule",
+   "tests/test_carl_ops_trajectory.py::test_optional_rule_id_accepted_and_typechecked",
+   "tests/test_carl_ops_trajectory.py::test_policy_verdict_full_vocabulary_accepted",
+   "tests/test_carl_ops_trajectory.py::test_ponr_null_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_ponr_zero_is_accepted_distinct_from_null",
+   "tests/test_carl_ops_trajectory.py::test_refusal_tarpit_clean_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_scored_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_surprisal_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_the_detail_is_optional",
+   "tests/test_carl_ops_trajectory.py::test_three_envelopes_may_be_null_under_not_computed",
+   "tests/test_carl_ops_trajectory.py::test_trajectory_record_round_trips_clean",
+   "tests/test_carl_ops_trajectory.py::test_unavailable_layer_recorded_honestly_is_accepted",
+   "tests/test_carl_ops_trajectory.py::test_widening_route_full_vocabulary_accepted",
+   "tests/test_carl_ops_trajectory.py::test_zero_surprisal_is_accepted",
+   "tests/test_chat_scorer.py::test_envelopes_consume_the_chat_distribution_unchanged",
+   "tests/test_chat_scorer.py::test_every_candidate_is_rendered_under_one_chosen_variant",
+   "tests/test_chat_scorer.py::test_no_template_kwargs_sends_the_byte_identical_body_as_before",
+   "tests/test_chat_scorer.py::test_only_the_suffix_is_scored",
+   "tests/test_chat_scorer.py::test_prefix_token_ids_are_reported_for_audit",
+   "tests/test_chat_scorer.py::test_probabilities_are_a_distribution_over_the_candidate_set",
+   "tests/test_chat_scorer.py::test_scoring_is_deterministic_prompt_only_echo",
+   "tests/test_chat_scorer.py::test_surprisal_is_read_off_the_same_distribution",
+   "tests/test_chat_scorer.py::test_template_kwargs_reach_every_render",
+   "tests/test_chat_scorer.py::test_the_prefix_is_rendered_with_a_generation_prompt",
+   "tests/test_chat_scorer.py::test_the_render_variant_is_probed_not_assumed",
+   "tests/test_chat_scorer.py::test_the_tools_array_is_sent_on_every_render",
+   "tests/test_chat_scorer.py::test_the_variant_cache_is_keyed_by_template_kwargs",
+   "tests/test_defense_stack.py::test_blocking_charges_a_reroute",
+   "tests/test_l4_robustness.py::test_binary_mode_parses_agentdogs_own_tokens",
+   "tests/test_matrix_seeds.py::test_cell_ids_are_unique",
+   "tests/test_matrix_seeds.py::test_cells_differing_in_fixture_mode_do_not_share_seeds",
+   "tests/test_matrix_seeds.py::test_cells_differing_in_precondition_do_not_share_seeds",
+   "tests/test_matrix_seeds.py::test_cells_differing_only_in_defense_config_share_seeds",
+   "tests/test_matrix_seeds.py::test_distinct_seed_count_is_strata_times_k",
+   "tests/test_matrix_seeds.py::test_each_cell_has_k_distinct_seeds",
+   "tests/test_matrix_seeds.py::test_every_cell_carries_its_stratum",
+   "tests/test_matrix_seeds.py::test_k_beyond_the_stride_is_refused_not_silently_collided",
+   "tests/test_matrix_seeds.py::test_ladder_top_rung_duplicates_a_matrix_cell_exactly",
+   "tests/test_matrix_seeds.py::test_spent_seeds_are_not_reused",
+   "tests/test_matrix_seeds.py::test_strata_seed_blocks_are_pairwise_disjoint",
+   "tests/test_taxonomy_sync.py::test_readme_counts_match_shipped_detectors",
+   "tests/test_trajectory_assembly.py::test_configured_route_that_disagrees_raises",
+   "tests/test_trajectory_assembly.py::test_mismatch_names_both_routes",
+   "tests/test_trajectory_assembly.py::test_no_record_is_emitted_on_route_mismatch",
+   "tests/test_widening_route_derivation.py::test_resolve_raises_on_mismatch",
+   "tests/test_widening_route_derivation.py::test_resolve_raises_when_grant_run_labeled_firewall",
+   "tests/test_widening_route_derivation.py::test_resolve_raises_when_none_labeled_grant"
+  ],
+  "baseline_collection_errors": [
+   "tests/test_router_affinity.py"
+  ],
+  "current_prefailing": []
+ },
+ "mutants": {
+  "D13": {
+   "commit": "3560d7646c79f0f6578274bf37da795df4dcf212",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.8,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class6_labels.py::test_assembler_derives_the_route_and_records_the_configured_one",
+     "tests/test_prepilot_adjustments.py::test_a_forced_route_the_stack_blocked_is_a_record_not_a_mismatch",
+     "tests/test_stage2b_amendments.py::test_bucket_route_is_derived_from_the_actions",
+     "tests/test_trajectory_assembly.py::test_a_different_widening_than_configured_is_recorded_with_both_routes",
+     "tests/test_widening_route_derivation.py::test_resolve_returns_the_derived_route_whatever_was_configured"
+    ],
+    "wall_s": 45.2,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D13\n\nClean revert of the CODE side of fix `c243332`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: carl_ops_agent/widening.py carl_ops_assembly/assembler.py carl_ops_trajectory/schema.py scripts/run_sweep_w24.py\nDiff size:  4 files changed, 16 insertions(+), 23 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D13.\n"
+  },
+  "D14": {
+   "commit": "db637be3e39e16947df7e34040f66282ef7a6e9f",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.8,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class6_labels.py::test_assembler_derives_the_route_and_records_the_configured_one",
+     "tests/test_prepilot_adjustments.py::test_a_forced_route_the_stack_blocked_is_a_record_not_a_mismatch",
+     "tests/test_stage2b_amendments.py::test_bucket_route_is_derived_from_the_actions",
+     "tests/test_trajectory_assembly.py::test_a_different_widening_than_configured_is_recorded_with_both_routes",
+     "tests/test_widening_route_derivation.py::test_resolve_returns_the_derived_route_whatever_was_configured"
+    ],
+    "wall_s": 44.2,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D14\n\nClean revert of the CODE side of fix `c243332`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: carl_ops_agent/widening.py carl_ops_assembly/assembler.py carl_ops_trajectory/schema.py scripts/run_sweep_w24.py\nDiff size:  4 files changed, 16 insertions(+), 23 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D14.\n"
+  },
+  "D16": {
+   "commit": "d4d821967d9a61efeff9b5befe1ba9028149449b",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.7,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_citable_gate.py::test_marker_population_gate_accepts_tagged_censored_first_detection"
+    ],
+    "wall_s": 44.7,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D16\n\nClean revert of the CODE side of fix `4bd0502`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: carl_ops_trajectory/citable.py\nDiff size:  1 file changed, 19 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D16.\n"
+  },
+  "D18": {
+   "commit": "bf6b72edb86e0b3e8f004e12ccbfa63895dd4444",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.8,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class6_labels.py::test_capability_manifest_declares_carl_ops_as_saster_31_only",
+     "tests/test_instrument_class6_labels.py::test_every_existing_corpus_record_carries_the_unsatisfiable_label",
+     "tests/test_l1_rendering.py::test_render_is_the_wire_form"
+    ],
+    "wall_s": 39.1,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D18\n\nClean revert of the CODE side of fix `b26e2cd`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: carl_ops_agent/capabilities.py saster_defense/l1_classifier.py saster_defense/manifest.py saster_instrument/registry.py scripts/run_cell_w9.py scripts/run_sweep_w24.py\nDiff size:  6 files changed, 5 insertions(+), 59 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D18.\n"
+  },
+  "D2": {
+   "commit": "35e6610b5e60fbd5826fba005ee81e64b84a7085",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 9.6,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/both_tokens]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/content_filter_refusal_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/empty_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/exceeds_max_tokens_length_capped]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/header_only_group_header]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/http_4xx_5xx_body]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/none]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/timeout_exception]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/truncated_json]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/well_formed_wrong_schema]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/whitespace_only]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/wrong_casing_of_token]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l3_trace/wrong_language_of_token]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/both_tokens]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/content_filter_refusal_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/empty_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/exceeds_max_tokens_length_capped]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/header_only_group_header]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/http_4xx_5xx_body]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/none]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/timeout_exception]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/truncated_json]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/well_formed_wrong_schema]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/whitespace_only]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/wrong_casing_of_token]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[z3_client/wrong_language_of_token]"
+    ],
+    "wall_s": 45.5,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D2\n\nClean revert of the CODE side of fix `13a911c`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: saster_defense/l3_trace.py\nDiff size:  1 file changed, 2 insertions(+), 38 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D2.\n"
+  },
+  "D3": {
+   "commit": "404192460b8152059c940f5b11d9b8a74fbe3cb2",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.2,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/both_tokens]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/content_filter_refusal_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/empty_string]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/exceeds_max_tokens_length_capped]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/header_only_group_header]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/http_4xx_5xx_body]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/none]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/timeout_exception]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/truncated_json]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/well_formed_wrong_schema]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/whitespace_only]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/wrong_casing_of_token]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l5_approval/wrong_language_of_token]"
+    ],
+    "wall_s": 45.5,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D3\n\nClean revert of the CODE side of fix `dd78486`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: saster_defense/l5_approval.py\nDiff size:  1 file changed, 1 insertion(+), 15 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D3.\n"
+  },
+  "D4": {
+   "commit": "9cbf20acf1e06cff075a542ae3ddfcb23458ac60",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.2,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l4_auditor_binary/wrong_casing_of_token]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[l4_auditor_fine_grained/wrong_casing_of_token]",
+     "tests/test_l4_robustness.py::test_binary_mode_parses_agentdogs_own_tokens"
+    ],
+    "wall_s": 44.8,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D4\n\nClean revert of the CODE side of fix `6f39e0e`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: saster_defense/l4_auditor.py\nDiff size:  1 file changed, 2 insertions(+), 7 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D4.\n"
+  },
+  "D6": {
+   "commit": "e2499daff84141be08753837ec2cad6e8473aabf",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.1,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[refusal_turn_classifier/http_4xx_5xx_body]",
+     "tests/test_instrument_class1_silent_default.py::test_degenerate_input_never_clean[refusal_turn_classifier/timeout_exception]"
+    ],
+    "wall_s": 44.9,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D6\n\nClean revert of the CODE side of fix `a0fbbce`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: saster_harness/canary.py\nDiff size:  1 file changed, 8 insertions(+), 24 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D6.\n"
+  },
+  "D8": {
+   "commit": "5ec216de3234f94b9f24bcfa3ec5478c5ec522f1",
+   "baseline": {
+    "killed": false,
+    "killing_tests": [],
+    "wall_s": 10.2,
+    "collection_errors": []
+   },
+   "current": {
+    "killed": true,
+    "killing_tests": [
+     "tests/test_stage2_runner_library.py::test_v15_unified_parser_two_stage"
+    ],
+    "wall_s": 44.8,
+    "collection_errors": []
+   },
+   "readme": "# Mutant D8\n\nClean revert of the CODE side of fix `288b380`; conflicts confined to docs/tests/runs were resolved to HEAD. Reported in the D table only \u2014 a defect the new suite found is killed by it tautologically.\n\nFiles: saster_defense/l4_auditor.py\nDiff size:  1 file changed, 1 insertion(+), 7 deletions(-)\n\nDirection and false assumption: docs/defect-log.md row D8.\n"
+  }
+ }
+}

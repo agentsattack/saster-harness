@@ -43,12 +43,21 @@ def failed_ids(worktree: Path, tests_dir: Path, rootdir: Path) -> tuple[set[str]
     return {norm(f) for f in failed}, {norm(e) for e in errors}, round(wall, 1)
 
 
-def baseline_tree(tmp: Path) -> Path:
-    b = tmp / "baseline"
+def baseline_tree(tmp: Path, ref: str = BASELINE_TAG, name: str = "baseline") -> Path:
+    b = tmp / name
     b.mkdir()
-    tar = subprocess.run(["git", "archive", BASELINE_TAG, "tests", "pyproject.toml"], cwd=REPO, capture_output=True, check=True)
+    tar = subprocess.run(["git", "archive", ref, "tests", "pyproject.toml"], cwd=REPO, capture_output=True, check=True)
     subprocess.run(["tar", "-x", "-C", str(b)], input=tar.stdout, check=True)
     return b
+
+
+def fix_commit_of(worktree: Path) -> str | None:
+    r"""The fix commit named in the mutant's README (``fix commit \`<hash>\``)."""
+    readme = worktree / "MUTANT_README.md"
+    if not readme.exists():
+        return None
+    m = re.search(r"[Ff]ix commit[^`]*`([0-9a-f]{7,40})`", readme.read_text()) or re.search(r"(?:reverting|revert of|of fix)[^`]*`([0-9a-f]{7,40})`", readme.read_text())
+    return m.group(1) if m else None
 
 
 def worktree(ref: str, tmp: Path, name: str) -> Path:
@@ -80,13 +89,24 @@ def main() -> None:
             base_kills = sorted(bf - ctrl_base_f)
             cur_kills = sorted(cf - ctrl_cur_f)
             readme = (w / "MUTANT_README.md").read_text() if (w / "MUTANT_README.md").exists() else ""
+            # the suite as it stood immediately BEFORE the row's fix commit — the
+            # suite that was green with the defect present — run against the mutant,
+            # controlled against unmutated HEAD
+            pre = {"fix": None, "killed": None, "killing_tests": [], "wall_s": None}
+            fix = fix_commit_of(w)
+            if fix and sh(["git", "rev-parse", "--verify", f"{fix}^"]).returncode == 0:
+                pre_tests = baseline_tree(tmp, f"{fix}^", f"pre_{row}") / "tests"
+                pf_ctrl, pe_ctrl, _ = failed_ids(head, pre_tests, pre_tests.parent)
+                pf, pe, pw = failed_ids(w, pre_tests, pre_tests.parent)
+                pre = {"fix": fix, "killed": bool(pf - pf_ctrl), "killing_tests": sorted(pf - pf_ctrl), "wall_s": pw, "prefailing_on_head": len(pf_ctrl)}
             results["mutants"][row] = {"commit": sh(["git", "rev-parse", ref]).stdout.strip(), "baseline": {"killed": bool(base_kills), "killing_tests": base_kills, "wall_s": bw, "collection_errors": sorted(be - ctrl_base_e)},
-                                       "current": {"killed": bool(cur_kills), "killing_tests": cur_kills, "wall_s": cw, "collection_errors": sorted(ce - ctrl_cur_e)}, "readme": readme}
-            print(f"{row:<4} baseline {'KILLED' if base_kills else 'survived':<8} ({len(base_kills)} tests, {bw}s) | current {'KILLED' if cur_kills else 'survived':<8} ({len(cur_kills)} tests, {cw}s) {cur_kills[:2]}")
+                                       "current": {"killed": bool(cur_kills), "killing_tests": cur_kills, "wall_s": cw, "collection_errors": sorted(ce - ctrl_cur_e)}, "suite_before_fix": pre, "readme": readme}
+            print(f"{row:<4} pre-fix {str(pre['killed']):<6} | baseline {'KILLED' if base_kills else 'survived':<8} ({len(base_kills)}) | current {'KILLED' if cur_kills else 'survived':<8} ({len(cur_kills)} tests, {cw}s) {cur_kills[:1]}")
             sh(["git", "worktree", "remove", "--force", str(w)])
         sh(["git", "worktree", "remove", "--force", str(head)])
-    (OUT / "mutation_score.json").write_text(json.dumps(results, indent=1))
-    print("wrote", OUT / "mutation_score.json")
+    name = os.environ.get("MUTSCORE_OUT", "mutation_score.json")
+    (OUT / name).write_text(json.dumps(results, indent=1))
+    print("wrote", OUT / name)
 
 
 if __name__ == "__main__":
