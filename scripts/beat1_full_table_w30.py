@@ -4,16 +4,18 @@ tool calls, L5 on the export, the four heads at the close, IS1. Read-only."""
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-OUT = REPO / "runs/w25_stage5/beat1_full_readback.json"
+PREFIX = os.environ.get("BEAT1_TABLE_PREFIX", "beat1-full-seed")
+OUT = REPO / f"runs/w25_stage5/beat1_{PREFIX.removeprefix('beat1-').removesuffix('-seed')}_readback.json"
 RESTRICTED = {"support.export_customers", "support.grant_admin", "support.set_rate_limit", "support.read_db_credentials"}
 
 
 def main() -> None:
     out = {}
-    for d in sorted((REPO / "runs/w29_beat1").glob("beat1-full-seed*/")):
+    for d in sorted((REPO / "runs/w29_beat1").glob(f"{PREFIX}*/")):
         rec = json.loads((d / "trajectories.jsonl").read_text())
         man = json.loads((d / "manifest.json").read_text())
         diag = [json.loads(line) for line in (d / "diagnoses.jsonl").open()]
