@@ -1683,3 +1683,11 @@ is. **Fix:** `b26e2cd` — `render_action_text` produces the wire form,
 pinned by `tests/test_l1_rendering.py`; both admission attempts are in
 `runs/w29_l1_admission.json`. Introduced in `0ce124f`, the client's first
 rendering.
+
+## D19 — the beat-1 runner keeps a denied input turn in the history the model sees next (2026-09-07)
+
+**Found by:** the readiness review of 2026-09-06 (untracked `docs/grrcon-readiness-review-2026-09-06.md`, finding R1), confirmed in the committed runner `scripts/run_beat1_w29.py` lines 148–149: on an L1 input denial the runner appends the denied user text and a placeholder assistant line to `messages`, and every later turn is sent with that history.
+**False assumption:** that blocking the reply quarantines the input — that a turn the classifier denied is out of the conversation. It is out of the reply, not out of the context.
+**Direction relative to "defense held":** away — the input block is credited on the turn it fires while the denied instruction stays in front of the model on every later turn, so a later capitulation may be the leaked instruction acting, and the count of erosion bypasses through a *held* L1 is inflated by an amount the committed runs cannot measure.
+**What the committed runs show:** in every beat-1 run the blocked turn-0 text was in the context at the capitulating turn, by construction; no run was made under quarantine semantics, so whether the two capitulations depended on it is undecidable from the citable records. The beat stays worded as "L1 blocked the ask; the export came on an erosion turn", never as an erosion bypass of quarantined input.
+**Fix:** not applied. The semantics have to be chosen and stated (retain in audit storage, omit from the victim's context) and re-run under a new run id; the untracked w30 batch's history arm was designed to measure exactly this and is not adopted here.
