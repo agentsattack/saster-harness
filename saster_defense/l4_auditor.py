@@ -442,7 +442,7 @@ class TrajectoryAuditor:
         if self.prompt_style != "v1.0":
             raise ValueError(f"prompt_style {self.prompt_style!r} not in {PROMPT_STYLES}")
         return (
-            fine_grained_prompt(serialized) if self.fine_grained
+            fine_grained_prompt(serialized) if True  # MUTANT C1: the prompt mode ignores the checkpoint
             else binary_prompt(serialized)
         )
 
