@@ -132,11 +132,6 @@ def classify_turn(text: str | None, raw: Any = None) -> TurnClass:
     turn produced nothing — and the record format has one class for it.
     """
     if isinstance(raw, dict):
-        # Stage 1 defect D6. An error body that reached this classifier as
-        # text — {"error": {...}} with no choices — used to classify as ok
-        # because the text was non-empty. It is a transport-class outcome.
-        if "error" in raw and not raw.get("choices"):
-            return TurnClass.ERROR
         for choice in raw.get("choices") or []:
             if not isinstance(choice, dict):
                 continue
@@ -228,31 +223,20 @@ def run_canary(
     for i in range(n):
         prompt = pool[i % len(pool)]
         result.n_attempted += 1
-        # Stage 1 defect D6. A router exception used to escape this loop, so
-        # the turn was never counted at all — not as an error, not as
-        # anything — and the gate read the rate off the turns before it.
-        try:
-            routed = router.generate(
-                run_id=campaign_id,
-                challenge_id=f"canary::{model}",
-                step_index=i,
-                messages=[{"role": "user", "content": prompt}],
-                params=canary_params_for(model) if params is None else params,
-            )
-        except Exception as exc:  # noqa: BLE001 — counted, with its type
-            result.errors += 1
-            result.error_detail.append(f"{type(exc).__name__}: {exc}")
-            continue
+        routed = router.generate(
+            run_id=campaign_id,
+            challenge_id=f"canary::{model}",
+            step_index=i,
+            messages=[{"role": "user", "content": prompt}],
+            params=canary_params_for(model) if params is None else params,
+        )
         if routed.response is None:
             result.errors += 1
             if routed.error:
                 result.error_detail.append(str(routed.error))
             continue
         klass = classify_turn(routed.response.text, routed.response.raw)
-        if klass is TurnClass.ERROR:
-            result.errors += 1
-            result.error_detail.append("error body in a completed response")
-        elif klass is TurnClass.FILTERED_OR_EMPTY:
+        if klass is TurnClass.FILTERED_OR_EMPTY:
             result.filtered_or_empty += 1
         else:
             result.ok += 1
