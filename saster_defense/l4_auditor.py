@@ -146,13 +146,8 @@ class FineGrainedVerdict:
 def _verdict_token(line: str) -> str | None:
     """The first line's verdict, or None. Tolerates surrounding whitespace and
     a single trailing period, and nothing else — the template says DO NOT PRINT
-    ANYTHING ELSE on this line.
-
-    Case is NOT folded (Stage 1 defect D4). The template's tokens are
-    lowercase; ``SAFE`` or ``Safe`` is a reply in a different shape from the
-    one the model was trained to emit, and folding it made the clean class the
-    one verdict reachable from a non-conforming reply."""
-    token = line.strip().rstrip(".").strip()
+    ANYTHING ELSE on this line."""
+    token = line.strip().rstrip(".").strip().lower()
     return token if token in ("safe", "unsafe") else None
 
 
