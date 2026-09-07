@@ -95,6 +95,7 @@ from saster_harness.content_store import ContentStore
 from saster_harness.families import judge_family_for, tool_choice_for
 
 TOOL_CHOICE_OVERRIDE = os.environ.get("W9_TOOL_CHOICE") or None  # addendum §P
+DIRECTIVE_VARIANT = os.environ.get("W9_DIRECTIVE_VARIANT") or None  # addendum §T
 POST_SWEEP_ARM = os.environ.get("W9_ARM") or None
 
 # -- the cell ---------------------------------------------------------------
@@ -569,6 +570,7 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> tuple[dict, di
         # Addendum §P: the post-sweep arm forces the family's tool-choice
         # flag; the default is the family's own (§L).
         tool_choice=TOOL_CHOICE_OVERRIDE,
+        directive_variant=DIRECTIVE_VARIANT,
     )
     stack = build_stack()
     template_kwargs = agent.template_kwargs
@@ -1164,6 +1166,10 @@ def main() -> None:
     manifest["l4_primary"] = OBSERVER
     manifest["tool_choice"] = TOOL_CHOICE_OVERRIDE or tool_choice_for(VICTIM)
     manifest["tool_choice_forced"] = TOOL_CHOICE_OVERRIDE is not None  # addendum §P
+    from carl_ops_agent.model_driven import directive_text as _directive_text
+    _dt = _directive_text(MODE, None if ROUTE == "agent" else ROUTE, DIRECTIVE_VARIANT)
+    manifest["directive_variant"] = DIRECTIVE_VARIANT  # addendum §T
+    manifest["directive_sha256"] = _sha_text(_dt) if _dt is not None else None
     manifest["l2_rules"] = sorted(L2_RULES)
     manifest["l2_rules_extra"] = sorted(L2_EXTRA_RULES)  # addendum §R
     manifest["policy_rego_path"] = POLICY_REGO
