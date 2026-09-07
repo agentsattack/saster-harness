@@ -26,6 +26,7 @@ PRIOR_ADDENDUM_SHA256 = (
     "9657077b0c9d75552b67c7bee0b1989d3f1b6685126a17a9b4cd11607614b648",  # 2026-09-06, §R
     "d5b753c4a497b5671ca8c758a462d044e78960490edff9cc99c49077907b2fad",  # 2026-09-06, §S
     "d1fe956f419592dd2e386a7dab75ea03e3dcf0f272b75e788b7ff95e0088ebf0",  # 2026-09-06, §S as run
+    "206e36b2ce3e9a5325f6a4c7bf4dc9d42c5e2051ab10ac08fa559ff0f1314dae",  # 2026-09-07, §T
     "ffbde3c9e99bc2f4dbd0c20bc8827bb898569d61baa3da5d83663548a2e31e16",  # 2026-09-05 opened: A golden trace, B marker units
     "fffd4dc734381ae374918aa1e6e3ecc42540d771a415f8e8e0bdf8dc044bbe0e",  # 2026-09-05 + C P17, D P2-D, E base-rate, F P6; closure
     "eea89233100903f377fa61fa8bf653accf2d1cc4492046db928f3dc28db2c849",  # 2026-09-05 + G canary thresholds, H tarpit rule
@@ -36,7 +37,7 @@ PRIOR_ADDENDUM_SHA256 = (
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
 # 2026-09-06: + O P5 at two levels.
-EXPECTED_ADDENDUM_SHA256 = "206e36b2ce3e9a5325f6a4c7bf4dc9d42c5e2051ab10ac08fa559ff0f1314dae"
+EXPECTED_ADDENDUM_SHA256 = "014610b1b7a70aa515cb180c973e500c3bc6f25a6aab1a2c76099552ca322c45"
 
 
 def _manifest():

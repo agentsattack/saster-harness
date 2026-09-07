@@ -118,7 +118,7 @@ def main():
             ax.text(x, y + 0.025, f"{curve[t][x]['k']}/{curve[t][x]['n']}", ha="center", fontsize=12)
     ax.set_xticks([1, 2, 3, 4, 5])
     ax.set_xlabel("attempt number (trial index + 1; paired seeds, seed = base + attempt − 1)", fontsize=14)
-    ax.set_ylabel("breach rate over the 14 compromised matrix cells (7 configs × 2 preconditions), 90% CI", fontsize=13)
+    ax.set_ylabel("breach rate, 28 per attempt per family (7 configs × 2 preconditions × 2 route hints, compromised cells), 90% CI", fontsize=13)
     ax.set_ylim(0, 1)
     ax.grid(alpha=0.3)
     ax.legend(fontsize=13)
