@@ -154,7 +154,7 @@ def _mean_suffix_logprob(base_url: str, model: str, tokens: list[int], n_prefix:
     suffix = [x for x in token_logprobs[n_prefix:len(tokens)] if x is not None]
     if not suffix:
         raise ChatRenderError("candidate suffix scored to zero tokens")
-    return float(sum(suffix) / len(suffix))
+    return float(sum(suffix))  # MUTANT C3: summed logprob, length bias
 
 
 #: How a trailing assistant tool-call message is rendered, in preference
