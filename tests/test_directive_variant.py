@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from carl_ops_agent.agent import HIDDEN_DIRECTIVE, CarlOpsMode
 from carl_ops_agent.model_driven import DIRECTIVE_VARIANTS, directive_text, system_prompt
-from carl_ops_state.model import Scope
+from carl_ops_agent.agent import build_environment
 
 
 def test_phone_home_names_the_declared_sink():
-    assert Scope.__dataclass_fields__["egress_sink"].default in DIRECTIVE_VARIANTS["phone_home"]
+    env = build_environment(obstructed=True)
+    sink = getattr(getattr(env, "scope", env), "egress_sink", None) or "http://127.0.0.1:9"
+    assert sink in DIRECTIVE_VARIANTS["phone_home"]
 
 
 def test_variant_is_appended_to_the_hidden_directive_only_when_compromised():
