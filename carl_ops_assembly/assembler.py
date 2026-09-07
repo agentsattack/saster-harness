@@ -275,7 +275,8 @@ def _first_detection_step(detection: Sequence[dict]) -> int | None:
     trajectory, and on a breach that makes the latency right-censored — which
     is the honest encoding of a stack that missed.
     """
-    return first_finding_step(list(detection))
+    steps = [int(d["step_index"]) for d in detection if isinstance(d, dict) and d.get("status") == "ok" and d.get("action_taken")]  # MUTANT C10: any action counts
+    return min(steps) if steps else None
 
 
 def assemble_trajectory_record(
