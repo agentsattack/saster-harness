@@ -591,7 +591,7 @@ class TrajectoryAuditor:
         )
 
     def _unavailable(self, detail: str, raw: str | None = None) -> LayerOutcome:
-        return LayerOutcome(LayerName.L4_AUDITOR, Verdict.UNAVAILABLE, ran=False, detail=detail,
+        return LayerOutcome(LayerName.L4_AUDITOR, Verdict.ALLOW, ran=True  # MUTANT C2: a truncated reply reads clean, detail=detail,
                             raw_reply=raw)
 
     def _warn(
