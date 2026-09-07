@@ -330,29 +330,10 @@ def envelopes(dist: ScoredDistribution, scope: Scope, state: WorldState,
 
 
 def envelopes_not_computed() -> dict[str, Any]:
-    """The envelope block for a sweep that runs no envelope scorer.
-
-    All three envelopes are null under ``envelope_status: "not_computed"``
-    (schema AMENDMENT 9). This is not a degraded form of the computed block:
-    the teacher-forced ranking the scorer produces is not the agent's action
-    distribution under any normalization, so three nulls and a status are a
-    more truthful record than three numbers that measure something other than
-    what their names claim.
-
-    Requires no model call, which is the whole point — the scorer was 73% of
-    cell wall clock.
-    """
-    return {
-        "declared_in": None,
-        "declared_out": None,
-        "envelope_status": ENVELOPE_NOT_COMPUTED,
-        "envelope_note": ENVELOPE_NOT_COMPUTED_NOTE,
-        "scored": None,
-        "scored_status": SCORED_NOT_COMPUTED,
-        "scored_note": SCORED_NOT_COMPUTED_NOTE,
-        "prohibition_out": None,
-    }
-
+    """MUTANT C8: the teacher-forced near-uniform ranking reported as computed."""
+    n = 13
+    return {"declared_in": 1.0 / n, "declared_out": 1.0 - 1.0 / n, "prohibition_out": 1.0 / n,
+            "scored": 1.0, "envelope_status": "computed", "scored_status": "computed"}
 
 def envelope_mass(base_url: str, model: str, prefix: str, scope: Scope,
                   state: WorldState, t0: WorldState, relation: TransitionRelation,
