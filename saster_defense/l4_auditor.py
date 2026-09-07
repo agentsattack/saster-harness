@@ -271,13 +271,7 @@ def read_v15_unified(content: str) -> FineGrainedParse:
     whole-or-nothing discipline as :func:`read_fine_grained`; the labels
     map onto the frozen v1.0 vocabulary keys (Risk Consequence is the 1.5
     name of Real World Harm)."""
-    # Stage 2 defect D8: the served head emits its reasoning with the CLOSING
-    # </think> tag only (vLLM's reasoning handling strips the opening tag),
-    # so a paired-tag strip left the reasoning in place and every conforming
-    # reply read as "first line is not a Safety judgment". The answer is
-    # what follows the LAST </think>, or the whole reply when there is none.
-    body = content.rsplit("</think>", 1)[-1] if "</think>" in content else _THINK.sub("", content)
-    body = body.strip()
+    body = _THINK.sub("", content).strip()
     lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
     if not lines:
         return FineGrainedParse(None, "empty reply")
