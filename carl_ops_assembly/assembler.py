@@ -424,7 +424,7 @@ def assemble_trajectory_record(
         # converted one. Passing verdict.breach_step_index here is the W9
         # defect.
         "containment_latency": _containment_latency(
-            breach, markers["breach_step_index"], first_detection, markers.get("units")
+            breach, verdict.breach_step_index, first_detection, markers.get("units")  # MUTANT C6: snapshot index in action arithmetic
         ),
         "terminal_outcome": terminal_outcome,
         # AMENDMENT 10 — which runner status produced it, when the class is
