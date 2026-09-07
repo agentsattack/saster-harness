@@ -130,7 +130,7 @@ def render_tokens(base_url: str, model: str, messages: list[dict], tools: list[d
     body = {
         "model": model,
         "messages": messages,
-        "tools": tools,
+        "tools": [],  # MUTANT C7: the scorer renders a prefix without the tool schema
         "add_generation_prompt": add_generation_prompt,
         "continue_final_message": continue_final_message,
     }
