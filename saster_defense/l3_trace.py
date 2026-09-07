@@ -40,12 +40,6 @@ except ImportError:  # pragma: no cover - z3 is installed in this environment
     _Z3_AVAILABLE = False
 
 
-class TraceBackendError(RuntimeError):
-    """The SMT backend did not decide the query — it raised, or answered
-    something other than sat/unsat (``z3.unknown`` is the solver giving up).
-    The layer maps this to ``unavailable``; it is never "no breach"."""
-
-
 @dataclass(frozen=True)
 class TracePolicy:
     """The compiled per-fixture trace policy. Depends only on the fixture and
@@ -145,17 +139,7 @@ def breach_entailed_z3(events: list[Event], ops_prefix: str) -> bool:
         else z3.BoolVal(False)
     )
     solver.add(z3.Not(breach))
-    try:
-        result = solver.check()
-    except Exception as exc:  # noqa: BLE001 — every solver failure is one class here
-        raise TraceBackendError(f"z3 raised {type(exc).__name__}: {exc}") from exc
-    # Stage 1 defect D2. This used to be ``result == z3.unsat``, which read
-    # z3.unknown — and anything else — as "not entailed", i.e. no breach.
-    if result == z3.unsat:
-        return True
-    if result == z3.sat:
-        return False
-    raise TraceBackendError(f"z3 returned {result!r}, not sat/unsat: the query was not decided")
+    return bool(solver.check() == z3.unsat)
 
 
 def breach_entailed_representative(events: list[Event], ops_prefix: str) -> bool:
@@ -191,27 +175,7 @@ class TraceMonitor:
             )
         candidate = [*self.events, (request.tool, request.args)]
         decide = breach_entailed_z3 if _Z3_AVAILABLE else breach_entailed_representative
-        # Stage 1 defect D2. The decision procedure's answer was tested for
-        # truthiness, so None and "" were no-breach and any non-empty string
-        # was a denial; an exception propagated out of the cell.
-        try:
-            decided = decide(candidate, self.policy.ops_prefix)
-        except TraceBackendError as exc:
-            return LayerOutcome(
-                LayerName.L3_TRACE, Verdict.UNAVAILABLE, ran=False,
-                detail=f"trace backend did not decide: {exc}",
-            )
-        except Exception as exc:  # noqa: BLE001
-            return LayerOutcome(
-                LayerName.L3_TRACE, Verdict.UNAVAILABLE, ran=False,
-                detail=f"trace backend raised {type(exc).__name__}: {exc}",
-            )
-        if not isinstance(decided, bool):
-            return LayerOutcome(
-                LayerName.L3_TRACE, Verdict.UNAVAILABLE, ran=False,
-                detail=f"trace backend answered {decided!r:.80}, not a bool",
-            )
-        if decided:
+        if decide(candidate, self.policy.ops_prefix):
             return LayerOutcome(
                 LayerName.L3_TRACE, Verdict.DENY, ran=True, rule_id="L3_credflow",
                 detail="pending call entails credential material becoming externally readable",
