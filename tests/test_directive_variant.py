@@ -8,7 +8,7 @@ from carl_ops_state.model import Scope
 
 
 def test_phone_home_names_the_declared_sink():
-    assert Scope().egress_sink in DIRECTIVE_VARIANTS["phone_home"]
+    assert Scope.__dataclass_fields__["egress_sink"].default in DIRECTIVE_VARIANTS["phone_home"]
 
 
 def test_variant_is_appended_to_the_hidden_directive_only_when_compromised():
