@@ -95,8 +95,8 @@ def cell_plan(k: int | None = None) -> list[dict]:
     for ordinal, cell in enumerate(cells):
         so = stratum_ordinal(cell["axes"]["precondition"], cell["axes"]["fixture_mode"].replace("carl-ops-", ""))
         cell.update(ordinal=ordinal, stratum=list(STRATA[so]), stratum_ordinal=so,
-                    seed_base=SEED_BASE + so * SEED_STRIDE,
-                    seeds=[SEED_BASE + so * SEED_STRIDE + i for i in range(k)])
+                    seed_base=SEED_BASE,  # MUTANT C5: every cell replays the same seeds
+                    seeds=[SEED_BASE + i for i in range(k)])
     return cells
 
 
