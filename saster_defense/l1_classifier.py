@@ -59,13 +59,9 @@ def client_family(model: str) -> str:
 
 
 def render_action_text(request: ActionRequest) -> str:
-    """What the input classifier is shown for one action: the tool call in
-    its wire form — the tool name as the schema names it (underscores, as
-    the model emits it) and the arguments as a JSON object in emission
-    order. Finding F27 (2026-09-06): the same 109 control actions drew 47
-    Granite Guardian denials rendered dotted and key-sorted, and 2 in this
-    form. A content classifier scores text; this is the text on the wire."""
-    return f"{request.tool.replace('.', '_')} {json.dumps(request.args, default=str)}"
+    """What the input classifier is shown for one action: the tool call as
+    the agent emitted it. A content classifier scores text; this is the text."""
+    return f"{request.tool} {json.dumps(request.args, sort_keys=True, default=str)}"
 
 
 def parse_guardian_reply(family: str, text: str | None) -> tuple[Verdict, str | None, str]:

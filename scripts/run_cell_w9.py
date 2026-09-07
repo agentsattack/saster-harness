@@ -192,10 +192,6 @@ _DEFENSE_CONFIGS = {
     # The seventh (addendum §C, P17): scope lock + per-action judge, no
     # temporal layer. Judge served on the cluster through the router.
     "vendor-shaped": DefenseConfig(vendor_shaped=True),
-    # Addendum §S (2026-09-06): the post-sweep L1 arm — the real input
-    # classifier as a blocking layer beside L2 or L3. Not pre-registered.
-    "l2+l1": DefenseConfig(l1=True, l2=True),
-    "l3+l1": DefenseConfig(l1=True, l3=True),
 }
 _DEFENSE_KEY = os.environ.get("W9_DEFENSE", "all5")
 if _DEFENSE_KEY not in _DEFENSE_CONFIGS:
@@ -214,7 +210,7 @@ if not 0 <= _L2_RULE_COUNT <= len(ALL_RULES):
 # Addendum §R: an arm may add rules that are not in ALL_RULES (the sweep policy
 # and the ladder are unchanged); they come with their own authored file.
 L2_EXTRA_RULES = frozenset(r.strip() for r in os.environ.get("W9_EXTRA_RULES", "").split(",") if r.strip())
-if not set(ARM_RULES) >= L2_EXTRA_RULES:
+if not L2_EXTRA_RULES <= set(ARM_RULES):
     raise SystemExit(f"W9_EXTRA_RULES must be a subset of {ARM_RULES}")
 L2_RULES = frozenset(ALL_RULES[:_L2_RULE_COUNT]) | L2_EXTRA_RULES
 POLICY_REGO = os.environ.get("W9_POLICY_REGO") or "saster_defense/policy.rego"
@@ -378,25 +374,6 @@ def judge_gate_record() -> dict[str, Any]:
             "prompt_sha256": g["prompt_sha256"], "measured_utc": g["measured_utc"]}
 
 
-#: Addendum §S: the real input classifier, when an endpoint is named. A cell
-#: that names one and cannot reach it does not run — never a stand-in under a
-#: real label (D5).
-L1_ENDPOINT = os.environ.get("W9_L1_ENDPOINT") or None
-L1_MODEL = os.environ.get("W9_L1_MODEL", "ibm-granite/granite-guardian-3.2-5b")
-L1_RISK = os.environ.get("W9_L1_RISK", "harm")
-L1_PINS = {"model_revision": os.environ.get("W9_L1_REVISION", ""), "image_digest": os.environ.get("W9_L1_IMAGE_DIGEST", "")}
-
-
-def _l1_guard():
-    if not L1_ENDPOINT:
-        return None
-    from saster_defense.l1_classifier import ClassifierGuard
-    guard = ClassifierGuard(model=L1_MODEL, endpoint=L1_ENDPOINT, risk_name=L1_RISK, pins=L1_PINS)
-    if not guard.health_check():
-        raise SystemExit(f"L1 endpoint {L1_ENDPOINT} does not list {L1_MODEL}; not running with a stand-in under a real label")
-    return guard
-
-
 def build_stack() -> DefenseStack:
     """The cell's one config. L4 is wired to the real AgentDoG endpoint, so
     its manifest ``backend_status`` is ``real`` rather than a stand-in."""
@@ -414,7 +391,6 @@ def build_stack() -> DefenseStack:
         )
     stack = DefenseStack(
         fixture_id="carl-ops",
-        classifier=_l1_guard(),
         config=DEFENSE_CONFIG,
         budget=BudgetLedger(cap=BUDGET_CAP),
         auditor=TrajectoryAuditor(observer_model=AGENTDOG_MODEL, endpoint=AGENTDOG,
