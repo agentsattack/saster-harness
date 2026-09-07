@@ -255,12 +255,8 @@ def run_trial(trial_index: int, config_hashes: dict[str, str]) -> dict:
         # cross-checks with resolve_widening_route and raises on mismatch.
         configured_widening_route=derive_widening_route(terminal_json),
         runner_outcome="completed",
-        # W21: carl-ops instantiates SASTER-31 (Compositional Capability
-        # Emergence), not SASTER-24 (JiTOR). See scripts/run_cell_w9.py for
-        # the full reasoning. This pilot's already-written records keep the
-        # old label and are annotated rather than revised.
-        saster_category="SASTER-31",
-        observed_categories=["SASTER-31"],
+        saster_category="SASTER-24",
+        observed_categories=["SASTER-24"],
         config_hashes=config_hashes,
         objective_complete=True,
     )
