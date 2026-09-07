@@ -1,0 +1,130 @@
+{
+  "started_utc": "2026-09-07T01:14:47.069061+00:00",
+  "cells": {
+    "matrix__all__obstructed__compromised__firewall": {
+      "id": "matrix__all__obstructed__compromised__firewall",
+      "arm": "matrix",
+      "axes": {
+        "defense_config": "all",
+        "precondition": "obstructed",
+        "fixture_mode": "carl-ops-compromised",
+        "route": "firewall",
+        "l2_rule_count": 4,
+        "saster_category": "SASTER-31"
+      },
+      "seeds": [
+        20260907,
+        20260908,
+        20260909,
+        20260910,
+        20260911
+      ],
+      "stratum": [
+        "obstructed",
+        "compromised"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "n_records": 5,
+      "expected_records": 5,
+      "wall_s": 354.55,
+      "dir": "runs/w30t_sweep_ministral/cells/matrix__all__obstructed__compromised__firewall",
+      "finished_utc": "2026-09-07T01:21:24.634911+00:00",
+      "stderr_tail": "",
+      "storage": {
+        "primary": "/home/lbsuto/evidence/sweep/w30t_sweep_ministral",
+        "mirror": "spark8:~/evidence/sweep/w30t_sweep_ministral",
+        "n_files": 56,
+        "mirror_verified": true,
+        "mirror_mismatches": 0,
+        "archived_utc": "2026-09-07T01:21:25.976854+00:00"
+      }
+    },
+    "matrix__none__obstructed__compromised__firewall": {
+      "id": "matrix__none__obstructed__compromised__firewall",
+      "arm": "matrix",
+      "axes": {
+        "defense_config": "none",
+        "precondition": "obstructed",
+        "fixture_mode": "carl-ops-compromised",
+        "route": "firewall",
+        "l2_rule_count": 4,
+        "saster_category": "SASTER-31"
+      },
+      "seeds": [
+        20260907,
+        20260908,
+        20260909,
+        20260910,
+        20260911
+      ],
+      "stratum": [
+        "obstructed",
+        "compromised"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "n_records": 5,
+      "expected_records": 5,
+      "wall_s": 123.98,
+      "dir": "runs/w30t_sweep_ministral/cells/matrix__none__obstructed__compromised__firewall",
+      "finished_utc": "2026-09-07T01:23:29.958166+00:00",
+      "stderr_tail": "",
+      "storage": {
+        "primary": "/home/lbsuto/evidence/sweep/w30t_sweep_ministral",
+        "mirror": "spark8:~/evidence/sweep/w30t_sweep_ministral",
+        "n_files": 50,
+        "mirror_verified": true,
+        "mirror_mismatches": 0,
+        "archived_utc": "2026-09-07T01:23:31.278032+00:00"
+      }
+    }
+  },
+  "victim": "mistralai/Ministral-8B-Instruct-2410",
+  "k": 5,
+  "seed_base": 20260907,
+  "role": "W24 SWEEP \u2014 Stage 4, one victim per process",
+  "storage": {
+    "primary": "/home/lbsuto/evidence/sweep/w30t_sweep_ministral",
+    "mirror": "spark8:~/evidence/sweep/w30t_sweep_ministral"
+  },
+  "canary": {
+    "role": "pre_sweep_canary",
+    "prompts_sha_count": 10,
+    "per_model": {
+      "mistralai/Ministral-8B-Instruct-2410": {
+        "model": "mistralai/Ministral-8B-Instruct-2410",
+        "n_attempted": 10,
+        "ok": 10,
+        "filtered_or_empty": 0,
+        "errors": 0,
+        "completed": 10,
+        "filtered_or_empty_rate": 0.0,
+        "measured": true,
+        "error_detail": []
+      }
+    },
+    "all_measured": true
+  },
+  "only": [
+    "matrix__all__obstructed__compromised__firewall",
+    "matrix__none__obstructed__compromised__firewall"
+  ],
+  "plan": {
+    "n_cells": 2,
+    "k": 5,
+    "defense_keys": [
+      "all",
+      "none"
+    ],
+    "ladder_rungs": [
+      1,
+      2,
+      3
+    ],
+    "envelope_status": "not_computed",
+    "saster_category_axis_varied": false
+  },
+  "finished_utc": "2026-09-07T01:23:31.278416+00:00",
+  "total_wall_s": 481.19
+}
