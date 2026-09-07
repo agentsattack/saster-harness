@@ -427,13 +427,10 @@ def assemble_trajectory_record(
             breach, markers["breach_step_index"], first_detection, markers.get("units")
         ),
         "terminal_outcome": terminal_outcome,
-        # AMENDMENT 10 — which runner status produced it, when the class is
-        # one that can carry a detail. D13: a trajectory that breached and
-        # THEN stopped in prose derives `breach` (breach wins), and the
-        # runner's stop detail does not belong on it.
+        # AMENDMENT 10 — which runner status produced it, when the
+        # class is one that can carry a detail.
         **({"terminal_outcome_detail": runner_detail}
-           if runner_detail is not None and terminal_outcome in ("agent_stopped_acting", "error")
-           else {}),
+           if runner_detail is not None else {}),
         "widening_route": widening_route,
         "widening_route_configured": widening_route_configured,
         "widening_route_realized": widening_route_realized,
