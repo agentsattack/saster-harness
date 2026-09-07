@@ -23,6 +23,7 @@ Every defect the instrument tests, the pilot and the sweep found in this harness
 | D17 | the arm manifest's `l4_heads.<key>.role` says "primary" for the binary head on an L4-off cell; the detection entries say "recorded" | neutral (a setting-derived label disagreeing with the entry-level role; no number changed) | the observer setting alone determines the head's role | documented `760f72f` (2026-09-06); **no fix** — a runner change mid-arm is a new run id; fix before any next run | `2002f4e` (2026-09-05, `l4_heads` manifest block) |
 | D18 | the input classifier's verdicts on the same 109 control actions changed with the rendering: 47 denials dotted and key-sorted, 2 in the wire form (F27) | toward-false-alarm | that a content classifier's verdict on an action is a property of the action — that any faithful serialization of the tool call is equivalent input | `b26e2cd` (2026-09-06; the layer renders the wire form, `tests/test_l1_rendering.py`) | `0ce124f` (2026-09-06, the L1 client's first rendering) |
 | D19 | the beat-1 runner keeps a denied input turn in the history the model sees on later turns (`run_beat1_w29.py:148-149`) | away | that blocking the reply quarantines the input — a denied turn is out of the reply, not out of the context | **no fix** — semantics to be chosen and stated, then a new run id | `328d1e9` (2026-09-06, the beat-1 runner) |
+| D20 | the runner binds tool-call arguments to the store method's signature; a correctly-shaped object with a null required field passes and the store executes it (`create_bucket(owner=None)`, `add_firewall_rule(port=None)`) | neutral (0 of 6,186 actions; mechanism mixed) | that binding to the signature validates the arguments — a present key is a value of the schema's type | **no fix before the talk**; strict-xfail rejection test `tests/test_argument_schema_null.py` | `63e0961` (2026-08-29, the model-driven action plane) |
 
 ## Count by direction
 
@@ -30,11 +31,11 @@ Every defect the instrument tests, the pilot and the sweep found in this harness
 |---|---|---|
 | toward-held | 9 | D1, D2, D4, D5, D6, D9, D13, D14, D15 |
 | erased | 3 | D11, D12, D16 |
-| neutral | 3 | D7, D10, D17 |
+| neutral | 4 | D7, D10, D17, D20 |
 | mixed | 1 | D3 |
 | away | 2 | D8, D19 |
 | toward-false-alarm | 1 | D18 |
 
-Nineteen. 9 toward held, 3 erased (each by omission toward held), 3 neutral, 1 mixed, 2 away, 1 toward false alarm (D18: a defense looking stricter than it is). Three are documented without a fix (D15, D17, D19), each with the reason.
+Twenty. 9 toward held, 3 erased (each by omission toward held), 4 neutral, 1 mixed, 2 away, 1 toward false alarm (D18: a defense looking stricter than it is). Four are documented without a fix (D15, D17, D19, D20), each with the reason.
 
 Introducing commits are the commit that first added the code carrying the assumption, from `git log -S` on the defining symbol; where a file predates the assumption, the file's first commit is given.

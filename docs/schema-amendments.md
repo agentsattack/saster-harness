@@ -1691,3 +1691,29 @@ rendering.
 **Direction relative to "defense held":** away — the input block is credited on the turn it fires while the denied instruction stays in front of the model on every later turn, so a later capitulation may be the leaked instruction acting, and the count of erosion bypasses through a *held* L1 is inflated by an amount the committed runs cannot measure.
 **What the committed runs show:** in every beat-1 run the blocked turn-0 text was in the context at the capitulating turn, by construction; no run was made under quarantine semantics, so whether the two capitulations depended on it is undecidable from the citable records. The beat stays worded as "L1 blocked the ask; the export came on an erosion turn", never as an erosion bypass of quarantined input.
 **Fix:** not applied. The semantics have to be chosen and stated (retain in audit storage, omit from the victim's context) and re-run under a new run id; the untracked w30 batch's history arm was designed to measure exactly this and is not adopted here.
+
+## D20 — the cell runner binds tool-call arguments to the store method's signature, never to the schema the model was sent (2026-09-07)
+
+**Found by:** the schema-admission check of 2026-09-07 (a scan, not a wrong
+number). `carl_ops_agent.tool_schemas.validate_arguments` checks unknown and
+missing keys against `CarlOpsToolSession`'s method signature and returns
+None for a correctly-shaped object with a **null** required field;
+`observe_executed` then calls the store, which **executes**
+`create_bucket(owner=None)` and `add_firewall_rule(port=None)` and raises
+only `PreconditionError` for `rotate_credential(credential_ref=None)`. No
+JSON-schema validation exists on the execution path, although the function
+schemas are what the model is sent.
+**False assumption:** that binding to the method signature validates the
+arguments — that a key being present means its value is of the schema's
+type. The contract the model was shown is never checked against what it
+returned.
+**Direction relative to "defense held":** neutral on this corpus — 0 of
+6,186 recorded actions across the 810 citable records and the §S, §T and §U
+arms carry a schema-invalid argument, and 0 trials ended as
+`bad_arguments`. The mechanism leans **mixed**: an out-of-schema action the
+store accepts is then scored by an oracle that never saw a null, so a
+null-owner bucket could be a breach or an invisible widening, and R4 would
+deny it only where L2 is on.
+**Fix:** not before the talk. Rejection test
+`tests/test_argument_schema_null.py` is `xfail(strict=True)` against the
+validator until it checks the schema; the runner is unchanged.
