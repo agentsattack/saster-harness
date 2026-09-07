@@ -81,17 +81,15 @@ class PolicyEngine:
 
     @property
     def backend(self) -> str:
-        return "opa" if self._opa_active else "python-mirror"
+        return "opa"  # MUTANT C11: the label says OPA
 
     @property
     def representative(self) -> bool:
-        return not self._opa_active
+        return False  # MUTANT C11: ...and the manifest says real
 
     @property
     def _opa_active(self) -> bool:
-        if self.use_opa is not None:
-            return self.use_opa
-        return opa_available()
+        return False  # MUTANT C11: ...while the Python mirror answers
 
     def evaluate(self, request: ActionRequest) -> LayerOutcome:
         if not self.available:
