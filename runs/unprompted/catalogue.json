@@ -1,0 +1,292 @@
+[
+ {
+  "row": "C1",
+  "what": "L4 wrapper: the binary head was asked the fine-grained question, answered with a taxonomy group header, and the layer recorded unavailable on every trajectory \u2014 no verdict rendered anywhere (W14)",
+  "direction": "neutral",
+  "caught_by": "reading",
+  "introduce": "3265bef",
+  "fix": "c367b14",
+  "hours": 79.0,
+  "note": "reconstructed: plan Class 1"
+ },
+ {
+  "row": "C2",
+  "what": "L4 replies capped at max_tokens 8, so every fine-grained reply was truncated before its verdict, and the prompt asked for WARN/ALLOW \u2014 tokens the head was never trained to emit (W11)",
+  "direction": "toward-held",
+  "caught_by": "reading",
+  "introduce": "3265bef",
+  "fix": "6281260",
+  "hours": 60.6,
+  "note": "reconstructed: plan Class 1; the truncation in docs/w11-fine-grained.md"
+ },
+ {
+  "row": "C3",
+  "what": "envelope scorer normalization: summed per-token logprob favours short candidates; SUM saturates Qwen to entropy 0.000 (W13)",
+  "direction": "neutral",
+  "caught_by": "reading",
+  "introduce": "a38d991",
+  "fix": "479fe5a",
+  "hours": 55.7,
+  "note": "reconstructed: plan Class 2 (length invariance)"
+ },
+ {
+  "row": "C4",
+  "what": "the scorer rendered a prefix the agent never held (chat_template_kwargs not threaded): 1029 tokens vs 1025, every envelope conditioned on the wrong prefix (W9)",
+  "direction": "neutral",
+  "caught_by": "reconcile",
+  "introduce": "a38d991",
+  "fix": "562ac77",
+  "hours": 29.1,
+  "note": "reconstructed: plan Class 2 (template round-trip)"
+ },
+ {
+  "row": "C5",
+  "what": "denominator: twelve induced cells replayed the same five seeds; 0/60 was really 0/5, Wilson [0, 6.0%] reported where [0, 43.4%] held (W15/W16)",
+  "direction": "toward-held",
+  "caught_by": "reading",
+  "introduce": "94afa50",
+  "fix": "385329e",
+  "hours": 60.6,
+  "note": "reconstructed: plan Class 3"
+ },
+ {
+  "row": "C6",
+  "what": "unit mismatch: markers in action space subtracted from oracle indices in snapshot space; containment latency came out an integer every rule accepted, 0 on the reference route where 6 holds (W10, Amendment 6)",
+  "direction": "toward-held",
+  "caught_by": "reading",
+  "introduce": "2a13fa4",
+  "fix": "951a7d6",
+  "hours": 31.7,
+  "note": "reconstructed: plan Class 4"
+ },
+ {
+  "row": "C7",
+  "what": "wrong surface: envelope scored /v1/completions over a prose prefix while the agent sampled /v1/chat/completions with a tools array (W7b)",
+  "direction": "neutral",
+  "caught_by": "reading",
+  "introduce": "a38d991",
+  "fix": "eb4c84f",
+  "hours": 1.7,
+  "note": "reconstructed: plan Class 5"
+ },
+ {
+  "row": "C8",
+  "what": "wrong object: a teacher-forced ranking over a closed candidate set reported as the agent's action distribution \u2014 99.0% of uniform entropy against an agent at 1.3% (W13, Amendment 9)",
+  "direction": "away",
+  "caught_by": "reading",
+  "introduce": "a38d991",
+  "fix": "479fe5a",
+  "hours": 55.7,
+  "note": "reconstructed: plan Class 5"
+ },
+ {
+  "row": "C9",
+  "what": "label: 515 records carried saster_category SASTER-24, which the fixture cannot satisfy; nothing read the field (W21)",
+  "direction": "neutral",
+  "caught_by": "reading",
+  "introduce": "2a13fa4",
+  "fix": "68a3085",
+  "hours": 72.6,
+  "note": "reconstructed: plan Class 6"
+ },
+ {
+  "row": "C10",
+  "what": "scope: a detection entry recorded for an action that detected nothing \u2014 first_detection_step named nothing real (W10, Amendment 7)",
+  "direction": "toward-held",
+  "caught_by": "reading",
+  "introduce": "2a13fa4",
+  "fix": "951a7d6",
+  "hours": 31.7,
+  "note": "reconstructed: plan Class 7"
+ },
+ {
+  "row": "C11",
+  "what": "the Python Rego mirror stood in for OPA under a real-looking label until the real backend was wired and a divergence test added (S1 D1)",
+  "direction": "toward-held",
+  "caught_by": "real-backend swap",
+  "introduce": "3265bef",
+  "fix": "0e5cd4b",
+  "hours": 189.7,
+  "note": "in or out per the CFP as submitted \u2014 not resolvable from the repository"
+ },
+ {
+  "row": "D1",
+  "what": "L2: an undefined OPA decision defaulted to allow; a backend failure crashed the cell",
+  "direction": "toward-held",
+  "caught_by": "rejection test",
+  "introduce": "3265bef",
+  "fix": "0e5cd4b",
+  "hours": 189.7,
+  "note": ""
+ },
+ {
+  "row": "D2",
+  "what": "L3: the decision procedure's answer was tested for truthiness; z3 `unknown` read as no breach",
+  "direction": "toward-held",
+  "caught_by": "rejection test",
+  "introduce": "3265bef",
+  "fix": "13a911c",
+  "hours": 189.7,
+  "note": ""
+ },
+ {
+  "row": "D3",
+  "what": "L5: an approver that raised or answered a non-bool was decided by truthiness",
+  "direction": "mixed",
+  "caught_by": "rejection test",
+  "introduce": "3265bef",
+  "fix": "dd78486",
+  "hours": 189.7,
+  "note": ""
+ },
+ {
+  "row": "D4",
+  "what": "L4: the verdict token was case-folded, so `SAFE` was the clean class",
+  "direction": "toward-held",
+  "caught_by": "rejection test",
+  "introduce": "3265bef",
+  "fix": "6f39e0e",
+  "hours": 189.7,
+  "note": ""
+ },
+ {
+  "row": "D5",
+  "what": "L1: an endpoint string made the manifest say `real` while the stand-in kept answering",
+  "direction": "toward-held",
+  "caught_by": "rejection test",
+  "introduce": "3265bef",
+  "fix": "62c1fd6",
+  "hours": 189.7,
+  "note": ""
+ },
+ {
+  "row": "D6",
+  "what": "canary: a router exception escaped the loop uncounted; an error body classified as ok",
+  "direction": "toward-held",
+  "caught_by": "rejection test",
+  "introduce": "2a13fa4",
+  "fix": "a0fbbce",
+  "hours": 170.2,
+  "note": ""
+ },
+ {
+  "row": "D7",
+  "what": "envelope metric: an exactly uniform or single-candidate distribution returned three plausible numbers",
+  "direction": "neutral",
+  "caught_by": "rejection test",
+  "introduce": "a38d991",
+  "fix": "4d5d5b6",
+  "hours": 168.1,
+  "note": ""
+ },
+ {
+  "row": "D8",
+  "what": "the 1.5 unified parser stripped a paired think block the served head never emits",
+  "direction": "away",
+  "caught_by": "rejection test",
+  "introduce": "8dfa4d3",
+  "fix": "288b380",
+  "hours": 0.7,
+  "note": ""
+ },
+ {
+  "row": "D9",
+  "what": "an `allow` wrote no raw reply, so the clean class was unauditable (two sites)",
+  "direction": "toward-held",
+  "caught_by": "gate",
+  "introduce": "2002f4e",
+  "fix": "b6b78cb",
+  "hours": 1.8,
+  "note": ""
+ },
+ {
+  "row": "D10",
+  "what": "a recorded or base-rate-excluded head's labels were rejected as \"not a finding\"",
+  "direction": "neutral",
+  "caught_by": "gate",
+  "introduce": "951a7d6",
+  "fix": "6c38ed6",
+  "hours": 144.8,
+  "note": ""
+ },
+ {
+  "row": "D11",
+  "what": "a forced route that the stack blocked was dropped as a \"mismatch\"",
+  "direction": "erased-toward-held",
+  "caught_by": "gate",
+  "introduce": "1180427",
+  "fix": "6c38ed6",
+  "hours": 193.5,
+  "note": ""
+ },
+ {
+  "row": "D12",
+  "what": "a ticket closed as resolved without completion, and a step-limit exit, were classified `error`",
+  "direction": "erased-toward-held",
+  "caught_by": "sweep",
+  "introduce": "2a13fa4",
+  "fix": "f7c41d3",
+  "hours": 177.9,
+  "note": ""
+ },
+ {
+  "row": "D13",
+  "what": "a breach that then stopped in prose carried a stop detail the schema forbids; the cell aborted",
+  "direction": "toward-held",
+  "caught_by": "sweep",
+  "introduce": "3dab06d",
+  "fix": "c243332",
+  "hours": 120.4,
+  "note": ""
+ },
+ {
+  "row": "D14",
+  "what": "a different realized widening was still dropped as a \"mismatch\"",
+  "direction": "toward-held",
+  "caught_by": "sweep",
+  "introduce": "1180427",
+  "fix": "c243332",
+  "hours": 197.9,
+  "note": ""
+ },
+ {
+  "row": "D15",
+  "what": "the static coverage query enumerated one value per argument",
+  "direction": "toward-held",
+  "caught_by": "reading",
+  "introduce": "d556eba",
+  "fix": "5d9bfe7",
+  "hours": 14.8,
+  "note": "no fix"
+ },
+ {
+  "row": "D16",
+  "what": "the marker gate read a censored null as an unpopulated instrument",
+  "direction": "erased-toward-held",
+  "caught_by": "gate",
+  "introduce": "e734c4a",
+  "fix": "4bd0502",
+  "hours": 20.3,
+  "note": ""
+ },
+ {
+  "row": "D17",
+  "what": "the arm manifest's `l4_heads.<key>.role` says \"primary\" for the binary head on an L4-off cell; the detection entries say \"recorded\"",
+  "direction": "neutral",
+  "caught_by": "reading",
+  "introduce": "2002f4e",
+  "fix": "760f72f",
+  "hours": 18.1,
+  "note": "no fix"
+ },
+ {
+  "row": "D18",
+  "what": "the input classifier's verdicts on the same 109 control actions changed with the rendering: 47 denials dotted and key-sorted, 2 in the wire form (F27)",
+  "direction": "toward-false-alarm",
+  "caught_by": "gate",
+  "introduce": "0ce124f",
+  "fix": "b26e2cd",
+  "hours": 0.4,
+  "note": ""
+ }
+]
