@@ -1754,3 +1754,25 @@ variables. The manifest's traffic-plane map carries a
 smoke cell (new run id) shows the primary on spark7 with `status: ok`, L1
 healthy on spark7, all four heads answering.
 
+## D22 — a scorer transport error aborts the cell and loses its completed trials (2026-09-12)
+
+**Found by:** Arm A (addendum §Y), cell `w34-arm-a-mistral-grant`, trial 3
+of 5: `httpx.ReadTimeout` raised inside
+`carl_ops_envelope.chat_scorer.score_candidates_chat` during the
+decision-point scoring propagated out of `run_trial` and `main`; the
+process exited 1 with `trajectories.jsonl` never written. Trials 0–2 had
+completed. The sweep ran every cell with `W9_ENVELOPE=not_computed`, so
+the scorer's transport path was never on a counted record's route.
+**False assumption:** that a scorer call either answers or raises a
+scorer error — that transport (a timeout on a victim under load; three
+families were sampling at once) is not a failure mode of a metric — and
+that end-of-cell persistence is safe because a cell either completes or
+was never a cell.
+**Direction relative to "defense held":** fail-closed. Zero records were
+made; nothing was miscounted. The cost is wall clock and a re-run.
+**Fix:** not before the talk. The cell was re-run under a new run id
+(`w34-arm-a-mistral-grant-r2`, directory `mistral/grant-r2`), which the
+invariance script reads and records. After the talk: per-trial
+persistence, and a transport error in the envelope scorer recorded as
+`envelope_status: unavailable` on the turn rather than raised.
+
