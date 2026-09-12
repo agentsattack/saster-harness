@@ -460,3 +460,11 @@ Router, 2026-09-12: a third backend, `http://127.0.0.1:8000`, serving
 `deepseek-v4.1-flash` (addendum §W, victim family C). The router keeps one
 ring per model over exactly the backends serving that model, so the Qwen
 and Ministral rings are unchanged by the addition.
+
+spark9, 2026-09-12: docker restored (by hand, daemon-reload and start);
+the pinned image shipped by save-and-load from spark7; a user-owned
+cache `~/hf-cache` holding `RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic`
+copied from spark1's cache and verified; served as `judge70b` on `:8000`
+at 0.85 with max model len 8192 — the Arm C judge node, §N-gated before
+it judges anything.
+

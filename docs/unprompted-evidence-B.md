@@ -205,3 +205,18 @@ max model len 8192; the §N gate result is recorded below when the chain
 finishes. It enters the registry only after the gate and only as a
 judge.
 
+**Gate result.** `RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic` served on
+spark9 with the pinned image (ready after 638 s, 111 of 121 G resident),
+scoped prompt: allowed 109/109 control actions, controls intact 24/24 —
+**§N pass** (`runs/w23_judge_gate_Llama-3.3-70B-Instruct-FP8-dynamic_scoped.json`).
+It stays out of the registry until the proposal is accepted; when it
+enters, it enters as a judge only, and no trajectory is judged by its
+own family across the four.
+
+## Arm C — waiting on the paraphrases
+
+The handoff is `docs/handoff-arm-c-paraphrases.md`: the whole brief the
+blind author receives. Arm C starts when the three paraphrases arrive
+with their hashes and each (judge, paraphrase) pair has passed §N on the
+controls.
+
