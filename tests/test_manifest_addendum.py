@@ -35,11 +35,12 @@ PRIOR_ADDENDUM_SHA256 = (
     "50ef648118a2d05289ab244ea70c1da1a7e5c6546595eb698959977b0d675fa5",  # 2026-09-05 + N blocking-layer admission gate
     "014610b1b7a70aa515cb180c973e500c3bc6f25a6aab1a2c76099552ca322c45",  # §U
     "64396c00d56ed51f6e6901743ab87cdf82738ed40946310e664102ea3f85ebf8",  # §V, §W
+    "708ace47de71a0ed13756ca2683649a5d0ecf49ffdc493a45579036c763c07c7",  # §V as run
 )
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
 # 2026-09-06: + O P5 at two levels.
-EXPECTED_ADDENDUM_SHA256 = "708ace47de71a0ed13756ca2683649a5d0ecf49ffdc493a45579036c763c07c7"
+EXPECTED_ADDENDUM_SHA256 = "5d1a0083ed0cf9dfd670080fc626de8da0acaa98086a3f8ae1a48d4bd20f54b6"
 
 
 def _manifest():
