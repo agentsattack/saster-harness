@@ -391,3 +391,28 @@ Note that spark4 is reachable from spark1 over both the fabric (`fd00:200::4`)
 and the LAN (`192.168.1.201`), but a host with no global IPv6 route cannot reach
 it at all on the fabric address — drive bring-up from spark1, or use
 `192.168.1.201`.
+
+## Relocation, 2026-09-11 — the harness moves off spark1–spark4
+
+A large model (DeepSeek-V4.1-Flash, TP=4, its own recipe under `dsv41/`)
+took spark1–spark4 and their GPUs; the harness services that lived there
+were stopped. The harness now serves on nodes that model does not use, with
+the same images, the same memory fractions and the same ports:
+
+| service | was | now |
+|---|---|---|
+| victim A, Qwen/Qwen3-8B `:8000` | spark3 (`192.168.1.228`) | **spark10** (`fd00:200::10`) |
+| AgentDoG 1.0 binary `:8001`, fine-grained `:8002`, Granite Guardian `:8003`, Llama Guard 3 8B `:8004` | spark4 (`fd00:200::4`) | **spark7** (`fd00:200::7`) |
+| AgentDoG 1.5 coarse `:8001`, 1.5 FG `:8002` (formerly under the Ray trade) | spark2 (`fd00:200::2`) | **spark5** (`fd00:200::5`) |
+| victim B, Ministral `:8000` | spark6 | spark6, unchanged |
+| affinity router `:8080`, cell runner, evidence store | spark1 | spark1, CPU only; the router's `--backends` now name spark10 and spark6 |
+| evidence mirror | spark8 | spark8, unchanged |
+
+The pinned image was shipped with `docker save | docker load` from spark4,
+never pulled; the weights were copied from the DeepSeek nodes' own caches
+over the fabric. `scripts/run_cell_w9.py` reads `W9_HEADS_10_HOST` and
+`W9_HEADS_15_HOST` (defaults: the old fabric addresses) so a new run names
+its placement in the environment and every manifest records the endpoint
+actually used. Records of the sweep are unaffected; a run made after this
+date under the new placement carries the new endpoints in its manifest and,
+in a public snapshot, a new role name rather than a reused one.
