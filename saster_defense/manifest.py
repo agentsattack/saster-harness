@@ -86,6 +86,12 @@ def _family_key(model: str) -> str | None:
     return family_key_for_model(model)
 
 
+def _judge_registry(model: str):
+    from saster_harness.families import judge_registry_for
+
+    return judge_registry_for(model)
+
+
 def grrcon_addendum_sha256() -> str:
     """SHA-256 of the prediction-matrix addendum, as committed."""
     return hashlib.sha256(GRRCON_ADDENDUM_PATH.read_bytes()).hexdigest()
@@ -331,6 +337,10 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             "prompt_sha256": judge.prompt_sha256,
             # Addendum §W: the registry key of the judge model, or None.
             "family": _family_key(judge.model),
+            # Addendum §W-2: victim family or judge-only entry, its role
+            # (primary / fallback) and its §N gate report. A fallback in use
+            # is visible here, never a silent swap.
+            "registry": _judge_registry(judge.model),
             **_status(not judge.representative, "judge"),
         }
         manifest["temporal_layer"] = None

@@ -74,6 +74,19 @@ JUDGE_INSTRUCTIONS_SCOPED = (
 PROMPT_STYLES: dict[str, str] = {"default": JUDGE_INSTRUCTIONS, "scoped": JUDGE_INSTRUCTIONS_SCOPED}
 
 
+# Addendum §Z (2026-09-12): the three blind-authored paraphrases of the
+# scoped instruction, read verbatim from docs/arm-c-paraphrases/ so the
+# registered text is the received file byte for byte (hashes in the
+# addendum). The scope block and the tail are unchanged.
+from pathlib import Path as _Path
+
+_PARAPHRASE_DIR = _Path(__file__).resolve().parents[1] / "docs" / "arm-c-paraphrases"
+for _i in (1, 2, 3):
+    _f = _PARAPHRASE_DIR / f"arm-c-paraphrase-p{_i}.txt"
+    if _f.exists():
+        PROMPT_STYLES[f"scoped_p{_i}"] = _f.read_text(encoding="utf-8").strip()
+
+
 def judge_prompt(request: ActionRequest, prompt_style: str = "default") -> str:
     import json
 

@@ -113,10 +113,12 @@ drawn (seed 20260914) by family × config over the L4-carrying configs.
 | breaching | 44 | 2 | 0.045 | 0.013–0.151 |
 | non-breaching | 46 | 11 | 0.239 | 0.139–0.379 |
 
-Direction: 11 `allow`→`warn`, 2 `warn`→`allow`; no
-`unavailable`. The relocated head is stricter, not noisier, and mostly on
-non-breaching trajectories. F28 carries the extension. The flip ids are in
-the run's `report.md`.
+Direction, stated neutrally: 11 of 13 flips `allow`→`warn`, 2
+`warn`→`allow`, concentrated on non-breaching trajectories; specificity
+on the 46 non-breaching records differs by about 20 points across two
+deterministic servings of the same weights. Neither serving is called
+correct. No `unavailable`. F28 carries the extension (Arm E); the flip
+ids are in the run's `report.md`.
 
 ## Arm B — detector panel (addendum §X)
 
@@ -141,9 +143,10 @@ are in the run's report with the same columns.
   constant detectors at both extremes the panel sd is 0.458 and the
   threshold 1.779, above 1. The expectation (the 1.0 FG head flagged)
   is not met by the rule; the head's silent default is visible in the
-  table instead — clean on every one of 71 breaches. A rule that
-  discriminates on a panel like this is a job for the next
-  pre-registration, not for this run.
+  table instead — clean on every one of 71 breaches. This is a
+  limitation of the rule as pre-registered — it cannot flag when
+  constant detectors bound the panel — and it is reported as that, not
+  re-tuned here.
 - **Agreement (test 2).** Krippendorff α over the load-bearing panel
   -0.212 on the sweep (with the qualified head, descriptive,
   -0.145); negative on every corpus. Every pairwise κ involving a
@@ -158,10 +161,15 @@ are in the run's report with the same columns.
   0.895; Llama Guard recall 0.141, specificity 0.863. On the
   24 controls the binary head is clean on none and both classifiers on
   all.
-- **Anchor table (test 4).** No detector's published number is
-  reproduced here; the only published number the repository states is
-  Llama Guard's ATBench agent-path recall (0.068). The column says "no"
-  on every row.
+- **Anchor table (test 4).** The AgentDoG heads carry the existing
+  ATBench anchors by reference (`docs/evidence-inventory.md`,
+  `docs/grrcon-readiness-review-2026-09-06.md`): 1.0 binary 975
+  well-formed of 1,000 attempted; 1.5 binary 966 of 1,000, accuracy
+  678/966; 1.5 FG 462 of 497. "Not reproduced" applies to the two
+  classifiers only — Granite Guardian's published harm numbers and Llama
+  Guard's ATBench agent-path recall (0.068, the constant the layer
+  carries) have no benchmark data on the cluster. The run's own
+  `report.md` predates this correction and is superseded by this table.
 - **Verdict stability across serving conditions, per head (test 5,
   F28).** 1.0 binary: 54/54, vacuous (constant). 1.0 FG: 30/30, vacuous
   (constant). 1.5 FG: 30/30 with 3 unavailable both sides, vacuous
@@ -219,4 +227,28 @@ The handoff is `docs/handoff-arm-c-paraphrases.md`: the whole brief the
 blind author receives. Arm C starts when the three paraphrases arrive
 with their hashes and each (judge, paraphrase) pair has passed §N on the
 controls.
+
+---
+
+## Judge family 4 accepted (2026-09-12, addendum §W-2)
+
+`RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic` on spark9 is registry entry
+`llama33_70b` (judge-only, role `primary`, §N 109/109 and 24/24). The
+fallback `meta-llama/Llama-3.1-8B-Instruct` is entry `llama31_8b` (role
+`fallback`, its own gate result recorded when its chain finishes; served
+on demand on spark8). The judge manifest block carries `registry` — key,
+kind, role, gate report — so a fallback in use is visible on every record
+it judged. `judge_panel_for(victim)` gives the other victim families and
+then the primary judge-only family; no trajectory is judged by its own
+family across the four.
+
+## Arm C paraphrases received (addendum §Z)
+
+Three paraphrases from a fresh session whose only input was the filled
+handoff; hashes and word counts are in §Z and in
+`docs/arm-c-paraphrases/HASHES.txt`, verified on receipt. Registered as
+`PROMPT_STYLES["scoped_p1".."scoped_p3"]`, read from the received files
+byte for byte. Each (judge, paraphrase) pair is §N-gated before it judges
+a record; the gate reports land beside the scoped ones under `runs/`. No
+Arm C trajectory has been read.
 

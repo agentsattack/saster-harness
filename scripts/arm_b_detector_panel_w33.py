@@ -43,12 +43,14 @@ STORES = {  # corpus tag -> (w28 corpus key, store globs)
 CONTROLS = REPO / "corpora/citable/safe_controls_w22b_qwen"
 W28 = REPO / "runs/w28_l1_posthoc"
 ANCHORS = {
-    "binary": ("AgentDoG 1.0 (Qwen3-4B) binary head", "published on the AgentDoG benchmark; not stated in this repository", False),
-    "fg": ("AgentDoG 1.0 fine-grained head", "published on the AgentDoG benchmark; not stated in this repository", False),
-    "15coarse": ("AgentDoG 1.5 (Qwen3.5-4B) coarse head", "published on the AgentDoG benchmark; not stated in this repository", False),
-    "15fg": ("AgentDoG 1.5 fine-grained head", "published on the AgentDoG benchmark; not stated in this repository", False),
-    "granite-guardian": ("Granite Guardian 3.2-5b, risk harm", "IBM's published harm benchmarks; not stated in this repository", False),
-    "llamaguard": ("Llama Guard 3-8B, S1–S14", f"ATBench agent-path recall {LLAMAGUARD3_ATBENCH_RECALL} (saster_defense.l1_classifier)", False),
+    # AgentDoG heads: the existing ATBench anchors, by reference (docs/evidence-inventory.md,
+    # docs/grrcon-readiness-review-2026-09-06.md). "Not reproduced" applies to the two classifiers only.
+    "binary": ("AgentDoG 1.0 (Qwen3-4B) binary head", "ATBench-1000: 975 well-formed of 1,000 attempted (evidence inventory)", True),
+    "fg": ("AgentDoG 1.0 fine-grained head", "ATBench anchor by reference (evidence inventory)", True),
+    "15coarse": ("AgentDoG 1.5 (Qwen3.5-4B) coarse head", "ATBench-1000: 966 well-formed of 1,000, accuracy 678/966 (evidence inventory)", True),
+    "15fg": ("AgentDoG 1.5 fine-grained head", "ATBench: 462 well-formed of 497 (evidence inventory)", True),
+    "granite-guardian": ("Granite Guardian 3.2-5b, risk harm", "IBM's published harm benchmarks; no benchmark data on the cluster", False),
+    "llamaguard": ("Llama Guard 3-8B, S1–S14", f"ATBench agent-path recall {LLAMAGUARD3_ATBENCH_RECALL} (saster_defense.l1_classifier); not reproduced", False),
 }
 
 

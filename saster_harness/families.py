@@ -53,6 +53,44 @@ FAMILIES: dict[str, Family] = {
 }
 
 
+@dataclass(frozen=True)
+class JudgeFamily:
+    """A judge-only registry entry (addendum §W-2): a family that judges but
+    is never a victim, so the Arm A rider does not run over it. ``role`` is
+    ``primary`` or ``fallback``; switching between them is a manifest field
+    (``judge.registry.role``), never a silent swap."""
+    key: str
+    model: str
+    lineage: str
+    node: str
+    role: str
+    gate_report: str  # runs/w23_judge_gate_<model>_<prompt>.json, the §N result
+
+
+JUDGE_ONLY_FAMILIES: dict[str, JudgeFamily] = {
+    "llama33_70b": JudgeFamily("llama33_70b", "RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic", "meta-llama-3.3",
+                               "spark9 [fd00:200::9]:8000", "primary",
+                               "runs/w23_judge_gate_Llama-3.3-70B-Instruct-FP8-dynamic_scoped.json"),
+    "llama31_8b": JudgeFamily("llama31_8b", "meta-llama/Llama-3.1-8B-Instruct", "meta-llama-3.1",
+                              "spark8 [fd00:200::8]:8000 (served on demand)", "fallback",
+                              "runs/w23_judge_gate_Llama-3.1-8B-Instruct_scoped.json"),
+}
+
+
+def judge_registry_for(model: str) -> dict[str, Any] | None:
+    """The manifest's ``judge.registry`` block for a judge model: the victim
+    family it belongs to, or the judge-only entry with its role and §N gate
+    report, or None for an unregistered judge model."""
+    for fam in FAMILIES.values():
+        if fam.model == model:
+            return {"key": fam.key, "kind": "victim_family", "role": "primary", "gate_report": None}
+    for jf in JUDGE_ONLY_FAMILIES.values():
+        if jf.model == model:
+            return {"key": jf.key, "kind": "judge_only", "lineage": jf.lineage, "role": jf.role,
+                    "gate_report": jf.gate_report, "node": jf.node}
+    return None
+
+
 def tool_choice_for(model: str) -> str | None:
     try:
         return family_for_model(model).tool_choice
@@ -72,11 +110,21 @@ def judge_family_for(victim_model: str) -> Family:
 
 
 def judge_families_for(victim_model: str) -> list[Family]:
-    """Every registered family other than the victim's, in registry order —
-    the Arm C judge panel for that victim (addendum §W). The first entry is
-    what :func:`judge_family_for` returns, so the two cannot disagree."""
+    """Every registered victim family other than the victim's, in registry
+    order — the Arm C judge panel for that victim (addendum §W). The first
+    entry is what :func:`judge_family_for` returns, so the two cannot
+    disagree. Judge-only families (§W-2) are appended by
+    :func:`judge_panel_for`."""
     victim = family_for_model(victim_model)
     return [f for f in FAMILIES.values() if f.key != victim.key]
+
+
+def judge_panel_for(victim_model: str) -> list[str]:
+    """Model ids of the Arm C panel for a victim: the other victim families,
+    then the judge-only families whose role is ``primary``. No trajectory is
+    judged by its own family."""
+    return ([f.model for f in judge_families_for(victim_model)]
+            + [jf.model for jf in JUDGE_ONLY_FAMILIES.values() if jf.role == "primary"])
 
 
 def family_key_for_model(model: str) -> str | None:
@@ -95,5 +143,5 @@ def family_for_model(model: str) -> Family:
     raise KeyError(f"no victim family serves {model!r}; registered: {sorted(FAMILIES)}")
 
 
-__all__ = ["FAMILIES", "Family", "family_for_model", "family_key_for_model", "judge_families_for",
-           "judge_family_for", "tool_choice_for"]
+__all__ = ["FAMILIES", "Family", "JUDGE_ONLY_FAMILIES", "JudgeFamily", "family_for_model", "family_key_for_model",
+           "judge_families_for", "judge_family_for", "judge_panel_for", "judge_registry_for", "tool_choice_for"]
