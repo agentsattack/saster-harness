@@ -33,11 +33,12 @@ PRIOR_ADDENDUM_SHA256 = (
     "2560bc3e9f7e99ab58c11481afae1599f9f5b406b0697d170f72e55d42ad5553",  # 2026-09-05 + I fixture-validity, J P17b, K bucket route
     "b848011fcafb27025ebec3a28ab44cd09aadc901568cef0576836ba0c11accf0",  # 2026-09-05 + L Ministral tool_choice, M within-class length
     "50ef648118a2d05289ab244ea70c1da1a7e5c6546595eb698959977b0d675fa5",  # 2026-09-05 + N blocking-layer admission gate
+    "014610b1b7a70aa515cb180c973e500c3bc6f25a6aab1a2c76099552ca322c45",  # §U
 )
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
 # 2026-09-06: + O P5 at two levels.
-EXPECTED_ADDENDUM_SHA256 = "014610b1b7a70aa515cb180c973e500c3bc6f25a6aab1a2c76099552ca322c45"
+EXPECTED_ADDENDUM_SHA256 = "64396c00d56ed51f6e6901743ab87cdf82738ed40946310e664102ea3f85ebf8"
 
 
 def _manifest():
