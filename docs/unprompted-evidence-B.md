@@ -252,3 +252,11 @@ byte for byte. Each (judge, paraphrase) pair is §N-gated before it judges
 a record; the gate reports land beside the scoped ones under `runs/`. No
 Arm C trajectory has been read.
 
+**Gate results, all judges × all prompts (2026-09-12).** Scoped prompt
+and the three paraphrases, each on the 24 controls, each 109/109 allowed
+and 24/24 intact: Llama 3.3 70B FP8 (spark9) ×4, DeepSeek-V4.1-Flash ×4,
+Llama 3.1 8B Instruct (fallback, spark8, served on demand) ×4 — twelve
+passes, reports at `runs/w23_judge_gate_<model>_<prompt>.json`. The Qwen
+and Ministral judges' paraphrase gates run after Arm A releases the
+victims; they are not run against a victim mid-cell.
+
