@@ -1717,3 +1717,40 @@ deny it only where L2 is on.
 **Fix:** not before the talk. Rejection test
 `tests/test_argument_schema_null.py` is `xfail(strict=True)` against the
 validator until it checks the schema; the runner is unchanged.
+
+## D21 — the cell runner named the observer address in two tables, and the relocation made one of them env-derived (2026-09-12)
+
+**Found by:** the first smoke cell under the relocated placement (k=1,
+three steps, written to a scratch directory, never counted). Its manifest
+named spark4 for `l4.endpoint` while `l4_heads.*.endpoint` named spark7 and
+spark5, and the record carried the primary L4 entry with
+`status: unavailable`. `scripts/run_cell_w9.py` had `OBSERVERS` (the
+primary's checkpoint and endpoint) and `L4_HEADS` (every head, recorded);
+the relocation commit `aee5734` derived `L4_HEADS` from
+`W9_HEADS_10_HOST` / `W9_HEADS_15_HOST` and left `OBSERVERS` on its
+literal.
+**False assumption:** that the observer address lived in one place, so
+making that place env-derived relocated the observer. A second table
+carrying the same literal is the same defect class as D5 (an endpoint
+string that says one thing while the path does another), with the
+placement as the axis.
+**Reported before it was found:** the relocation was reported as "runner
+env override committed" and the placement as verified, when one of the two
+tables still carried the old host; separately, the spark5 weight copy was
+reported as verified when both copies had failed at `mkdir` on a
+root-owned directory. Both reports preceded any record and both were
+wrong; the smoke cell, not the report, is the verification.
+**Direction relative to "defense held":** fail-closed. The primary returned
+`unavailable`, `detection_complete` went false, and the record would have
+been excluded from every rate that excludes an unavailable layer
+(AMENDMENT 16). No counted record was made under the stale table; the 810
+citable records and the §P–§U arms all predate the relocation and carry
+the sweep's endpoints.
+**Fix:** `5c92cac` — both tables derive from the two host variables, which
+are defined once, ahead of both. `scripts/run_beat1_w29.py` had the same
+literal in its head table and default L1 endpoint and takes the same
+variables. The manifest's traffic-plane map carries a
+`relocated_2026_09_11` entry naming the new victim-A backend. The second
+smoke cell (new run id) shows the primary on spark7 with `status: ok`, L1
+healthy on spark7, all four heads answering.
+
