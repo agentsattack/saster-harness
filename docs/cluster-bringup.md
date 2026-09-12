@@ -416,3 +416,42 @@ its placement in the environment and every manifest records the endpoint
 actually used. Records of the sweep are unaffected; a run made after this
 date under the new placement carries the new endpoints in its manifest and,
 in a public snapshot, a new role name rather than a reused one.
+
+Bring-up notes, 2026-09-12. Two things differ from the table's "same
+everything":
+
+- **spark5 mounts `~/hf-cache`, not `~/.cache/huggingface`.** The default
+  cache directory on spark5 is root-owned (a leftover of an earlier
+  container) and there is no passwordless sudo, so the 1.5 weights were
+  copied from spark2's cache into a user-owned directory and the two heads
+  mount that. Verified by size-and-path digest against the source before
+  either container started. The first two launches, which used the default
+  path, exited for want of weights; nothing was recorded from them.
+- **Heads start one at a time, gated on the previous one answering.** A
+  vLLM container started while its neighbour is still profiling sees less
+  free memory than its fraction assumes and dies at engine init ("No
+  available memory for the cache blocks"). Granite and Llama Guard on spark7
+  both died this way when started 90 s apart on a fixed timer; started only
+  after `/v1/models` on the previous port answered, all four came up. Same
+  rule on spark5.
+
+- **The 1.5 FG head on spark5 runs at `--gpu-memory-utilization 0.55`, not
+  the 0.60 it had on spark2.** With the coarse head resident, spark5 had
+  72.09 GiB free and 0.60 asks for 73.01 (spark5 carries about 9 GiB more
+  baseline than spark2 did); vLLM refuses at init. The fraction sets the KV
+  cache size and therefore concurrency, nothing about the model or its
+  outputs. The coarse head keeps 0.30. The four spark7 fractions are the
+  sweep's.
+
+Every endpoint answered a real request before the smoke cell ran. The
+smoke cell (k=1, three steps, written to a scratch directory, not `runs/`)
+is the first trajectory under this placement and counts for nothing — and
+it earned its keep: its manifest showed the primary L4 observer still
+pointed at the old host (`l4.endpoint` = spark4) while the four recorded
+heads pointed at the new ones, and the record carried L4 as `unavailable`.
+`scripts/run_cell_w9.py` had two tables naming the observer address, and
+the relocation change had touched only one. Both now derive from the same
+`W9_HEADS_10_HOST` / `W9_HEADS_15_HOST`, as does `scripts/run_beat1_w29.py`;
+the manifest's traffic-plane map carries a `relocated_2026_09_11` entry
+naming the new victim-A backend. No counted record was made under the
+stale table; the second smoke cell, under a new run id, is the check.

@@ -112,10 +112,19 @@ ROUTER_URL = os.environ.get("W9_ROUTER", "http://localhost:8080")
 #: applies. Both stay served so a result can be measured against either, and so
 #: the binary head — the observer every result to date was measured against —
 #: remains available for comparison rather than being replaced by the FG one.
+#: Where the heads are served. The sweep ran them on the fabric addresses
+#: below; a relocation (2026-09-11, the harness moved off the nodes a large
+#: model took) names the hosts by env, and every manifest records the
+#: endpoint actually used, so the placement is never implicit. Defined once,
+#: here, ahead of BOTH tables that name an endpoint: the first relocation
+#: smoke cell (2026-09-12) found the primary observer still pointed at the
+#: old host because this table carried its own copy of the address.
+HEADS_10_HOST = os.environ.get("W9_HEADS_10_HOST", "[fd00:200::4]")
+HEADS_15_HOST = os.environ.get("W9_HEADS_15_HOST", "[fd00:200::2]")
 OBSERVERS: dict[str, tuple[str, str]] = {
     # name  ->  (checkpoint, endpoint)
-    "binary": ("AI45Research/AgentDoG-Qwen3-4B", "http://[fd00:200::4]:8001"),
-    "fg": ("AI45Research/AgentDoG-FG-Qwen3-4B", "http://[fd00:200::4]:8002"),
+    "binary": ("AI45Research/AgentDoG-Qwen3-4B", f"http://{HEADS_10_HOST}:8001"),
+    "fg": ("AI45Research/AgentDoG-FG-Qwen3-4B", f"http://{HEADS_10_HOST}:8002"),
 }
 
 #: Every L4 head, recorded on EVERY trajectory (schema AMENDMENT 16). The
@@ -124,12 +133,6 @@ OBSERVERS: dict[str, tuple[str, str]] = {
 #: negative-control firing rate at 24/24, excluded under the base-rate
 #: rule; the other three are recorded with role "recorded" and never
 #: counted. name -> (checkpoint, endpoint, prompt_style, fine_grained)
-#: Where the heads are served. The sweep ran them on the fabric addresses
-#: below; a relocation (2026-09-11, the harness moved off the nodes a large
-#: model took) names the hosts by env, and every manifest records the
-#: endpoint actually used, so the placement is never implicit.
-HEADS_10_HOST = os.environ.get("W9_HEADS_10_HOST", "[fd00:200::4]")
-HEADS_15_HOST = os.environ.get("W9_HEADS_15_HOST", "[fd00:200::2]")
 L4_HEADS: dict[str, tuple[str, str, str, bool]] = {
     "binary": ("AI45Research/AgentDoG-Qwen3-4B", f"http://{HEADS_10_HOST}:8001", "v1.0", False),
     "fg": ("AI45Research/AgentDoG-FG-Qwen3-4B", f"http://{HEADS_10_HOST}:8002", "v1.0", True),

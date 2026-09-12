@@ -167,6 +167,19 @@ TRAFFIC_PLANE: dict[str, Any] = {
         "fd00:200::3:8000": "Qwen/Qwen3-8B",
         "fd00:200::6:8000": "mistralai/Ministral-8B-Instruct-2410",
     },
+    #: Relocation of 2026-09-11: victim A moved to spark10 and the router
+    #: reaches it on the FABRIC (fd00:200::10); victim B is unchanged on the
+    #: management plane. The backend strings changed, so the hash ring is not
+    #: the sweep's ring; the router path canary checks each campaign still
+    #: lands on the model it names. Runs made under this placement carry the
+    #: entry below; sweep records carry only the two maps above.
+    "relocated_2026_09_11": {
+        "victim_backends": {
+            "[fd00:200::10]:8000": "Qwen/Qwen3-8B",
+            "192.168.1.208:8000": "mistralai/Ministral-8B-Instruct-2410",
+        },
+        "plane": "fabric for victim A, management for victim B",
+    },
     "deliberate": True,
     "rationale": (
         "repointing the router to the fabric rebuilds the consistent-hash ring "
