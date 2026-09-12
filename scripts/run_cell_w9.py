@@ -140,6 +140,13 @@ L4_HEADS: dict[str, tuple[str, str, str, bool]] = {
     "15coarse": ("AI45Research/AgentDoG1.5-Qwen3.5-4B", f"http://{HEADS_15_HOST}:8001", "v1.5-coarse", False),
     "15fg": ("AI45Research/AgentDoG1.5-FG-Qwen3.5-4b", f"http://{HEADS_15_HOST}:8002", "v1.5-unified", True),
 }
+#: F28 (2026-09-12, addendum §V / §V-extended): heads whose verdict on a
+#: record moved across serving conditions. Carried on every manifest;
+#: excluded from any analysis where the verdict is load-bearing.
+SERVING_SENSITIVE_HEADS: dict[str, str] = {
+    "15coarse": "F28: the label follows a long free-text analysis; deterministic on each stack; "
+                "a one-token fork under greedy decoding flips it (2/30 in §V)",
+}
 #: Which heads to record beside the primary; "" records none.
 RECORDED_HEADS = tuple(
     h.strip() for h in os.environ.get("W9_RECORDED_HEADS", "fg,15coarse,15fg").split(",") if h.strip()
@@ -1179,7 +1186,11 @@ def main() -> None:
     manifest["non_discriminating_provenance"] = NON_DISCRIMINATING_PROVENANCE
     manifest["l4_heads"] = {
         key: {"model": m, "endpoint": e, "prompt_style": st, "fine_grained": fg,
-              "role": "primary" if key == OBSERVER else ("recorded" if key in RECORDED_HEADS else "off")}
+              "role": "primary" if key == OBSERVER else ("recorded" if key in RECORDED_HEADS else "off"),
+              # F28 / addendum §V-extended: a head whose verdict moved across
+              # serving conditions is qualified in every manifest and table.
+              "serving_sensitive": key in SERVING_SENSITIVE_HEADS,
+              "serving_sensitive_reason": SERVING_SENSITIVE_HEADS.get(key)}
         for key, (m, e, st, fg) in L4_HEADS.items()
     }
     manifest["l4_primary"] = OBSERVER

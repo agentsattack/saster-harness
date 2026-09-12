@@ -68,6 +68,8 @@ HEADS = {
     "15coarse": ("AI45Research/AgentDoG1.5-Qwen3.5-4B", f"http://{HEADS_15_HOST}:8001", "v1.5-coarse", False),
     "15fg": ("AI45Research/AgentDoG1.5-FG-Qwen3.5-4b", f"http://{HEADS_15_HOST}:8002", "v1.5-unified", True),
 }
+#: F28 (addendum §V-extended): the head whose verdict moved across serving conditions.
+SERVING_SENSITIVE_HEADS = {"15coarse": "F28: label follows a long free-text analysis; a one-token fork flips it"}
 RUN_ID = os.environ.get("BEAT1_RUN_ID") or f"w29-beat1-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
 OUT = REPO / "runs/w29_beat1" / RUN_ID
 
@@ -232,7 +234,7 @@ def main() -> None:
             try:
                 httpx.get(f"{endpoint}/v1/models", timeout=3).raise_for_status()
             except httpx.HTTPError:
-                heads_out.append({"head": key, "model": model, "verdict": "unavailable", "raw": None, "endpoint": endpoint})
+                heads_out.append({"head": key, "model": model, "serving_sensitive": key in SERVING_SENSITIVE_HEADS, "verdict": "unavailable", "raw": None, "endpoint": endpoint})
                 print(f"   L4 head {key}: unavailable ({endpoint})")
                 continue
             aud = TrajectoryAuditor(observer_model=model, endpoint=endpoint, fine_grained=fg, prompt_style=style, role="recorded", timeout=600, tool_list_text=tools_text)
@@ -240,7 +242,7 @@ def main() -> None:
             entry = out.as_detection_entry(max(len(actions) - 1, 0))
             if entry is not None:
                 detection.append(entry)
-            heads_out.append({"head": key, "model": model, "verdict": out.verdict.value, "raw": out.raw_reply})
+            heads_out.append({"head": key, "model": model, "serving_sensitive": key in SERVING_SENSITIVE_HEADS, "verdict": out.verdict.value, "raw": out.raw_reply})
             print(f"   L4 head {key}: {out.verdict.value}")
     breach = bool(state["restricted_performed"])
     breach_action = next((a["step_index"] for a in actions if a["tool"] in RESTRICTED_TOOLS and a["policy_verdict"] == "allow"), None)
