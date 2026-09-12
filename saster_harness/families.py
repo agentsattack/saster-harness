@@ -43,6 +43,13 @@ FAMILIES: dict[str, Family] = {
         "mistral", "mistralai/Ministral-8B-Instruct-2410", "mistral", "spark6 192.168.1.208:8000",
         tool_choice="required",
     ),
+    # Addendum §W (2026-09-12): victim family C and judge family 3. Served
+    # TP=4 on spark1–spark4 by its own recipe (dsv41/), thinking off by the
+    # server's default template kwargs and stated explicitly in
+    # TEMPLATE_KWARGS_BY_MODEL. Registered, not measured, at entry.
+    "deepseek": Family(
+        "deepseek", "deepseek-v4.1-flash", "deepseek_v41", "spark1 127.0.0.1:8000 (TP=4 spark1-4)",
+    ),
 }
 
 
@@ -64,6 +71,23 @@ def judge_family_for(victim_model: str) -> Family:
     return others[0]
 
 
+def judge_families_for(victim_model: str) -> list[Family]:
+    """Every registered family other than the victim's, in registry order —
+    the Arm C judge panel for that victim (addendum §W). The first entry is
+    what :func:`judge_family_for` returns, so the two cannot disagree."""
+    victim = family_for_model(victim_model)
+    return [f for f in FAMILIES.values() if f.key != victim.key]
+
+
+def family_key_for_model(model: str) -> str | None:
+    """The registry key serving ``model``, or None for an unregistered model —
+    the manifest's ``family`` field for a judge or victim."""
+    try:
+        return family_for_model(model).key
+    except KeyError:
+        return None
+
+
 def family_for_model(model: str) -> Family:
     for fam in FAMILIES.values():
         if fam.model == model:
@@ -71,4 +95,5 @@ def family_for_model(model: str) -> Family:
     raise KeyError(f"no victim family serves {model!r}; registered: {sorted(FAMILIES)}")
 
 
-__all__ = ["FAMILIES", "Family", "family_for_model", "judge_family_for", "tool_choice_for"]
+__all__ = ["FAMILIES", "Family", "family_for_model", "family_key_for_model", "judge_families_for",
+           "judge_family_for", "tool_choice_for"]

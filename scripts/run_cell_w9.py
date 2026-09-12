@@ -92,7 +92,8 @@ from saster_harness.canary import (
     run_canary,
 )
 from saster_harness.content_store import ContentStore
-from saster_harness.families import judge_family_for, tool_choice_for
+from saster_harness.families import family_for_model, judge_family_for, tool_choice_for
+from carl_ops_envelope.chat_scorer import render_fallback_used as cs_render_fallback_used
 
 TOOL_CHOICE_OVERRIDE = os.environ.get("W9_TOOL_CHOICE") or None  # addendum §P
 DIRECTIVE_VARIANT = os.environ.get("W9_DIRECTIVE_VARIANT") or None  # addendum §T
@@ -1128,6 +1129,15 @@ def main() -> None:
     manifest["run_id"] = RUN_ID
     manifest["campaign_id"] = CAMPAIGN_ID
     manifest["victim_model"] = VICTIM
+    # Addendum §W: the registry entry the victim runs under, or None.
+    try:
+        _fam = family_for_model(VICTIM)
+        manifest["victim_family"] = {"key": _fam.key, "tool_call_parser": _fam.tool_call_parser,
+                                     "chat_template_kwargs": _fam.chat_template_kwargs,
+                                     "tool_choice": _fam.tool_choice, "node": _fam.node}
+    except KeyError:
+        manifest["victim_family"] = None
+    manifest["render_fallback_used"] = bool(cs_render_fallback_used())
     manifest["k"] = K
     manifest["obstructed"] = OBSTRUCTED
     manifest["precondition_state"] = "obstructed" if OBSTRUCTED else "unobstructed"

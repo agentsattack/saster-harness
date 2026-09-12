@@ -1,0 +1,18 @@
+{
+  "role": "\u00a7W: Arm A chat-template round-trip rider on family C",
+  "test": "tests/test_instrument_arm_a_roundtrip.py::test_tool_call_round_trips_through_the_family_template[*-deepseek]",
+  "result": "FAIL on all three probe candidates: ChatRenderError 'no chat-render variant distinguishes candidates for deepseek-v4.1-flash'",
+  "cause": "the DeepSeek image's /tokenize route (the render fallback; /v1/chat/completions/render is absent, 404) answers HTTP 400 to an assistant message whose content is null \u2014 the scorer's candidate_message \u2014 so no variant extends the prefix; with content '' the same template renders two different tool calls distinctly in its DSML markup",
+  "probe": {
+    "candidate_message_null_content": {
+      "status": 400,
+      "body": "{\"error\":{\"message\":\"cannot pickle 'pydantic_core._pydantic_core.ValidatorIterator' object\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}"
+    },
+    "same_message_empty_content": {
+      "status": 200,
+      "n_tokens": 1139
+    }
+  },
+  "marked": "strict xfail for the family in the rider (tests/test_instrument_arm_a_roundtrip.py::_KNOWN_FAILING_FAMILIES)",
+  "not_changed": "candidate_message (content null) \u2014 a change there re-renders every family's prefix and is an instrument change, not a registration"
+}

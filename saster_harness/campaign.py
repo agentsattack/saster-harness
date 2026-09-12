@@ -127,6 +127,9 @@ DEFAULT_HALAGENT_PATH = Path.home() / "halctf-agent"
 TEMPLATE_KWARGS_BY_MODEL: dict[str, dict[str, Any]] = {
     "Qwen/Qwen3-8B": {"enable_thinking": False},
     "mistralai/Ministral-8B-Instruct-2410": {},
+    # Addendum §W: the server's default is thinking off; stated here so the
+    # registry cannot drift from what the server renders.
+    "deepseek-v4.1-flash": {"thinking": False},
 }
 
 

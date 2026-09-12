@@ -455,3 +455,8 @@ the relocation change had touched only one. Both now derive from the same
 the manifest's traffic-plane map carries a `relocated_2026_09_11` entry
 naming the new victim-A backend. No counted record was made under the
 stale table; the second smoke cell, under a new run id, is the check.
+
+Router, 2026-09-12: a third backend, `http://127.0.0.1:8000`, serving
+`deepseek-v4.1-flash` (addendum §W, victim family C). The router keeps one
+ring per model over exactly the backends serving that model, so the Qwen
+and Ministral rings are unchanged by the addition.

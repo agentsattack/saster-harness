@@ -136,11 +136,32 @@ def render_tokens(base_url: str, model: str, messages: list[dict], tools: list[d
     }
     if chat_template_kwargs:
         body["chat_template_kwargs"] = dict(chat_template_kwargs)
-    payload = _post(base_url, "/v1/chat/completions/render", body, campaign_id, timeout)
-    tokens = payload.get("token_ids")
+    try:
+        payload = _post(base_url, "/v1/chat/completions/render", body, campaign_id, timeout)
+        tokens = payload.get("token_ids")
+    except ChatRenderError as exc:
+        # Addendum §W: a server without the render route (the DeepSeek
+        # image) renders the same template through /tokenize, which takes
+        # the same messages, tools and kwargs. Only a 404 falls through; any
+        # other failure is still the error it was. The fallback is recorded
+        # so a manifest can say which route rendered the prefix.
+        if "HTTP 404" not in str(exc):
+            raise
+        global _RENDER_FALLBACK_USED
+        _RENDER_FALLBACK_USED = True
+        payload = _post(base_url, "/tokenize", body, campaign_id, timeout)
+        tokens = payload.get("tokens")
     if not tokens:
         raise ChatRenderError("render returned no token_ids")
     return list(tokens)
+
+
+#: Set when any render in this process fell back to /tokenize (§W).
+_RENDER_FALLBACK_USED = False
+
+
+def render_fallback_used() -> bool:
+    return _RENDER_FALLBACK_USED
 
 
 def _mean_suffix_logprob(base_url: str, model: str, tokens: list[int], n_prefix: int,

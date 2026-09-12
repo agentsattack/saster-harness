@@ -1,0 +1,98 @@
+{
+  "run_id": "w32-relocation-fidelity-20260912",
+  "role": "addendum \u00a7V relocation fidelity (Arm E)",
+  "started_utc": "2026-09-12T16:01:37.349182+00:00",
+  "finished_utc": "2026-09-12T16:04:54.825083+00:00",
+  "code_commit": "d9224447c73fc66a2e992db05b9bfac39fd3c51e",
+  "grrcon_addendum_sha256": "708ace47de71a0ed13756ca2683649a5d0ecf49ffdc493a45579036c763c07c7",
+  "sample_sha256": "8b844831d66a2cc281af7dcde850897eb34a978d11782982e9158a2f92a5a2dd",
+  "heads": {
+    "binary": {
+      "model": "AI45Research/AgentDoG-Qwen3-4B",
+      "endpoint": "http://[fd00:200::7]:8001",
+      "prompt_style": "v1.0",
+      "fine_grained": false,
+      "gpu_memory_utilization": 0.2,
+      "served": {
+        "id": "AI45Research/AgentDoG-Qwen3-4B",
+        "max_model_len": 16384
+      }
+    },
+    "fg": {
+      "model": "AI45Research/AgentDoG-FG-Qwen3-4B",
+      "endpoint": "http://[fd00:200::7]:8002",
+      "prompt_style": "v1.0",
+      "fine_grained": true,
+      "gpu_memory_utilization": 0.2,
+      "served": {
+        "id": "AI45Research/AgentDoG-FG-Qwen3-4B",
+        "max_model_len": 16384
+      }
+    },
+    "15coarse": {
+      "model": "AI45Research/AgentDoG1.5-Qwen3.5-4B",
+      "endpoint": "http://[fd00:200::5]:8001",
+      "prompt_style": "v1.5-coarse",
+      "fine_grained": false,
+      "gpu_memory_utilization": 0.3,
+      "served": {
+        "id": "AI45Research/AgentDoG1.5-Qwen3.5-4B",
+        "max_model_len": 16384
+      }
+    },
+    "15fg": {
+      "model": "AI45Research/AgentDoG1.5-FG-Qwen3.5-4b",
+      "endpoint": "http://[fd00:200::5]:8002",
+      "prompt_style": "v1.5-unified",
+      "fine_grained": true,
+      "gpu_memory_utilization": 0.55,
+      "served": {
+        "id": "AI45Research/AgentDoG1.5-FG-Qwen3.5-4b",
+        "max_model_len": 16384
+      }
+    }
+  },
+  "classifiers": {
+    "granite-guardian": {
+      "model": "ibm-granite/granite-guardian-3.2-5b",
+      "endpoint": "http://[fd00:200::7]:8003",
+      "risk": "harm",
+      "pins": {
+        "model_revision": "d97903719a4fe78cb7099eb1ebc7defc96d26a37",
+        "image_digest": "sha256:735caabf4f1e52c5a343a68793aab86690683465cc51d76dd84f7af011750639"
+      },
+      "gpu_memory_utilization": 0.25,
+      "served": {
+        "id": "ibm-granite/granite-guardian-3.2-5b",
+        "max_model_len": 8192
+      }
+    },
+    "llamaguard": {
+      "model": "meta-llama/Llama-Guard-3-8B",
+      "endpoint": "http://[fd00:200::7]:8004",
+      "risk": "harm",
+      "pins": {
+        "model_revision": "7327bd9f6efb",
+        "image_digest": "sha256:735caabf4f1e52c5a343a68793aab86690683465cc51d76dd84f7af011750639"
+      },
+      "gpu_memory_utilization": 0.2,
+      "served": {
+        "id": "meta-llama/Llama-Guard-3-8B",
+        "max_model_len": 8192
+      }
+    }
+  },
+  "image": {
+    "repo_tag": "eugr/spark-vllm:latest",
+    "id": "32f23ba5871d",
+    "digest": "sha256:735caabf4f1e52c5a343a68793aab86690683465cc51d76dd84f7af011750639"
+  },
+  "temperature": 0.0,
+  "replay_role": "recorded",
+  "tool_list_text_sha256": "5a7ece6b26d724614e472ac5268a12be7c5ea773c6fc95187b85b424d0ad71eb",
+  "sealed_comparators": {
+    "heads": "cell diagnoses.jsonl sidecar (last row per trial and head); controls: the primary L4 detection entry, binary head only",
+    "classifiers": "runs/w28_l1_posthoc/<tag>/scores.jsonl by text_sha256"
+  },
+  "corpus_written": false
+}

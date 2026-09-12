@@ -80,6 +80,12 @@ def envelope_preregistration_sha256() -> str:
     return hashlib.sha256(ENVELOPE_PREREG_PATH.read_bytes()).hexdigest()
 
 
+def _family_key(model: str) -> str | None:
+    from saster_harness.families import family_key_for_model
+
+    return family_key_for_model(model)
+
+
 def grrcon_addendum_sha256() -> str:
     """SHA-256 of the prediction-matrix addendum, as committed."""
     return hashlib.sha256(GRRCON_ADDENDUM_PATH.read_bytes()).hexdigest()
@@ -177,8 +183,10 @@ TRAFFIC_PLANE: dict[str, Any] = {
         "victim_backends": {
             "[fd00:200::10]:8000": "Qwen/Qwen3-8B",
             "192.168.1.208:8000": "mistralai/Ministral-8B-Instruct-2410",
+            # §W: victim family C, on the router's own host (TP=4 across spark1-4).
+            "127.0.0.1:8000": "deepseek-v4.1-flash",
         },
-        "plane": "fabric for victim A, management for victim B",
+        "plane": "fabric for victim A, management for victim B, loopback for victim C",
     },
     "deliberate": True,
     "rationale": (
@@ -321,6 +329,8 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             "temperature": 0.0,
             "prompt_style": judge.prompt_style,
             "prompt_sha256": judge.prompt_sha256,
+            # Addendum §W: the registry key of the judge model, or None.
+            "family": _family_key(judge.model),
             **_status(not judge.representative, "judge"),
         }
         manifest["temporal_layer"] = None

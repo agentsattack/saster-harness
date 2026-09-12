@@ -85,8 +85,23 @@ def _tool_calls(text: str) -> list[tuple[str, dict]]:
     return calls
 
 
+#: Addendum §W (2026-09-12): family C fails this rider on its serving image,
+#: not its template — the DeepSeek vLLM image's /tokenize route answers
+#: HTTP 400 ("cannot pickle ... ValidatorIterator") to an assistant message
+#: with null content, which is what the scorer's candidate message carries;
+#: with empty-string content the same template renders two different calls
+#: distinctly (runs/w32_deepseek_registration/arm_a_rider.json). Strict, so
+#: a fixed image or a changed candidate rendering flips it loudly.
+_KNOWN_FAILING_FAMILIES = {
+    "deepseek": "serving image rejects a null-content assistant message on /tokenize (HTTP 400); §W registration",
+}
+
+
 @pytest.mark.cluster
-@pytest.mark.parametrize("family", sorted(VICTIM_FAMILIES))
+@pytest.mark.parametrize("family", [
+    pytest.param(k, marks=[pytest.mark.xfail(strict=True, reason=_KNOWN_FAILING_FAMILIES[k])]
+                 if k in _KNOWN_FAILING_FAMILIES else [])
+    for k in sorted(VICTIM_FAMILIES)])
 @pytest.mark.parametrize("candidate", PROBE_CANDIDATES, ids=lambda c: c.tool)
 def test_tool_call_round_trips_through_the_family_template(family, candidate):
     if not _router_up():
