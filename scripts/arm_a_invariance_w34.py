@@ -38,7 +38,7 @@ from saster_instrument import metrics as _m  # noqa: E402
 from saster_defense.manifest import grrcon_addendum_sha256  # noqa: E402
 
 ROOT = Path(os.environ.get("W34_ROOT", REPO / "runs/w34_arm_a"))
-OUT = ROOT / "invariance"
+OUT = Path(os.environ.get("W34_OUT", ROOT / "invariance"))
 FAMILIES = ("qwen3", "mistral", "deepseek")
 ROUTES = ("firewall", "grant")
 DECIMALS = 6
@@ -53,13 +53,22 @@ def q(x):
     return None if x is None else round(float(x), DECIMALS)
 
 
+CELL_DIRS: dict[tuple[str, str], str] = {}
+
+
 def load() -> dict[tuple[str, str], list[dict]]:
+    """A cell is ``<family>/<route>``; a cell whose first run aborted before
+    writing records is read from its rerun directory ``<route>-r2`` (new run
+    id), and the directory used is recorded in the output."""
     cells = {}
     for fam in FAMILIES:
         for route in ROUTES:
-            f = ROOT / fam / route / "trajectories.jsonl"
-            if f.exists():
-                cells[(fam, route)] = [json.loads(l) for l in f.open() if l.strip()]
+            for d in (route, f"{route}-r2"):
+                f = ROOT / fam / d / "trajectories.jsonl"
+                if f.exists():
+                    cells[(fam, route)] = [json.loads(l) for l in f.open() if l.strip()]
+                    CELL_DIRS[(fam, route)] = f"{fam}/{d}"
+                    break
     return cells
 
 
@@ -143,6 +152,7 @@ def main() -> None:
                                    "(C3, C4, C6, C10); no post hoc marker re-scoring path exists for these mutants in this tree — "
                                    "reported, not simulated"},
               "heatmap": moved, "cells": {f"{f}/{r}": len(v) for (f, r), v in cells.items()},
+              "cell_dirs": {f"{f}/{r}": d for (f, r), d in CELL_DIRS.items()},
               "code_commit": subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True).stdout.strip(),
               "grrcon_addendum_sha256": grrcon_addendum_sha256(), "measured_utc": datetime.now(UTC).isoformat()}
     (OUT / "invariance.json").write_text(json.dumps(result, indent=2))
@@ -152,14 +162,13 @@ def main() -> None:
     grid = [[(moved[f][m] if moved[f].get(m) is not None else float("nan")) for f in FAMILIES] for m in metrics]
     im = ax.imshow(grid, cmap="viridis", vmin=0, vmax=1, aspect="auto")
     ax.set_xticks(range(len(FAMILIES)), [f"{f}\n({'A' if f == 'qwen3' else 'B' if f == 'mistral' else 'C'})" for f in FAMILIES], fontsize=14)
-    ax.set_yticks(range(len(metrics)), metrics, fontsize=14)
+    ax.set_yticks(range(len(metrics)), [f"{m}  ⚠ identical everywhere" if table[m]["suspected_instrument_artifact"] else m
+                                        for m in metrics], fontsize=14)
     for i, m in enumerate(metrics):
         for j, f in enumerate(FAMILIES):
             v = moved[f].get(m)
             txt = "not carried" if v is None else f"{v:.2f}"
             ax.text(j, i, txt, ha="center", va="center", fontsize=13, color="white" if (v or 0) < 0.6 else "black")
-        if table[m]["suspected_instrument_artifact"]:
-            ax.text(len(FAMILIES) - 0.4, i, "⚠ identical everywhere", va="center", fontsize=12, color="crimson")
     ax.set_title("Arm A — did this number move? fraction of compared keys where the family's value differs from another family's\n"
                  "(config all-on, obstructed, compromised; routes firewall + grant; k = 5; envelope not computed for C by scope)", fontsize=15)
     fig.colorbar(im, ax=ax, fraction=0.03, label="fraction moved")
