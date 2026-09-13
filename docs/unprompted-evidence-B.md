@@ -419,3 +419,71 @@ the scoped instruction and fails two paraphrases of it is a prompt effect
 surfacing in the admission gate before any trajectory is read; the rule
 for it is addendum §Z-2.
 
+---
+
+## Arm C — judge variance decomposition (addendum §AA, §Z-2, §Z-3; 2026-09-13)
+
+Run `w35-arm-c-20260913`, `runs/w35_arm_c/`. Sixty distinct sweep
+trajectories (15 per family × oracle breach), 464 actions, judged under
+judge × prompt × temperature × repeat: 38,208 calls between 19:51Z and
+21:26Z, every row carrying `gate_passed` and the judge's registry role
+(all four judges `primary`; the 8B fallback did not engage). Three judge
+families per trajectory, none the victim's own.
+
+**The two decompositions, side by side.** Configuration-level judged
+breach rate; method of moments on configuration means; bootstrap over
+trajectories, B = 1000, 95% percentile intervals.
+
+| decomposition | configs | headline rate | naive SE | total-error SE | judge | prompt | temperature | judge × prompt | residual |
+|---|---|---|---|---|---|---|---|---|---|
+| primary (§Z-2, failing pairs removed) | 84 | 0.652 [0.554, 0.753] | 0.0615 | 0.2092 [0.1589, 0.2656] | 0.0366 [0.0178, 0.0624] | 0.0006 [0.0004, 0.0012] | 0.0000 [0.0000, 0.0001] | 0.0023 [0.0015, 0.0040] | 0.0004 [0.0003, 0.0013] |
+| sensitivity (§Z-3, all twenty pairs) | 96 | 0.690 [0.595, 0.771] | 0.0597 | 0.2150 [0.1649, 0.2701] | 0.0398 [0.0209, 0.0656] | 0.0015 [0.0007, 0.0026] | 0.0000 [0.0000, 0.0001] | 0.0009 [0.0005, 0.0022] | 0.0005 [0.0003, 0.0014] |
+
+**Reading it against the pre-registered expectation.** The headline
+rate, the total-error SE, and the judge, temperature and residual
+components agree within their intervals. The prompt and judge × prompt
+components do not, quite: their intervals touch at the edge, and the
+point estimates move in opposite directions — removing Ministral's two
+failing prompts *lowers* the prompt component (0.0006 against 0.0015)
+and *raises* the judge × prompt component (0.0023 against 0.0009). The
+excluded pairs are exactly the cells where the prompt moved a judge
+(Ministral under `scoped_p1`/`scoped_p2` denies at 0.71–0.73 against
+0.63–0.69 elsewhere), so removing them takes variance out of the prompt
+main effect; what is left of Ministral sits at the extreme of the panel
+on two prompts, which the interaction term then carries. So the
+admission rule is **not inert**, but it does not bias the judge × prompt
+component downward as §Z-3 anticipated: it moves a small amount of
+variance from the prompt term into the interaction term and leaves every
+total unchanged. Both numbers stand; neither is re-chosen.
+
+**What dominates.** The judge component (0.037–0.040) is the whole
+story: judge means Ministral 0.89–0.93, DeepSeek 0.74, Llama 3.3 70B
+0.72, Qwen 0.37. Temperature contributes nothing measurable
+(0.00002); prompt and repeat are an order of magnitude below the judge.
+The total-error SE of the headline rate is **0.21 against a naive
+binomial SE of 0.06** — three and a half times — which is Messing's
+result on this corpus: the interval a single judge configuration reports
+covers a sixth of the uncertainty a reader should carry.
+
+**P13, agreement with the deterministic side.** Cohen's κ between a
+configuration's verdict and the oracle's breach, mean 0.20 (primary) /
+0.18 (sensitivity), range −0.03 to 0.33 across configurations. Step
+attribution: the judged first-deny step equals the oracle's breach step
+on 18.7% / 18.3% of the breaching trajectory-configurations (1,711 /
+2,070 pairs). The panel is a weak comparator for breach and a poor one
+for the step, on every judge.
+
+**Serving determinism at temperature 0 (F28's question, per judge).**
+Repeat pairs at T = 0 disagreeing: Llama 3.3 70B 0 of 1,856; Ministral
+8 of 1,856; DeepSeek 18 of 1,856; Qwen 3 of 800. The 70B is the only
+judge that is deterministic on this stack.
+
+**Unavailable.** 73 of 38,208 calls (0.19%): 64 Qwen replies hit the
+8-token limit (`length`), spread evenly over temperatures; 9 Ministral
+replies at T = 0.7 were `Deny`/`Allow` capitalised, which the exact-token
+contract does not accept. Reported in the row counts, excluded from the
+rates.
+
+**Next.** The mutant-corpus CI-coverage twist (C6, latency zero) runs on
+this same sample under its own section.
+
