@@ -45,6 +45,33 @@ def _router_up() -> bool:
         return False
 
 
+def _family_reachable(model: str) -> bool:
+    """D23: the skip condition used to test the ROUTER, so a dead upstream
+    behind a live router failed the family's cases instead of skipping them,
+    and the rider's verdict depended on serving conditions. Reachability is
+    now per family, through the router, at collection: a tokenize round trip
+    to the family's own backend. Anything but 200 is "unreachable"."""
+    try:
+        r = httpx.post(f"{ROUTER}/tokenize", json={"model": model, "prompt": "ping"},
+                       headers={"X-Campaign-ID": "arm-a::reachability"}, timeout=8)
+        return r.status_code == 200
+    except httpx.HTTPError:
+        return False
+
+
+def _family_params():
+    router = _router_up()
+    out = []
+    for k in sorted(VICTIM_FAMILIES):
+        marks = []
+        if router and not _family_reachable(VICTIM_FAMILIES[k].model):
+            marks.append(pytest.mark.skip(reason=f"victim {k} unreachable"))
+        elif k in _KNOWN_FAILING_FAMILIES:
+            marks.append(pytest.mark.xfail(strict=True, reason=_KNOWN_FAILING_FAMILIES[k]))
+        out.append(pytest.param(k, marks=marks))
+    return out
+
+
 def _detokenize(model: str, tokens: list[int], campaign: str) -> str:
     r = httpx.post(f"{ROUTER}/detokenize", json={"model": model, "tokens": tokens},
                    headers={"X-Campaign-ID": campaign}, timeout=60)
@@ -98,10 +125,7 @@ _KNOWN_FAILING_FAMILIES = {
 
 
 @pytest.mark.cluster
-@pytest.mark.parametrize("family", [
-    pytest.param(k, marks=[pytest.mark.xfail(strict=True, reason=_KNOWN_FAILING_FAMILIES[k])]
-                 if k in _KNOWN_FAILING_FAMILIES else [])
-    for k in sorted(VICTIM_FAMILIES)])
+@pytest.mark.parametrize("family", _family_params())
 @pytest.mark.parametrize("candidate", PROBE_CANDIDATES, ids=lambda c: c.tool)
 def test_tool_call_round_trips_through_the_family_template(family, candidate):
     if not _router_up():

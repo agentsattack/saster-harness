@@ -20,7 +20,12 @@ from saster_defense import ActionRequest, DefenseStack, TrajectoryAuditor
 from saster_instrument import DEFENSE_CONFIGS
 from tests.test_carl_ops_trajectory import reject, valid_trajectory_record
 
-L4_ENDPOINT = "http://[fd00:200::4]:8001"
+import os as _os
+
+#: Relocation (2026-09-11): the head host comes from the same variable the
+#: runner reads; the default is the sweep's address, so the cluster tier is
+#: run with W9_HEADS_10_HOST set to the current placement.
+L4_ENDPOINT = f"http://{_os.environ.get('W9_HEADS_10_HOST', '[fd00:200::4]')}:8001"
 L4_MODEL = "AI45Research/AgentDoG-Qwen3-4B"
 
 

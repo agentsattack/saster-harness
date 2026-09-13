@@ -107,6 +107,11 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
+# Two tiers (2026-09-13, D23). The default run excludes every test that
+# reaches a live endpoint; `pytest -m cluster` runs that tier, and within it
+# a family whose upstream does not answer is skipped, never failed. Both
+# counts are cited: the default count and the cluster-tier count.
+addopts = "-m 'not cluster'"
 markers = [
-    "cluster: needs the GB10 serving cluster (skipped when the router does not answer)",
+    "cluster: reaches a live endpoint (router, victim, head, classifier); excluded by default, run with -m cluster; a dead upstream skips its family",
 ]
