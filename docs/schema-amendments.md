@@ -1776,3 +1776,28 @@ invariance script reads and records. After the talk: per-trial
 persistence, and a transport error in the envelope scorer recorded as
 `envelope_status: unavailable` on the turn rather than raised.
 
+## D23 — the rider's skip condition tested the router, not the upstream (2026-09-13)
+
+**Found by:** three detached full-suite runs on 2026-09-13, each with the
+same three failures in under 0.15 s: the Arm A round-trip rider's
+Ministral cases, raising `ChatRenderError` on an HTTP 502 from the router
+("cannot connect to host 192.168.1.208:8000"). The Ministral victim had
+been OOM-killed on spark6 at 19:52 the evening before. Two earlier runs
+under Arm A load (338 s and 406 s, 2 and 3 failures, names not captured)
+are consistent with the same cases timing out on a busy upstream.
+**False assumption:** that the router answering means the family
+answers. `_router_up()` polled `/router/stats`; a live router with one
+dead backend proxies a 502, and the rider — a test about a chat
+template — failed on a server. Its verdict, and the suite count that
+carried it, depended on serving conditions.
+**Direction relative to "defense held":** neutral. A test verdict; no
+record, no rate.
+**Fix:** the suite is two tiers. `addopts = -m 'not cluster'` excludes
+every test that reaches a live endpoint from the default run;
+`pytest -m cluster` runs that tier. Within it, reachability is per
+family at collection (a tokenize round trip through the router to the
+family's own backend); an unreachable family's cases are skipped with
+`victim <family> unreachable`, never failed. The class-7 scope test's
+head endpoint follows `W9_HEADS_10_HOST`. Both counts — default tier and
+cluster tier — are cited from now on.
+
