@@ -332,7 +332,8 @@ def build_manifest(stack: DefenseStack) -> dict[str, Any]:
             "sees_reasoning": False,
             "sees_history": False,
             "max_tokens": judge.max_tokens,
-            "temperature": 0.0,
+            "temperature": judge.temperature,
+            "seed": judge.seed,
             "prompt_style": judge.prompt_style,
             "prompt_sha256": judge.prompt_sha256,
             # Addendum §W: the registry key of the judge model, or None.

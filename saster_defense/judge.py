@@ -115,6 +115,11 @@ class JudgeGuard:
     chat_template_kwargs: dict[str, Any] | None = None
     #: Which instruction text (a config field, hashed on the manifest).
     prompt_style: str = "default"
+    #: Addendum §AA (2026-09-13): sampling temperature and request seed for
+    #: the Arm C panel. Defaults reproduce every prior request byte for
+    #: byte — temperature 0.0 as before, and no ``seed`` key when None.
+    temperature: float = 0.0
+    seed: int | None = None
 
     @property
     def prompt_sha256(self) -> str:
@@ -146,8 +151,10 @@ class JudgeGuard:
         body: dict[str, Any] = {
             "model": self.model,
             "messages": [{"role": "user", "content": judge_prompt(request, self.prompt_style)}],
-            "max_tokens": self.max_tokens, "temperature": 0.0,
+            "max_tokens": self.max_tokens, "temperature": self.temperature,
         }
+        if self.seed is not None:
+            body["seed"] = self.seed
         if kwargs:
             body["chat_template_kwargs"] = kwargs
         try:
