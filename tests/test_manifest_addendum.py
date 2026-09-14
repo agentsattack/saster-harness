@@ -40,11 +40,12 @@ PRIOR_ADDENDUM_SHA256 = (
     "694104d37df352ce53eb997d655de4c20693e7b317d94ec0ed394b7962f62d9f",  # §W-2, §Y, §Z
     "97dca0899a487bcb6ec90e872c9b70a6f12e191fd567d19b08325a3bd6e2deaa",  # §Z-2
     "fb354ba7c4ebcbcfb5fd7a8cf9258afee01964d559710d0d402fb5ae7eaf148e",  # §Z-3, §AA
+    "d156d1916498ca56b6a4ca5957f43c42390b8330b01c58aef7242bfed957d94f",  # §Z-4
 )
 # 2026-09-05: + C P17, D P2 as discrimination, E base-rate rule, F P6
 # conditioned; closure at the start of Stage 3 stated.
 # 2026-09-06: + O P5 at two levels.
-EXPECTED_ADDENDUM_SHA256 = "d156d1916498ca56b6a4ca5957f43c42390b8330b01c58aef7242bfed957d94f"
+EXPECTED_ADDENDUM_SHA256 = "6bfb7019e13039a2b6659083e649c85622407a12caf7f5391a2dcf25bbdc9d8e"
 
 
 def _manifest():
