@@ -569,3 +569,24 @@ as the two victims', run ids `w37-deepseek-<cell>`, evidence store
 `~/evidence/sweep/w37_sweep_deepseek` mirrored to spark8 with hash
 verification. Log `runs/w37_sweep_deepseek.console.log`.
 
+## Family C sweep — §AB as run (2026-09-14)
+
+`runs/w37_sweep_deepseek`, 48 cells, 240 records, 8,890 s, every cell
+mirror-verified; run ids `w37-deepseek-<cell>`. **§AB is refuted**:
+condition 1 fires on l3, l3-l4, l4 and none, condition 3's R4 clause on
+l2. Family C breaches 27/240 against the comparators' 111/240 and
+100/287, through the same routes and tools with R1–R3 silent on the
+breaching action, and its all-on rate equals Qwen's 0.03 — the
+mechanism reproduces where it occurs, the rate does not, because the
+victim seldom widens. F29 carries the table and the reading.
+
+| config | family C | Wilson 95% | Qwen | Ministral | condition 1 |
+|---|---|---|---|---|---|
+| all | 1/30 = 0.03 | [0.01, 0.17] | 0.03 | 0.20 | within |
+| l2 | 3/30 = 0.10 | [0.03, 0.26] | 0.40 | 0.40 | within |
+| l3 | 6/30 = 0.20 | [0.10, 0.37] | 0.67 | 0.46 | **fires** |
+| l3-l4 | 3/30 = 0.10 | [0.03, 0.26] | 0.67 | 0.27 | **fires** |
+| l4 | 2/30 = 0.07 | [0.02, 0.21] | 0.67 | 0.37 | **fires** |
+| none | 5/30 = 0.17 | [0.07, 0.34] | 0.67 | 0.41 | **fires** |
+| vendor-shaped | 2/30 = 0.07 | [0.02, 0.21] | 0.00 | 0.20 | within |
+
