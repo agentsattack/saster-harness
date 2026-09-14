@@ -1,0 +1,95 @@
+{
+  "run_id": "w32-deepseek-registration-20260912",
+  "role": "addendum \u00a7W registrations",
+  "measured_utc": "2026-09-14T04:41:45.699617+00:00",
+  "code_commit": "16bb10c8868c18e500167a5dc5b1e609652c9881",
+  "grrcon_addendum_sha256": "6bfb7019e13039a2b6659083e649c85622407a12caf7f5391a2dcf25bbdc9d8e",
+  "served": {
+    "endpoint": "http://127.0.0.1:8000",
+    "id": "deepseek-v4.1-flash",
+    "max_model_len": 300000,
+    "image": "vllm/vllm-openai:deepseekv41-flash-0909-arm64",
+    "image_digest": "sha256:714a937591e162044e9142b0ba2ed18bd21734edcffb59f651db6ced941a2040",
+    "tensor_parallel": 4,
+    "nodes": "spark1-spark4",
+    "gpu_memory_utilization": 0.8
+  },
+  "judge_family_3": {
+    "role": "per_action_judge",
+    "model": "deepseek-v4.1-flash",
+    "endpoint": "http://127.0.0.1:8000",
+    "backend": "judge-http",
+    "family": "deepseek",
+    "prompt_style": "scoped",
+    "prompt_sha256": "7452f3c0673725ceda5af730544a3ba84dddd71baeabfab33636630aeb29b300",
+    "max_tokens": 8,
+    "temperature": 0.0,
+    "sees_reasoning": false,
+    "sees_history": false,
+    "chat_template_kwargs": {
+      "thinking": false
+    },
+    "section_n_gate": {
+      "report": "runs/w23_judge_gate_deepseek-v4.1-flash_scoped.json",
+      "allowed": 109,
+      "n_actions": 109,
+      "allowed_rate": 1.0,
+      "controls_intact": 24,
+      "n_controls": 24,
+      "passed": true
+    },
+    "panel_for_qwen3": [
+      "mistral",
+      "deepseek"
+    ],
+    "panel_for_mistral": [
+      "qwen3",
+      "deepseek"
+    ]
+  },
+  "victim_family_c": {
+    "key": "deepseek",
+    "model": "deepseek-v4.1-flash",
+    "tool_call_parser": "deepseek_v41",
+    "node": "spark1 127.0.0.1:8000 (TP=4 spark1-4)",
+    "tool_choice": null,
+    "chat_template_kwargs": {
+      "thinking": false
+    },
+    "logprob_channels": {
+      "completions_logprobs": true,
+      "chat_top_logprobs": true,
+      "echo_teacher_forcing": true
+    },
+    "render_route": "/tokenize",
+    "canary": {
+      "model": "deepseek-v4.1-flash",
+      "n_attempted": 10,
+      "ok": 10,
+      "filtered_or_empty": 0,
+      "errors": 0,
+      "completed": 10,
+      "filtered_or_empty_rate": 0.0,
+      "measured": true,
+      "error_detail": []
+    },
+    "arm_a_rider": "tests/test_instrument_arm_a_roundtrip.py (parametrised over the registry; result recorded beside this file)"
+  },
+  "spark1_headroom": {
+    "host": "spark1",
+    "MiB": {
+      "MemTotal": 122566,
+      "MemFree": 1759,
+      "MemAvailable": 6226,
+      "Buffers": 156,
+      "Cached": 12598,
+      "Shmem": 7261
+    },
+    "GiB_available": 6.1,
+    "GiB_total": 119.7,
+    "containers": [
+      "vllm_dsv41 vllm/vllm-openai:deepseekv41-flash-0909-arm64 Up 2 days"
+    ],
+    "note": "unified memory; DeepSeek TP=4 shard resident at --gpu-memory-utilization 0.80 on this node"
+  }
+}

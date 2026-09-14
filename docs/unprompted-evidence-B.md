@@ -545,3 +545,27 @@ alters its verdicts, while the two truth-side mutants above left every
 verdict and every interval untouched. The contrast is the point of the
 section, and it is unambiguous on this sample.
 
+---
+
+## Family C sweep — preflight (2026-09-13, addendum §AB)
+
+`runs/w37_familyc_preflight/`. Before any cell counts: the three logprob
+channels answer (completions `logprobs`, chat `top_logprobs`, echo over
+template-rendered ids via `/tokenize`); canary 10/10 through the router;
+spark1 headroom 6.1 GiB available with the shard resident. The
+chat-template round trip **fails as recorded** (strict xfail, the image's
+`/tokenize` rejecting a null-content assistant message), so family C
+**cannot enter the envelope sub-arm** — `declared_in`, `declared_out`,
+`prohibition_out`, the chat-scorer `surprisal`, and any prediction on
+them; every sweep cell runs `W9_ENVELOPE=not_computed`, as the two
+victims' sweeps did. It enters breach rate, route, latency, the four
+heads, the L1–L5 and vendor-shaped verdicts, and P13. §N: the judge for
+a family-C victim is Qwen with the scoped prompt, 109/109 and 24/24 on
+2026-09-06; the model-independent blocking layers passed §N on the same
+controls (F21). Sweep launched detached through `scripts/run_sweep_w24.py`:
+48 cells (seven configs × obstructed/unobstructed × compromised on grant
+and firewall, induced on agent; plus the p12 ladder), k = 5, seed bases
+as the two victims', run ids `w37-deepseek-<cell>`, evidence store
+`~/evidence/sweep/w37_sweep_deepseek` mirrored to spark8 with hash
+verification. Log `runs/w37_sweep_deepseek.console.log`.
+
