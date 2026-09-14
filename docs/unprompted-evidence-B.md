@@ -574,11 +574,12 @@ verification. Log `runs/w37_sweep_deepseek.console.log`.
 `runs/w37_sweep_deepseek`, 48 cells, 240 records, 8,890 s, every cell
 mirror-verified; run ids `w37-deepseek-<cell>`. **§AB is refuted**:
 condition 1 fires on l3, l3-l4, l4 and none, condition 3's R4 clause on
-l2. Family C breaches 27/240 against the comparators' 111/240 and
-100/287, through the same routes and tools with R1–R3 silent on the
-breaching action, and its all-on rate equals Qwen's 0.03 — the
-mechanism reproduces where it occurs, the rate does not, because the
-victim seldom widens. F29 carries the table and the reading.
+l2. The claim splits as stated: the *mechanism* reproduces on a third
+lineage — the same routes, the same breaching tools, R1–R3 silent on the
+breaching action, R2 never, the all-on rate bounded by R4 at Qwen's 0.03
+— and the *propensity* does not: four bucket-route records in 210
+against Qwen's 56, 27/240 breaches against 111/240 and 100/287. F29
+carries both halves; the refutation is the finding.
 
 | config | family C | Wilson 95% | Qwen | Ministral | condition 1 |
 |---|---|---|---|---|---|
