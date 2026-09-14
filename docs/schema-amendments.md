@@ -1801,3 +1801,30 @@ family's own backend); an unreachable family's cases are skipped with
 head endpoint follows `W9_HEADS_10_HOST`. Both counts — default tier and
 cluster tier — are cited from now on.
 
+## D24 — the reference-scorer handoff described `finding` as present on every detection entry (2026-09-14)
+
+**Found by:** running the blind-authored `reference_scorer.py` (Protocol B)
+over the citable corpus per configuration. It scored 3 of 22 groups and
+refused 19 with `missing field 'finding'`. 364 detection entries lack the
+field: 357 primary L4 entries and 7 recorded-head entries with status
+`unavailable`, and 2 judge entries with status `unavailable`.
+**False assumption:** that the handoff's prose was the schema. The schema
+(`carl_ops_trajectory/schema.py::_validate_finding`, AMENDMENT 7) makes
+`finding` OPTIONAL — absent means the derived rule (`warn`/`block` are
+findings, `escalate` is routing) — and `LayerOutcome.as_detection_entry`
+omits it on every unavailable layer. The handoff wrote "each has `layer`,
+`step_index`, `finding`, …" and defined a counted entry as `finding` true
+and `status` `"ok"`; it never said the field could be absent or what its
+absence means. The blind scorer, told to refuse rather than default,
+refused.
+**Direction relative to "defense held":** neutral. No number moves: an
+unavailable entry is never counted under either reading, and on the three
+groups the scorer did score every one of the eleven numbers agrees to the
+decimal with the harness (`runs/w38_reference_scorer/`). What is withheld
+is the second opinion on the other nineteen.
+**Fix:** none to the scorer — it is the blind artifact and it behaved as
+instructed. The remedy is an amended handoff that names the optionality,
+the derived rule and the unavailable-entry shape, and a revised scorer
+from the blind session under the same exclusion discipline. Until then,
+agreement is claimed on three groups and not claimed on nineteen.
+
