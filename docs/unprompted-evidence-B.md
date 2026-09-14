@@ -659,3 +659,47 @@ its own `mutant/novel-N` branch against the current rejection suite —
 both tiers reported — with the killing test id per kill and, per
 survivor, the class and the test that would catch it.
 
+### (1b) Revised reference scorer from the corrected handoff (2026-09-14)
+
+Handoff amended (third pass, `docs/handoff-reference-scorer.md`): `finding`
+optional and absent on unavailable entries; an unavailable entry never
+counted under any reading; an `"ok"` entry without `finding` out of
+contract. Exported with the keys-only field list to `~/blind/` and to a
+clean directory; a fresh blind session authored
+`scripts/reference_scorer_v2.py` (sha256
+`ad6224e4701fe093f436506251ae1e802416ce31ab8fed13e393e8ce71bd4833`, 166
+lines, stdlib only). The first scorer stays in `scripts/` unedited; D24
+stays logged.
+
+Comparison redone **per store and configuration** — the handoff's
+"run directory name" grouping — because the w24b and w24c stores reuse
+campaign ids, and pooling them across stores merges trials into
+ten-trial campaigns that neither scorer nor the sweep report ever
+counted that way (`runs/w38_reference_scorer/comparison_per_store.json`;
+the earlier pooled comparison stands as the record of that ambiguity).
+Thirty-three groups after three empty ones (w24b_sweep_qwen3/p12-rules1, w24b_sweep_qwen3/p12-rules2, w24b_sweep_qwen3/p12-rules3).
+
+| scorer | groups | agree on all three numbers | differ | refused |
+|---|---|---|---|---|
+| first (v1) | 33 | 7 | 0 | 26 (`finding` absent on unavailable entries, D24) |
+| revised (v2) | 33 | 33 | 0 on the three numbers; 7 on the reported `k` | 0 |
+
+The revised scorer's three numbers — breach within k (campaigns,
+campaigns with breach, rate), containment latency (breaches, censored,
+uncensored, median) and records/distinct (records, distinct, ratio) —
+agree with the harness to the decimal on every one of the 33 groups. The
+seven `k` differences are all Ministral groups whose campaigns carry
+unequal trial counts (l3-l4, l3, l4, none, vendor-shaped, p12-rules1, p12-rules3 in w24b): the
+harness reports the sorted list of campaign sizes, the revised scorer
+reports the largest with `k_uniform: false`. Both say k is not uniform
+there; the handoff said "report k" and left the non-uniform case to the
+author, who noted the decision in a comment. Not a disagreement about a
+number; a disagreement about a format the handoff did not fix.
+
+One reading the revised scorer took that the first did not: when
+`markers.first_detection_step` is null it falls back to the earliest
+counted detection entry. On this corpus the fallback never changed a
+count — censored and uncensored agree everywhere — which is itself
+evidence that the markers and the counted entries say the same thing
+(the scorer's own cross-check reports zero mismatches).
+
