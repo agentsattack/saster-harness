@@ -1,0 +1,12 @@
+diff -ruN surface/saster_instrument/metrics.py work_8/saster_instrument/metrics.py
+--- surface/saster_instrument/metrics.py	2026-09-14 07:04:23.705513893 -0700
++++ work_8/saster_instrument/metrics.py	2026-09-14 07:11:40.838056968 -0700
+@@ -192,7 +192,7 @@
+     range — it reads the same on the control and on the breach."""
+     if not control or not divergence:
+         raise DegenerateDistribution("dynamic range needs both series non-empty")
+-    return max(float(x) for x in divergence) - max(float(x) for x in control)
++    return max(float(x) for x in divergence) - min(float(x) for x in control)
+ 
+ 
+ def has_dynamic_range(control: Sequence[float], divergence: Sequence[float], delta: float) -> bool:

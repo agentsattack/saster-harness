@@ -703,3 +703,56 @@ count — censored and uncensored agree everywhere — which is itself
 evidence that the markers and the counted entries say the same thing
 (the scorer's own cross-check reports zero mismatches).
 
+### (2b) Novel mutants, blind session on the rewritten handoff (2026-09-14)
+
+The first blind session had produced nothing. Two causes in the brief:
+the exclusion list enumerated 1,243 test ids, and the deliverable asked
+for branches off a repository branch the author could not have. The
+handoff was rewritten — the exclusion as class and component names in
+45 lines, the deliverable as `patch -p1` files against an exported copy
+of the surface (47 files) — and a fresh blind session returned eight
+one-line patches, none touching a test, with a README and hashes
+(`runs/w39_novel_mutants/`). Each patch is on its own branch
+`mutant/novel-N` off b68be3d, committed there; the suite is unedited.
+
+Scoring: the current rejection suite, default tier, on each branch in a
+worktree with the OPA tools linked, against an unpatched worktree
+baseline at the same commit (1551 passed, no failures; a first pass
+without the tools link showed three OPA-unavailable failures on every
+branch and is superseded). A kill is any test failing beyond the
+baseline. The cluster tier ran too: 6 passed, 7 xfailed on every branch,
+no kills there.
+
+| mutant | component and number | result | killing test |
+|---|---|---|---|
+| novel-1 | `saster_instrument/metrics.py` — `PREREGISTERED_RULES` gains R4; `cvr_preregistered_r1_r3` absorbs a post-hoc rule | **survived** | — |
+| novel-2 | `carl_ops_envelope/scorer.py` — `_cidr_in_scope` tests overlap instead of containment; `declared_in`/`declared_out` | killed | `tests/test_vendor_shaped.py::test_representative_judge_is_labelled_and_checks_scope_only` |
+| novel-3 | `saster_defense/l3_trace.py` — `TraceMonitor.check` queries the trace without the pending call; L3 breach rate, `first_detection_step` | killed | `tests/test_coverage_query.py::test_l3_denies_the_copy_into_the_widened_bucket_after_the_grant` (+7) |
+| novel-4 | `carl_ops_assembly/assembler.py` — `derive_terminal_outcome` reads `repeats` for `stalls`; held-vs-stalled budget outcomes | killed | `tests/test_prepilot_adjustments.py::test_closed_unresolved_is_its_own_class_and_budget_is_the_step_limit` (+1) |
+| novel-5 | `saster_defense/coverage.py` — precondition-rejected candidates counted as declared prohibitions; `total_declared`, `gap_fraction` | killed | `tests/test_coverage_query.py::test_declared_side_agrees_with_introduces_violation` (+1) |
+| novel-6 | `saster_defense/l2_policy.py` — an unparseable `reaches` denied instead of passed; CVR on the firewall route | killed | `tests/test_defense_stack.py::test_l2_opa_and_python_mirror_agree_on_the_test_set` (+5) |
+| novel-7 | `scripts/run_sweep_w24.py` — seeds keyed on the cell ordinal, not the stratum; every between-config difference | killed | `tests/test_sweep_w24.py::test_plan_shape_and_pairing` |
+| novel-8 | `saster_instrument/metrics.py` — `dynamic_range` from the control's floor; `has_dynamic_range` | killed | `tests/test_instrument_class2_degenerate_metric.py::test_dynamic_range_check` |
+
+**Headline: 7 of 8 novel mutants killed.**
+
+**Survivor, novel-1.** Class: *scope* — a reported number whose name
+promises a set (the pre-registered R1–R3) that its computation no longer
+honours; the same family as C9/C10 (a label or scope nothing checks),
+and it leans toward "defense held" (R4's denials inflate the number
+that claims to be the pre-registered constraint-violation rate). Why it
+survived: nothing pins `PREREGISTERED_RULES` to the matrix's rule list,
+and no test feeds `cvr_by_rule` an action denied by R4 and asserts it
+lands outside `cvr_preregistered_r1_r3`. The test that would catch it
+(not written here — the suite is not edited during scoring): a rejection
+test asserting `PREREGISTERED_RULES == ("R1_egress", "R2_role",
+"R3_grant")` against the pinned matrix text, and a unit test on
+`cvr_by_rule` with one R4_bucket_owner denial among evaluated actions
+asserting `cvr_preregistered_r1_r3 == 0` while the post-hoc partition
+carries it.
+
+Worktree note: the worktree baseline collects three fewer tests than the
+main tree (1551 against 1554 passed) because three tests read untracked
+files present only in the working checkout; they are absent on every
+branch alike and do not affect a kill.
+

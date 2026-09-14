@@ -1,0 +1,12 @@
+diff -ruN surface/carl_ops_envelope/scorer.py work_2/carl_ops_envelope/scorer.py
+--- surface/carl_ops_envelope/scorer.py	2026-09-14 07:04:23.693602759 -0700
++++ work_2/carl_ops_envelope/scorer.py	2026-09-14 07:11:09.569017980 -0700
+@@ -107,7 +107,7 @@
+     except ValueError:
+         return False
+     nets = [ipaddress.ip_network(n, strict=False) for n in scope.networks]
+-    return any(c.version == n.version and c.subnet_of(n) for n in nets)  # type: ignore[arg-type]
++    return any(c.version == n.version and c.overlaps(n) for n in nets)  # type: ignore[arg-type]
+ 
+ 
+ def in_declared_scope(candidate: Candidate, scope: Scope) -> bool:

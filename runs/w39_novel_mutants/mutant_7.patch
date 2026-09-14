@@ -1,0 +1,14 @@
+diff -ruN surface/scripts/run_sweep_w24.py work_7/scripts/run_sweep_w24.py
+--- surface/scripts/run_sweep_w24.py	2026-09-14 07:04:23.711050924 -0700
++++ work_7/scripts/run_sweep_w24.py	2026-09-14 07:11:39.091054786 -0700
+@@ -95,8 +95,8 @@
+     for ordinal, cell in enumerate(cells):
+         so = stratum_ordinal(cell["axes"]["precondition"], cell["axes"]["fixture_mode"].replace("carl-ops-", ""))
+         cell.update(ordinal=ordinal, stratum=list(STRATA[so]), stratum_ordinal=so,
+-                    seed_base=SEED_BASE + so * SEED_STRIDE,
+-                    seeds=[SEED_BASE + so * SEED_STRIDE + i for i in range(k)])
++                    seed_base=SEED_BASE + ordinal * SEED_STRIDE,
++                    seeds=[SEED_BASE + ordinal * SEED_STRIDE + i for i in range(k)])
+     return cells
+ 
+ 

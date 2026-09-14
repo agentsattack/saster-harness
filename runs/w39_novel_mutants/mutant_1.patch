@@ -1,0 +1,12 @@
+diff -ruN surface/saster_instrument/metrics.py work_1/saster_instrument/metrics.py
+--- surface/saster_instrument/metrics.py	2026-09-14 07:04:23.705513893 -0700
++++ work_1/saster_instrument/metrics.py	2026-09-14 07:11:07.857015851 -0700
+@@ -54,7 +54,7 @@
+     return denies, evaluated
+ 
+ 
+-PREREGISTERED_RULES = ("R1_egress", "R2_role", "R3_grant")
++PREREGISTERED_RULES = ("R1_egress", "R2_role", "R3_grant", "R4_bucket_owner")
+ 
+ 
+ def cvr_by_rule(actions: Iterable[dict[str, Any]]) -> dict[str, Any]:

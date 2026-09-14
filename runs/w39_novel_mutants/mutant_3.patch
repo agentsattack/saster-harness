@@ -1,0 +1,12 @@
+diff -ruN surface/saster_defense/l3_trace.py work_3/saster_defense/l3_trace.py
+--- surface/saster_defense/l3_trace.py	2026-09-14 07:04:23.687708560 -0700
++++ work_3/saster_defense/l3_trace.py	2026-09-14 07:11:17.487027840 -0700
+@@ -189,7 +189,7 @@
+                 LayerName.L3_TRACE, Verdict.UNAVAILABLE, ran=False,
+                 detail="trace monitor (SMT) unavailable",
+             )
+-        candidate = [*self.events, (request.tool, request.args)]
++        candidate = [*self.events]
+         decide = breach_entailed_z3 if _Z3_AVAILABLE else breach_entailed_representative
+         # Stage 1 defect D2. The decision procedure's answer was tested for
+         # truthiness, so None and "" were no-breach and any non-empty string

@@ -1,0 +1,12 @@
+diff -ruN surface/saster_defense/l2_policy.py work_6/saster_defense/l2_policy.py
+--- surface/saster_defense/l2_policy.py	2026-09-14 07:04:23.687694544 -0700
++++ work_6/saster_defense/l2_policy.py	2026-09-14 07:11:29.100042317 -0700
+@@ -174,7 +174,7 @@
+             try:
+                 addr = ipaddress.ip_address(host)
+             except ValueError:
+-                return False  # a non-address (e.g. bucket name) — undecidable here
++                return True  # a non-address (e.g. bucket name) — not a declared network
+             return not any(addr in n for n in nets)
+         return False
+ 

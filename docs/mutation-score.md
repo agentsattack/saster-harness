@@ -60,3 +60,24 @@ D table: tests-baseline 0/9, current suite 9/9.
 - Per-mutant results with killing test ids and wall times: `runs/unprompted/mutation_score_C.json`, `runs/unprompted/mutation_score_D.json`.
 
 Novel mutants: `docs/handoff-novel-mutants.md` — authored blind in a separate session; scored here as a third table when they arrive.
+
+## Third table — novel mutants from the blind session (2026-09-14)
+
+Eight blind-authored one-line patches (`runs/w39_novel_mutants/`), each on
+`mutant/novel-N` off b68be3d, scored against the current rejection suite
+(default tier; worktree baseline 1551 passed, no failures).
+
+| mutant | component and number | result | killing test |
+|---|---|---|---|
+| novel-1 | `saster_instrument/metrics.py` — `PREREGISTERED_RULES` gains R4; `cvr_preregistered_r1_r3` absorbs a post-hoc rule | **survived** | — |
+| novel-2 | `carl_ops_envelope/scorer.py` — `_cidr_in_scope` tests overlap instead of containment; `declared_in`/`declared_out` | killed | `tests/test_vendor_shaped.py::test_representative_judge_is_labelled_and_checks_scope_only` |
+| novel-3 | `saster_defense/l3_trace.py` — `TraceMonitor.check` queries the trace without the pending call; L3 breach rate, `first_detection_step` | killed | `tests/test_coverage_query.py::test_l3_denies_the_copy_into_the_widened_bucket_after_the_grant` (+7) |
+| novel-4 | `carl_ops_assembly/assembler.py` — `derive_terminal_outcome` reads `repeats` for `stalls`; held-vs-stalled budget outcomes | killed | `tests/test_prepilot_adjustments.py::test_closed_unresolved_is_its_own_class_and_budget_is_the_step_limit` (+1) |
+| novel-5 | `saster_defense/coverage.py` — precondition-rejected candidates counted as declared prohibitions; `total_declared`, `gap_fraction` | killed | `tests/test_coverage_query.py::test_declared_side_agrees_with_introduces_violation` (+1) |
+| novel-6 | `saster_defense/l2_policy.py` — an unparseable `reaches` denied instead of passed; CVR on the firewall route | killed | `tests/test_defense_stack.py::test_l2_opa_and_python_mirror_agree_on_the_test_set` (+5) |
+| novel-7 | `scripts/run_sweep_w24.py` — seeds keyed on the cell ordinal, not the stratum; every between-config difference | killed | `tests/test_sweep_w24.py::test_plan_shape_and_pairing` |
+| novel-8 | `saster_instrument/metrics.py` — `dynamic_range` from the control's floor; `has_dynamic_range` | killed | `tests/test_instrument_class2_degenerate_metric.py::test_dynamic_range_check` |
+
+**7 of 8 killed.** The survivor is a scope mutant on the pre-registered
+rule set; the catching test is named in `docs/unprompted-evidence-B.md`.
+

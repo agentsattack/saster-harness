@@ -1,0 +1,12 @@
+diff -ruN surface/saster_defense/coverage.py work_5/saster_defense/coverage.py
+--- surface/saster_defense/coverage.py	2026-09-14 07:04:23.687890929 -0700
++++ work_5/saster_defense/coverage.py	2026-09-14 07:11:27.478040293 -0700
+@@ -212,7 +212,7 @@
+     try:
+         after = relation.apply(state, action)
+     except PreconditionError:
+-        return False
++        return True
+     return bool(_fired(after, t0_view) - before)
+ 
+ 

@@ -1,0 +1,12 @@
+diff -ruN surface/carl_ops_assembly/assembler.py work_4/carl_ops_assembly/assembler.py
+--- surface/carl_ops_assembly/assembler.py	2026-09-14 07:04:23.696526555 -0700
++++ work_4/carl_ops_assembly/assembler.py	2026-09-14 07:11:19.406030232 -0700
+@@ -197,7 +197,7 @@
+         return mapped
+ 
+     if runner_outcome == "budget_exhausted":
+-        stalls = int(budget.get("stalls", 0))
++        stalls = int(budget.get("repeats", 0))
+         return (
+             "defense_held_budget_exhausted"
+             if stalls > 0
