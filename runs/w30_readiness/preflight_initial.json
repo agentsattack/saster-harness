@@ -1,0 +1,37 @@
+{
+  "spark2": {
+    "returncode": 0,
+    "stdout": "spark2\n               total        used        free      shared  buff/cache   available\nMem:          122506        4105      115182           2        4271      118401\nSwap:          16383         196       16187\nrayworker vllm-node:pinned Up 4 hours\n/rayworker sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"bash\",\"-c\",\"ray start --address=[fd00:200::1]:6379 --node-ip-address=fd00:200::2 && sleep infinity\"]\nNVIDIA GB10\n",
+    "stderr": ""
+  },
+  "spark3": {
+    "returncode": 255,
+    "stdout": "spark3\n               total        used        free      shared  buff/cache   available\nMem:          122502      112549        1037          91       10029        9953\nSwap:          16383          17       16366\nvictimA vllm-node:pinned Up 27 hours\n/victimA sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"vllm\",\"serve\",\"Qwen/Qwen3-8B\",\"--max-model-len\",\"32768\",\"--enable-auto-tool-choice\",\"--tool-call-parser\",\"hermes\",\"--gpu-memory-utilization\",\"0.85\"]\nFailed to initialize NVML: Unknown Error\n",
+    "stderr": ""
+  },
+  "spark4": {
+    "returncode": 0,
+    "stdout": "spark4\n               total        used        free      shared  buff/cache   available\nMem:          122502      109174        1018         268       13804       13327\nSwap:          16383        8799        7584\nllamaguard eugr/spark-vllm:latest Up 2 hours\ngranite eugr/spark-vllm:latest Up 2 hours\nagentdogfg eugr/spark-vllm:latest Up 27 hours\nagentdog10 eugr/spark-vllm:latest Up 27 hours\n/llamaguard sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"vllm\",\"serve\",\"meta-llama/Llama-Guard-3-8B\",\"--max-model-len\",\"8192\",\"--gpu-memory-utilization\",\"0.20\",\"--served-model-name\",\"meta-llama/Llama-Guard-3-8B\"]\nNVIDIA GB10\n/granite sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"vllm\",\"serve\",\"ibm-granite/granite-guardian-3.2-5b\",\"--max-model-len\",\"8192\",\"--gpu-memory-utilization\",\"0.25\",\"--served-model-name\",\"ibm-granite/granite-guardian-3.2-5b\"]\nNVIDIA GB10\n/agentdogfg sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"vllm\",\"serve\",\"AI45Research/AgentDoG-FG-Qwen3-4B\",\"--max-model-len\",\"16384\",\"--gpu-memory-utilization\",\"0.20\"]\nNVIDIA GB10\n/agentdog10 sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"vllm\",\"serve\",\"AI45Research/AgentDoG-Qwen3-4B\",\"--max-model-len\",\"16384\",\"--gpu-memory-utilization\",\"0.20\"]\nNVIDIA GB10\n",
+    "stderr": ""
+  },
+  "spark5": {
+    "returncode": 255,
+    "stdout": "",
+    "stderr": "ssh: connect to host fd00:200::5 port 22: No route to host\n"
+  },
+  "spark6": {
+    "returncode": 0,
+    "stdout": "spark6\n               total        used        free      shared  buff/cache   available\nMem:          124610      123960         817          86         952         650\nSwap:          16383        1494       14889\nvictimB vllm-node:pinned Up 27 hours\n/victimB sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"vllm\",\"serve\",\"mistralai/Ministral-8B-Instruct-2410\",\"--max-model-len\",\"32768\",\"--enable-auto-tool-choice\",\"--tool-call-parser\",\"mistral\",\"--tokenizer-mode\",\"mistral\",\"--config-format\",\"mistral\",\"--load-format\",\"mistral\",\"--gpu-memory-utilization\",\"0.85\"]\nNVIDIA GB10\n",
+    "stderr": ""
+  },
+  "spark7": {
+    "returncode": 255,
+    "stdout": "spark7\n               total        used        free      shared  buff/cache   available\nMem:          122478        4223      117122           5        2133      118254\nSwap:          16383           0       16383\nrayworker vllm-node:pinned Up 27 hours\n/rayworker sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"bash\",\"-c\",\"ray start --address=[fd00:200::1]:6379 --node-ip-address=fd00:200::7 && sleep infinity\"]\nFailed to initialize NVML: Unknown Error\n",
+    "stderr": ""
+  },
+  "spark8": {
+    "returncode": 255,
+    "stdout": "spark8\n               total        used        free      shared  buff/cache   available\nMem:          122479        4302      116879           5        2315      118176\nSwap:          16383           0       16383\nrayworker vllm-node:pinned Up 27 hours\n/rayworker sha256:32f23ba5871de180fd284d227302875d463e0949878478a9968a1d6f4de16112 [\"bash\",\"-c\",\"ray start --address=[fd00:200::1]:6379 --node-ip-address=fd00:200::8 && sleep infinity\"]\nFailed to initialize NVML: Unknown Error\n",
+    "stderr": ""
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "format": "saster.reproducibility.v1",
+  "run_id": "w31_reproducibility_20260907",
+  "created_utc": "2026-09-07T14:06:29.249184+00:00",
+  "base_commit": "55a32aa319a3c99c3cfb64b3ecd42ffdf3b4b392",
+  "source_sha256": {
+    "runs/w31_reproducibility_20260907/driver.py": "e518ea8d60649244df92e9eb4d9dc29ac828a4e09ede52542fa8221c068f6b39",
+    "runs/w31_reproducibility_20260907/PROTOCOL.md": "54946a29100527ac048487daebe8477b65c3b3c120ee0f230cc95605d8ff05eb",
+    "scripts/experiments_w30.py": "50921062f20a005514242d886a3d6ea1aad90bf23aaa0ba6b4893f64691dae5e",
+    "scripts/run_beat1_w29.py": "4a69a58d27b47ad758a47e7e4bd74c268aeb5a7dc52490ab6065acf75291e9c0",
+    "saster_defense/policy_support_w30.rego": "edcb5f1a37463601ab98a859ab3e9533c06793c91fa0998b2ed120320dac1589",
+    "carl/directives.py": "b1c0afb1f22697bbf8eebe7f9541ec1b01603b9eaa5d117dc5e68d361a051fbe",
+    "saster_defense/l1_classifier.py": "905c9094959ef23cafa909402b7f105d7b526f4ad5a1cba959f3e266b6dc4935",
+    "saster_defense/opa_backend.py": "1d4ee07e3d2c5374f1a0e7695b73a22454c27e65fe61722837e8e48233029533"
+  },
+  "cases": 64,
+  "cases_sha256": "17ed930ffb435f975ff68b420f4da7668fbb020a654045f7662e689f0067c69f",
+  "models": {
+    "qwen3": [
+      "Qwen/Qwen3-8B",
+      "http://192.168.1.228:8000"
+    ],
+    "ministral": [
+      "mistralai/Ministral-8B-Instruct-2410",
+      "http://192.168.1.208:8000"
+    ]
+  },
+  "guard": {
+    "model": "ibm-granite/granite-guardian-3.2-5b",
+    "endpoint": "http://[fd00:200::4]:8003",
+    "risk": "harm"
+  },
+  "parameters": {
+    "victim_temperature": 0.7,
+    "guard_temperature": 0,
+    "max_tokens": 256,
+    "max_calls_per_turn": 2,
+    "sequential_workers": 1,
+    "concurrent_workers": 4
+  },
+  "primary_endpoint": "within-pair breach outcome agreement",
+  "secondary_endpoints": [
+    "within-pair canonical action-sequence agreement",
+    "within-pair canonical victim-output agreement",
+    "safe control completion",
+    "paired schedule agreement difference"
+  ],
+  "core_corpus_member": false,
+  "citable_candidate": false,
+  "admission": "requires completed run, strict schema validation, analysis, and review"
+}

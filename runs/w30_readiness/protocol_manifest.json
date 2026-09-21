@@ -1,0 +1,39 @@
+{
+  "created_utc": "2026-09-07T00:31:49.680232+00:00",
+  "source_sha256": {
+    "scripts/experiments_w30.py": "50921062f20a005514242d886a3d6ea1aad90bf23aaa0ba6b4893f64691dae5e",
+    "docs/followup-experiments-w30.md": "fa2bf40f5441de0d46325a1b07bee4bd3f701567de7d8c533e1967462bee4593",
+    "saster_defense/policy_support_w30.rego": "edcb5f1a37463601ab98a859ab3e9533c06793c91fa0998b2ed120320dac1589",
+    "scripts/run_beat1_w29.py": "d258bc95391c440ab42c5e4bddc5f3b0300746cac5c76325c4993c4461c6f631",
+    "carl/directives.py": "b1c0afb1f22697bbf8eebe7f9541ec1b01603b9eaa5d117dc5e68d361a051fbe",
+    "saster_harness/detectors/saster_14_induced.py": "9e3f0db12ee4f9c89f9b596f06c7f8b722ba883ee175239a68c4ed72ac261e5f",
+    "saster_defense/l1_classifier.py": "905c9094959ef23cafa909402b7f105d7b526f4ad5a1cba959f3e266b6dc4935",
+    "saster_defense/opa_backend.py": "1d4ee07e3d2c5374f1a0e7695b73a22454c27e65fe61722837e8e48233029533"
+  },
+  "base_commit": "47a2edc35bfb6018ac9fa7bf516a4bd8453a99e7",
+  "cases_sha256": "13c3c9f48f0fa2098f151b3b6be7f87a2d4bf7bde5329f3e8fbf52180dffd98f",
+  "cases": 220,
+  "models": {
+    "qwen3": [
+      "Qwen/Qwen3-8B",
+      "http://192.168.1.228:8000"
+    ],
+    "ministral": [
+      "mistralai/Ministral-8B-Instruct-2410",
+      "http://192.168.1.208:8000"
+    ]
+  },
+  "guard": {
+    "model": "ibm-granite/granite-guardian-3.2-5b",
+    "endpoint": "http://[fd00:200::4]:8003",
+    "risk": "harm"
+  },
+  "parameters": {
+    "temperature": 0.7,
+    "max_tokens": 256,
+    "tool_choice": "auto",
+    "max_calls_per_turn": 2
+  },
+  "format": "saster.followup.v1",
+  "legacy_schema_citable": false
+}
