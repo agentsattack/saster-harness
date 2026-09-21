@@ -1,8 +1,8 @@
 # GrrCON talk — state of the work, 2026-09-20 (reconstitution log)
 
-Read this first in a new session. Everything below is on disk; nothing in the harness repo is committed from this work.
+Read this first in a new session. Everything below is committed on `feat/defense-stack` (21 Sep, five commits, no Claude trailer) and pushed to the public harness repo; `main` was not merged.
 
-## Deliverables (repo root, all uncommitted)
+## Deliverables (repo root; committed 21 Sep)
 
 | file | what | state |
 |---|---|---|
@@ -48,6 +48,6 @@ Never edit oracle code, invariant definitions, hash-pinned docs or pre-registere
 ## Open items
 
 - Public corpus PUSHED 21 Sep: `agentsattack/saster-evidence` main = `843aa83d`, author Larry Suto, no trailer; deploy key `~/.ssh/saster-evidence` (write) via repo-local `core.sshCommand`.
-- Nothing in the harness repo is committed: decide what to commit (docs, scripts, W38 runs, deck).
+- Committed and pushed 21 Sep on `feat/defense-stack`; left out: superseded v3 decks, `currentpres/`, the zip bundles, `scripts/deck/*.pdf|html` duplicates. `main` still at `04e7836` (no oracle, no runs): fast-forward is the operator's call. The `docs/public-repo-checklist.md` scrub (LAN addresses, home paths, host-key notes) was never applied to the harness tree; the pushed branch already carried them.
 - Optional: bridge line on the D19 slide notes to the Artifactory cache episode in the OpenAI report (keys left in an anonymously readable cache re-enabled admin access after the wipe).
 - Cluster: victim router on spark1:8080 (Qwen on spark10, Ministral on 192.168.1.208, DeepSeek local); Granite Guardian on spark7:8003, Llama Guard :8004, AgentDoG 1.0 heads spark7:8001/8002, 1.5 heads spark5:8001/8002.
