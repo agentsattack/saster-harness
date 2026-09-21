@@ -1,6 +1,6 @@
 # GrrCON talk — state of the work, 2026-09-20 (reconstitution log)
 
-Read this first in a new session. Everything below is committed on `feat/defense-stack` (21 Sep, five commits, no Claude trailer) and pushed to the public harness repo; `main` was not merged.
+Read this first in a new session. Everything below is committed and pushed to the public harness repo (21 Sep, no Claude trailer); `main` was fast-forwarded to `feat/defense-stack` and both are at `5599a99` or later. The scrubbed-tree plan for after the talk is `docs/harness-public-tree-plan.md`.
 
 ## Deliverables (repo root; committed 21 Sep)
 
@@ -48,6 +48,6 @@ Never edit oracle code, invariant definitions, hash-pinned docs or pre-registere
 ## Open items
 
 - Public corpus PUSHED 21 Sep: `agentsattack/saster-evidence` main = `843aa83d`, author Larry Suto, no trailer; deploy key `~/.ssh/saster-evidence` (write) via repo-local `core.sshCommand`.
-- Committed and pushed 21 Sep on `feat/defense-stack`; left out: superseded v3 decks, `currentpres/`, the zip bundles, `scripts/deck/*.pdf|html` duplicates. `main` still at `04e7836` (no oracle, no runs): fast-forward is the operator's call. The `docs/public-repo-checklist.md` scrub (LAN addresses, home paths, host-key notes) was never applied to the harness tree; the pushed branch already carried them.
+- Committed and pushed 21 Sep on `feat/defense-stack`; left out: superseded v3 decks, `currentpres/`, the zip bundles, `scripts/deck/*.pdf|html` duplicates. `main` fast-forwarded and pushed by the operator on 21 Sep. The `docs/public-repo-checklist.md` scrub (LAN addresses, home paths, host-key notes) was never applied to the harness tree; the pushed branch already carried them.
 - Optional: bridge line on the D19 slide notes to the Artifactory cache episode in the OpenAI report (keys left in an anonymously readable cache re-enabled admin access after the wipe).
 - Cluster: victim router on spark1:8080 (Qwen on spark10, Ministral on 192.168.1.208, DeepSeek local); Granite Guardian on spark7:8003, Llama Guard :8004, AgentDoG 1.0 heads spark7:8001/8002, 1.5 heads spark5:8001/8002.
